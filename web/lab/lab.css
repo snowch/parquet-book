@@ -149,6 +149,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
   .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
+  .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
+  .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -224,6 +226,31 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .pages-list tr.err td { color: var(--stop); }
 .pages-list button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
 
+/* Ch07: compression. */
+.comp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+             grid-template-areas: "chunks chunks" "pages pages" "tokens output"; border-bottom: 1px solid var(--edge); }
+.comp-grid .p-chunks { grid-area: chunks; border-bottom: 1px solid var(--edge); }
+.comp-grid .p-comp-pages { grid-area: pages; border-bottom: 1px solid var(--edge); }
+.comp-grid .p-tokens { grid-area: tokens; border-right: 1px solid var(--edge); }
+.comp-grid .p-output { grid-area: output; }
+.comp-grid .pages-list .bar { display: inline-block; width: 8rem; height: .7rem; vertical-align: middle;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 2px; }
+.comp-grid .pages-list .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
+.comp-grid .pages-list tr.chosen td { background: var(--wash); }
+.comp-grid button.span, .comp-grid .pages-list button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.page-picks { display: flex; flex-wrap: wrap; gap: .3rem; }
+.page-picks button { font-size: 12.5px; }
+.comp-tokens li.k-copy button.span { border-color: var(--warn); }
+.comp-tokens li.k-header button.span { color: var(--muted); }
+.out-rows { font: 11px/1.5 var(--mono); max-height: 18rem; overflow: auto; }
+.out-row { display: flex; gap: .5rem; white-space: pre; }
+.out-row .off { color: var(--faint); }
+.out-row i { font-style: normal; padding: 0 1px; }
+.out-row .hx i { margin-right: 2px; }
+.out-row .tx i { padding: 0; }
+.out-row i.out { background: var(--wash); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.out-row i.src { outline: 1px solid var(--warn); outline-offset: -1px; }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -250,6 +277,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
   .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
+  .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
+  .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

@@ -282,3 +282,291 @@ data_page_size=128
 write_batch_size=16
 write_page_checksum=True
 ```
+
+## `codec-none.parquet`
+
+256 orders, PLAIN-encoded with no dictionary and not compressed: the baseline the other codec-* files are measured against.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 15953 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 806 bytes |
+| SHA-256 | `d53c6b99c3c150bd…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `codec-snappy.parquet`
+
+256 orders, PLAIN-encoded with no dictionary, compressed with snappy. The codec-* files hold identical pages before compression, so any difference in their sizes is the codec's.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 6977 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 802 bytes |
+| SHA-256 | `abc55ee0a7e3422f…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `codec-gzip.parquet`
+
+256 orders, PLAIN-encoded with no dictionary, compressed with gzip. The codec-* files hold identical pages before compression, so any difference in their sizes is the codec's.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 5052 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 802 bytes |
+| SHA-256 | `3e1f661b4783d749…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | GZIP |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | GZIP |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | GZIP |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | GZIP |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | GZIP |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | GZIP |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | GZIP |
+
+Writer options:
+
+```python
+compression='gzip'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `codec-lz4.parquet`
+
+256 orders, PLAIN-encoded with no dictionary, compressed with lz4. The codec-* files hold identical pages before compression, so any difference in their sizes is the codec's.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 6641 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 802 bytes |
+| SHA-256 | `1bd91f635d0101e5…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | LZ4 |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | LZ4 |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | LZ4 |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | LZ4 |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | LZ4 |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | LZ4 |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | LZ4 |
+
+Writer options:
+
+```python
+compression='lz4'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `codec-zstd.parquet`
+
+256 orders, PLAIN-encoded with no dictionary, compressed with zstd. The codec-* files hold identical pages before compression, so any difference in their sizes is the codec's.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 5060 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 802 bytes |
+| SHA-256 | `f9d0f560ca99b6bd…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+
+Writer options:
+
+```python
+compression='zstd'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `codec-brotli.parquet`
+
+256 orders, PLAIN-encoded with no dictionary, compressed with brotli. The codec-* files hold identical pages before compression, so any difference in their sizes is the codec's.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 4513 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 801 bytes |
+| SHA-256 | `32545187a00721f9…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | BROTLI |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | BROTLI |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | BROTLI |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | BROTLI |
+| `weight_kg` | DOUBLE | None | 0 | 0 | PLAIN, RLE | BROTLI |
+| `distance_km` | DOUBLE | None | 0 | 0 | PLAIN, RLE | BROTLI |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | BROTLI |
+
+Writer options:
+
+```python
+compression='brotli'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `pages-v2-snappy.parquet`
+
+pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 1854 bytes |
+| Rows | 60 |
+| Row groups | 1 |
+| Footer length | 396 bytes |
+| SHA-256 | `46e6c748a90443af…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=['country']
+write_statistics=True
+store_schema=False
+data_page_version='2.0'
+write_page_index=False
+data_page_size=128
+write_batch_size=16
+write_page_checksum=True
+```
+
+## `codec-zstd-split.parquet`
+
+codec-zstd.parquet with its two float columns written BYTE_STREAM_SPLIT. Comparing the two files measures what splitting a float's bytes is worth to a compressor, for decimal-looking floats and for noisy ones.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 5360 bytes |
+| Rows | 256 |
+| Row groups | 1 |
+| Footer length | 802 bytes |
+| SHA-256 | `b916da53758901c3…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | ZSTD |
+| `weight_kg` | DOUBLE | None | 0 | 0 | BYTE_STREAM_SPLIT, RLE | ZSTD |
+| `distance_km` | DOUBLE | None | 0 | 0 | BYTE_STREAM_SPLIT, RLE | ZSTD |
+| `note` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | ZSTD |
+
+Writer options:
+
+```python
+compression='zstd'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+column_encoding={'weight_kg': 'BYTE_STREAM_SPLIT', 'distance_km': 'BYTE_STREAM_SPLIT'}
+```

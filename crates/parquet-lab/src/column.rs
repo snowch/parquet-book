@@ -24,11 +24,16 @@
 //! A data page version 2 (ch06) keeps the same three parts, but the level streams' lengths move
 //! into the page header, so the levels have no length prefix, and they are never compressed.
 //!
-//! What this reader does not do yet, and says so rather than guessing: decompress pages (ch07).
+//! A compressed page (ch07) is decompressed before any of this. Under version 1 the whole body
+//! is one compressed block; under version 2 only the values are, and only when the header says
+//! so. Spans into a decompressed copy would point at bytes that are not in the file, so every
+//! span found inside one is reported as the compressed bytes that hold it: the reader can say
+//! which compressed block a value came from, not which of its bytes.
 
 use std::fmt;
 
 use crate::bytes::{ByteReader, Span};
+use crate::compress;
 use crate::decode::{self, Dictionary, Step};
 use crate::metadata::ColumnChunk;
 use crate::pages::{walk_pages, Page};
@@ -118,12 +123,6 @@ pub fn read_column(
     chunk: &ColumnChunk,
     leaf: &Leaf,
 ) -> Result<ColumnData, ColumnError> {
-    if chunk.codec != "UNCOMPRESSED" {
-        return err(format!(
-            "this column is compressed with {}; the reader decompresses pages from ch07 on",
-            chunk.codec
-        ));
-    }
     let range = chunk.byte_range();
     let Some(bytes) = file.get(range.start as usize..range.end as usize) else {
         return err(format!(
@@ -136,6 +135,7 @@ pub fn read_column(
         pages: Vec::new(),
         triples: Vec::new(),
     };
+    let codec = chunk.codec.as_str();
     for (index, page) in pages.into_iter().enumerate() {
         let body_start = page.body_span.start as usize - range.start as usize;
         let body = &bytes[body_start..body_start + page.body_span.len() as usize];
@@ -144,21 +144,37 @@ pub fn read_column(
             "DICTIONARY_PAGE" => {
                 // The dictionary: every distinct value, PLAIN-encoded, once.
                 let count = page.num_values.unwrap_or(0).max(0) as usize;
-                let entries = plain::decode(
+                let plain_body = decompress(codec, body, &page, page.uncompressed_page_size)?;
+                let mut entries = plain::decode(
                     leaf.physical_type,
                     leaf.type_length,
-                    body,
+                    &plain_body,
                     page.body_span.start,
                     count,
                 )
                 .map_err(|e| ColumnError(format!("dictionary: {e}")))?;
+                if codec != "UNCOMPRESSED" {
+                    for (_, s) in &mut entries {
+                        *s = page.body_span;
+                    }
+                }
                 out.dictionary = Some(DictionaryPage { page, entries });
                 continue;
             }
             other => return err(format!("unexpected page type {other}")),
         }
         let count = page.num_values.unwrap_or(0).max(0) as usize;
-        let mut r = ByteReader::new(body, page.body_span.start);
+        // Version 1 compresses the whole body as one block. Decompress it, and read the levels
+        // and values from the copy.
+        let whole = page.v2.is_none() && codec != "UNCOMPRESSED";
+        let v1_plain;
+        let (levels_bytes, levels_base) = if whole {
+            v1_plain = decompress(codec, body, &page, page.uncompressed_page_size)?;
+            (&v1_plain[..], page.body_span.start)
+        } else {
+            (body, page.body_span.start)
+        };
+        let mut r = ByteReader::new(levels_bytes, levels_base);
         // Version 2 moves the level lengths into the header and never compresses the levels.
         let (rep_len, def_len) = match page.v2 {
             Some(v2) => (
@@ -167,11 +183,6 @@ pub fn read_column(
             ),
             None => (None, None),
         };
-        if page.v2.is_some_and(|v2| v2.is_compressed) && chunk.codec != "UNCOMPRESSED" {
-            return err(
-                "this page's values are compressed; the reader decompresses pages from ch07 on",
-            );
-        }
         let rep_levels = if leaf.max_repetition_level > 0 {
             Some(level_stream(
                 &mut r,
@@ -205,9 +216,20 @@ pub fn read_column(
             .filter(|&&d| d == leaf.max_definition_level)
             .count();
         let values_start = r.offset();
-        let rest = &body[(values_start - page.body_span.start) as usize..];
+        let rest = &levels_bytes[(values_start - levels_base) as usize..];
+        // Version 2 compresses only the values, and only when the header says so.
+        let values_compressed =
+            codec != "UNCOMPRESSED" && page.v2.is_some_and(|v2| v2.is_compressed);
+        let v2_plain;
+        let rest = if values_compressed {
+            let levels = (values_start - page.body_span.start) as i64;
+            v2_plain = decompress(codec, rest, &page, page.uncompressed_page_size - levels)?;
+            &v2_plain[..]
+        } else {
+            rest
+        };
         let encoding = page.encoding.clone().unwrap_or_default();
-        let decoded = decode::values(
+        let mut decoded = decode::values(
             &encoding,
             leaf.physical_type,
             leaf.type_length,
@@ -217,6 +239,29 @@ pub fn read_column(
             out.dictionary.as_ref().map(|d| &d.entries),
         )
         .map_err(|e| ColumnError(format!("values: {e}")))?;
+        let mut values = Span::new(values_start, decoded.end.max(values_start));
+        let mut rep_levels = rep_levels;
+        let mut def_levels = def_levels;
+        // Spans found in a decompressed copy become the compressed bytes that hold them.
+        if whole || values_compressed {
+            let from = if whole {
+                page.body_span.start
+            } else {
+                values_start
+            };
+            let compressed = Span::new(from, page.body_span.end);
+            blur(&mut decoded, compressed);
+            values = compressed;
+            if whole {
+                for (s, runs) in rep_levels.iter_mut().chain(def_levels.iter_mut()) {
+                    *s = compressed;
+                    for run in runs {
+                        run.header = compressed;
+                        run.body = compressed;
+                    }
+                }
+            }
+        }
         let mut next = decoded.values.into_iter();
         for i in 0..count {
             let (value, value_span, extra_spans) = if defs[i] == leaf.max_definition_level {
@@ -240,12 +285,32 @@ pub fn read_column(
             page,
             rep_levels,
             def_levels,
-            values: Span::new(values_start, decoded.end.max(values_start)),
+            values,
             encoding,
             steps: decoded.steps,
         });
     }
     Ok(out)
+}
+
+/// Decompress a page body, or a version 2 page's values section, into `size` bytes.
+fn decompress(codec: &str, bytes: &[u8], page: &Page, size: i64) -> Result<Vec<u8>, ColumnError> {
+    let size = usize::try_from(size).map_err(|_| ColumnError(format!("page size {size}")))?;
+    compress::decompress(codec, bytes, page.body_span.start, size)
+        .map(|d| d.bytes)
+        .map_err(|e| ColumnError(format!("page at offset {}: {e}", page.header_span.start)))
+}
+
+/// Report every span of a decode as `to`: the compressed bytes the decoded bytes came from.
+fn blur(decoded: &mut decode::Decoded, to: Span) {
+    for v in &mut decoded.values {
+        v.span = to;
+        v.extra.clear();
+    }
+    for step in &mut decoded.steps {
+        step.span = to;
+    }
+    decoded.end = to.end;
 }
 
 /// The index of the first row each page holds, given each page's repetition levels.

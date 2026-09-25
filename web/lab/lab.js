@@ -13,10 +13,11 @@ import { mountSchema } from "./schema.js";
 import { mountLevels } from "./levels.js";
 import { mountEncodings } from "./encodings.js";
 import { mountPages } from "./pages.js";
+import { mountCompression } from "./compression.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
-  encodings: mountEncodings, pages: mountPages,
+  encodings: mountEncodings, pages: mountPages, compression: mountCompression,
 };
 
 class Fixtures {

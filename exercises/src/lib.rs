@@ -15,6 +15,7 @@
 //! your function against it across many cases.
 
 pub mod anatomy_of_a_parquet_file;
+pub mod compression;
 pub mod encodings;
 pub mod nested_data;
 pub mod pages;

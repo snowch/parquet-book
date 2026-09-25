@@ -19,6 +19,7 @@
 //! | [`plain`] | PLAIN values, with the bytes of each | ch04, ch05 |
 //! | [`decode`] | any encoding's values, with the steps and bytes of each | ch05 |
 //! | [`delta`] | DELTA_BINARY_PACKED, the byte-array deltas, BYTE_STREAM_SPLIT | ch05 |
+//! | [`compress`] | SNAPPY, LZ4_RAW and GZIP pages decompressed, token by token | ch07 |
 //! | [`column`] | a column chunk read into (repetition, definition, value) triples | ch04 |
 //! | [`nested`] | what the levels mean, and records rebuilt from them | ch04 |
 //! | [`encoding`] | turning encoded bytes back into values | ch05 |
@@ -29,8 +30,9 @@
 //! ## What it does not do yet
 //!
 //! The book grows this crate chapter by chapter, and `PLAN.md` lists what each chapter adds.
-//! Today it finds and decodes the footer and walks page headers. It does not decode page
-//! values, decompress, evaluate predicates, or decrypt. A file that needs any of those still
+//! Today it finds and decodes the footer, walks pages, decompresses SNAPPY, LZ4_RAW and GZIP
+//! pages, and decodes every encoding writers use. It does not decompress ZSTD or BROTLI, evaluate
+//! predicates, or decrypt. A file that needs any of those still
 //! opens, and the missing step is reported as missing rather than guessed at.
 //!
 //! The crate has no dependencies. It is compiled natively for the tests and the command line,
@@ -38,6 +40,7 @@
 
 pub mod bytes;
 pub mod column;
+pub mod compress;
 pub mod decode;
 pub mod delta;
 pub mod encoding;

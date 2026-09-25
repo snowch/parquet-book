@@ -45,21 +45,29 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Problems 6.1 (walk a chunk) and 6.2 (CRC-32) with tests; 6.3 open.
 - The Rust toolchain is pinned in `rust-toolchain.toml`, after a floating `stable` turned CI red.
 
-## Next: ch07, compression
+## Done: ch07, compression
 
-1. Decide the codec strategy and record it in PLAN.md §4: the reader has no dependencies, so
-   either write teaching decoders (Snappy and LZ4_RAW are small; GZIP's DEFLATE is manageable)
-   or keep ZSTD out of the reader and measure it with pyarrow at fixture time.
-2. Fixtures: the same table under each codec, and one column with BYTE_STREAM_SPLIT then ZSTD.
-3. Experiment: encoded size, compressed size and ratio per codec, and a page decompressed in view.
+- Reader: Snappy, LZ4_RAW and GZIP (inflate) decompressors that record their tokens
+  (`compress.rs`); the column reader decompresses v1 bodies, v2 values sections and dictionary
+  pages. ZSTD and Brotli are refused by name (PLAN.md §4).
+- Fixtures: `codec-{none,snappy,lz4,gzip,zstd,brotli}.parquet`, `codec-zstd-split.parquet`,
+  `pages-v2-snappy.parquet`. Every decodable page matches `codec-none.parquet` byte for byte.
+- Experiment: the compression panel (sizes per chunk, tokens stepped against the rebuilt page).
+- Problems 7.1 (Snappy) and 7.2 (LZ4) with tests; 7.3 open.
+
+## Next: ch08, metadata and statistics
+
+1. Fixture `statistics.parquet`: signed and unsigned integers, strings with non-ASCII bytes,
+   floats with NaN and negative zero, a column without statistics, and deprecated `min`/`max`
+   beside `min_value`/`max_value`.
+2. Reader: sort orders from logical types; which statistics a reader may trust and why.
+3. Experiment: a footer's statistics, per row group, with the comparisons a reader would make.
 
 ## Then
 
-- **ch07**: decompression. Snappy and ZSTD decoders are large; decide whether to write teaching
-  decoders (Snappy is small enough) and gate ZSTD behind a comparison with a production crate,
-  kept out of the zero-dependency reader. Record the decision in PLAN.md §4.
-- **ch08 to ch10**: `statistics.parquet`, `pruning.parquet`; pruning decisions, page indexes, Bloom
-  filters; request coalescing and concurrency in `TracingStore` (a clock per connection).
+- **ch09 to ch10**: `pruning.parquet`; pruning decisions, page indexes, Bloom filters; request
+  coalescing and concurrency in `TracingStore` (a clock per connection).
+- **ch11**: writing well, measured: row group and page sizes, sorting, dictionary fallback.
 - **ch12**: a tiny query engine over the reader.
 
 ## Book infrastructure

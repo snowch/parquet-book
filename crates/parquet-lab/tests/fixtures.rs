@@ -144,10 +144,13 @@ fn every_column_chunk_is_where_pyarrow_says_it_is() {
                     e.get("physical_type").and_then(Json::as_str).unwrap(),
                     "{name} {path}"
                 );
-                assert_eq!(
-                    c.codec,
-                    e.get("compression").and_then(Json::as_str).unwrap()
-                );
+                // pyarrow calls codec 7 "LZ4"; parquet.thrift calls it LZ4_RAW, and uses "LZ4"
+                // for codec 5, the older framing that pyarrow no longer writes.
+                let theirs = match e.get("compression").and_then(Json::as_str).unwrap() {
+                    "LZ4" => "LZ4_RAW",
+                    other => other,
+                };
+                assert_eq!(c.codec, theirs, "{name} {path}");
                 let mut mine = c.encodings.clone();
                 mine.sort();
                 let theirs: Vec<String> = e
@@ -384,9 +387,22 @@ fn records_rebuilt_from_levels_match_pyarrows_rows() {
                 .collect();
             let mut records = Vec::new();
             for rg in &md.row_groups {
-                let data = parquet_lab::column::read_column(&bytes, &rg.columns[leaf.column], leaf)
+                let chunk = &rg.columns[leaf.column];
+                if !parquet_lab::compress::supported(&chunk.codec) {
+                    // ZSTD and BROTLI: the reader must say it cannot, not return anything.
+                    let e = parquet_lab::column::read_column(&bytes, chunk, leaf).unwrap_err();
+                    assert!(e.0.contains("does not decompress"), "{name}: {e}");
+                    continue;
+                }
+                let data = parquet_lab::column::read_column(&bytes, chunk, leaf)
                     .unwrap_or_else(|e| panic!("{name} {}: {e}", leaf.dotted_path()));
                 records.extend(parquet_lab::nested::assemble(&fields, leaf, &data.triples));
+            }
+            if records.is_empty() && !md.row_groups.is_empty() {
+                let codec = &md.row_groups[0].columns[leaf.column].codec;
+                if !parquet_lab::compress::supported(codec) {
+                    continue;
+                }
             }
             assert_eq!(
                 records.len(),
@@ -447,4 +463,49 @@ fn page_checksums_verify_and_catch_damage() {
         }
     }
     assert!(checked > 8, "only {checked} pages carried a checksum");
+}
+
+#[test]
+fn every_codec_decompresses_to_the_same_pages() {
+    // The codec-* fixtures differ only in their codec, so every page, decompressed, must be the
+    // uncompressed file's page byte for byte.
+    let all = fixtures();
+    let body_of = |bytes: &[u8], column: usize| -> Vec<(String, Vec<u8>)> {
+        let md = report::open_bytes(bytes).unwrap();
+        let c = &md.row_groups[0].columns[column];
+        let r = c.byte_range();
+        let pages =
+            parquet_lab::pages::walk_pages(&bytes[r.start as usize..r.end as usize], r.start)
+                .unwrap();
+        pages
+            .iter()
+            .map(|p| {
+                let body = &bytes[p.body_span.start as usize..p.body_span.end as usize];
+                let size = p.uncompressed_page_size as usize;
+                let d = parquet_lab::compress::decompress(&c.codec, body, p.body_span.start, size);
+                (c.codec.clone(), d.map(|d| d.bytes).unwrap_or_default())
+            })
+            .collect()
+    };
+    let none = &all.iter().find(|f| f.0 == "codec-none.parquet").unwrap().1;
+    let mut checked = 0;
+    for codec in ["snappy", "gzip", "lz4"] {
+        let file = format!("codec-{codec}.parquet");
+        let bytes = &all.iter().find(|f| f.0 == file).unwrap().1;
+        for column in 0..7 {
+            let expected = body_of(none, column);
+            let got = body_of(bytes, column);
+            assert_eq!(
+                expected.len(),
+                got.len(),
+                "{file} column {column}: page count"
+            );
+            for ((_, e), (c, g)) in expected.iter().zip(&got) {
+                assert_ne!(c, "UNCOMPRESSED", "{file} should be compressed");
+                assert_eq!(e, g, "{file} column {column}");
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked >= 21, "only {checked} pages compared");
 }

@@ -215,6 +215,33 @@ await page.waitForFunction(() => (document.querySelector('.lab[data-experiment="
 check(true, `damaging byte ${target} makes page 1's checksum fail, and only page 1's`);
 if (shots) await pagesLab.screenshot({ path: path.join(shots, "pages-lab.png") });
 
+// ch07: compression. The tokens and the rebuilt page are the Rust decompressor's.
+await page.goto(base + "compression.html");
+const compLab = page.locator('.lab[data-experiment="compression"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]')?.dataset.state === "ok");
+const snappy = native(["compression", "fixtures/codec-snappy.parquet", "1"]);
+check(await compLab.getAttribute("data-tokens") === String(snappy.decompressed.tokens.length),
+  `country's Snappy page decompresses in the reader's ${snappy.decompressed.tokens.length} tokens`);
+check(await compLab.getAttribute("data-decompressed") === String(snappy.pages[snappy.page].uncompressed_page_size),
+  "the decompressed page is as long as its header says");
+await compLab.locator('button[data-step="1"]').click();
+await compLab.locator('button[data-step="1"]').click();
+await compLab.locator('button[data-step="1"]').click();
+const copy = snappy.decompressed.tokens[2];
+check(await compLab.locator(".out-bytes i.out").count() === 2 * (copy.output[1] - copy.output[0]),
+  "stepping to the first copy marks the bytes it wrote");
+check(await compLab.locator(".out-bytes i.src").count() === 2 * (copy.output[1] - copy.output[0]),
+  "and outlines the earlier bytes it copied");
+await compLab.locator(".lab-head select").selectOption("codec-zstd.parquet");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.decompressed === "none");
+check((await compLab.locator(".out-bytes").innerText()).includes("does not decompress ZSTD"),
+  "a ZSTD page is reported as one the reader cannot decompress");
+if (shots) {
+  await compLab.locator(".lab-head select").selectOption("codec-snappy.parquet");
+  await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.codec === "SNAPPY");
+  await compLab.screenshot({ path: path.join(shots, "compression-lab.png") });
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -1291,3 +1291,179 @@ pub fn pages(file: &[u8], column: usize) -> Json {
         ("pages", Json::Arr(out)),
     ])
 }
+
+/// Ch07's experiment: what compression did to every column chunk, and how one page of one
+/// column was decompressed, token by token.
+///
+/// The sizes come from the footer, so they are reported for every codec. The tokens need a
+/// decoder, so a page compressed with a codec [`crate::compress`] does not decode reports why
+/// instead of tokens.
+pub fn compression(file: &[u8], column: usize, page: Option<usize>) -> Json {
+    use crate::compress::{decompress, supported, TokenKind};
+    use crate::schema::{build, leaves};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let Some(leaf) = all.get(column) else {
+        return fail(format!("the file has no column {column}"));
+    };
+    // Every column chunk's two sizes, summed over the row groups.
+    let chunks = Json::Arr(
+        all.iter()
+            .map(|l| {
+                let cs: Vec<&ColumnChunk> = md
+                    .row_groups
+                    .iter()
+                    .map(|rg| &rg.columns[l.column])
+                    .collect();
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                    ("codec", cs.first().map(|c| c.codec.clone()).into()),
+                    (
+                        "uncompressed",
+                        cs.iter()
+                            .map(|c| c.total_uncompressed_size)
+                            .sum::<i64>()
+                            .into(),
+                    ),
+                    (
+                        "compressed",
+                        cs.iter()
+                            .map(|c| c.total_compressed_size)
+                            .sum::<i64>()
+                            .into(),
+                    ),
+                ])
+            })
+            .collect(),
+    );
+    let Some(chunk) = md.row_groups.first().map(|rg| &rg.columns[leaf.column]) else {
+        return fail("the file has no row groups".into());
+    };
+    let range = chunk.byte_range();
+    let Some(bytes) = file.get(range.start as usize..range.end as usize) else {
+        return fail(format!("column chunk {range} is past the end of the file"));
+    };
+    let walked = match walk_pages(bytes, range.start) {
+        Ok(p) => p,
+        Err(e) => return fail(e.to_string()),
+    };
+    // What the codec was given: the whole body, or in a version 2 data page only the values,
+    // and only when the header says they are compressed.
+    let sections: Vec<(Span, i64, bool)> = walked
+        .iter()
+        .map(|p| match p.v2 {
+            Some(v2) => {
+                let levels = (v2.repetition_levels_byte_length + v2.definition_levels_byte_length)
+                    .clamp(0, p.body_span.len() as i64);
+                let from = p.body_span.start + levels as u64;
+                (
+                    Span::new(from, p.body_span.end),
+                    p.uncompressed_page_size - levels,
+                    v2.is_compressed,
+                )
+            }
+            None => (p.body_span, p.uncompressed_page_size, true),
+        })
+        .collect();
+    let chosen = page.unwrap_or_else(|| {
+        walked
+            .iter()
+            .position(|p| p.page_type != "DICTIONARY_PAGE")
+            .unwrap_or(0)
+    });
+    let pages = Json::Arr(
+        walked
+            .iter()
+            .zip(&sections)
+            .enumerate()
+            .map(|(i, (p, (section, size, compressed)))| {
+                obj([
+                    ("index", i.into()),
+                    ("type", p.page_type.clone().into()),
+                    ("span", p.span().into()),
+                    ("header", p.header_span.into()),
+                    ("compressed_section", (*section).into()),
+                    ("section_compressed", (*compressed).into()),
+                    ("compressed_page_size", p.compressed_page_size.into()),
+                    ("uncompressed_page_size", p.uncompressed_page_size.into()),
+                    ("section_uncompressed_size", (*size).into()),
+                    ("encoding", p.encoding.clone().into()),
+                ])
+            })
+            .collect(),
+    );
+    let decoded = match (walked.get(chosen), sections.get(chosen)) {
+        (Some(_), Some((section, size, compressed))) => {
+            let codec = if *compressed {
+                chunk.codec.as_str()
+            } else {
+                "UNCOMPRESSED"
+            };
+            let input = &file[section.start as usize..section.end as usize];
+            match decompress(codec, input, section.start, (*size).max(0) as usize) {
+                Ok(d) => obj([
+                    ("ok", true.into()),
+                    ("codec", codec.into()),
+                    ("bytes", hex(&d.bytes).into()),
+                    (
+                        "tokens",
+                        Json::Arr(
+                            d.tokens
+                                .iter()
+                                .map(|t| {
+                                    let (kind, distance) = match t.kind {
+                                        TokenKind::Header => ("header", Json::Null),
+                                        TokenKind::Literal => ("literal", Json::Null),
+                                        TokenKind::Copy { distance } => ("copy", distance.into()),
+                                    };
+                                    obj([
+                                        ("kind", kind.into()),
+                                        ("label", t.label.clone().into()),
+                                        ("input", t.input.into()),
+                                        ("output", t.output.into()),
+                                        ("distance", distance),
+                                        ("detail", t.detail.clone().into()),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                ]),
+                Err(e) => obj([
+                    ("ok", false.into()),
+                    ("codec", codec.into()),
+                    ("error", e.into()),
+                ]),
+            }
+        }
+        _ => obj([
+            ("ok", false.into()),
+            (
+                "error",
+                format!("the column chunk has no page {chosen}").into(),
+            ),
+        ]),
+    };
+    obj([
+        ("ok", true.into()),
+        ("file_size", file.len().into()),
+        ("chunks", chunks),
+        ("column", column.into()),
+        ("path", leaf.dotted_path().into()),
+        ("codec", chunk.codec.clone().into()),
+        ("supported", supported(&chunk.codec).into()),
+        ("pages", pages),
+        ("page", chosen.into()),
+        ("decompressed", decoded),
+    ])
+}

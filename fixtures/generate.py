@@ -131,6 +131,49 @@ PAGES_TABLE = pa.table(
 #: Small pages: the writer starts a new page after a few values, so each column chunk has several.
 SMALL_PAGES = {"data_page_size": 128, "write_batch_size": 16, "use_dictionary": ["country"]}
 
+
+def _orders(n: int) -> pa.Table:
+    """``n`` orders with the kinds of columns a compressor meets: a counter, short repeated
+    strings, codes from a small set, random integers, decimal-looking floats, noisy floats, and
+    free text that is mostly empty."""
+    x = 12345
+    amounts, weights, distances = [], [], []
+    for _ in range(n):
+        # A linear congruential generator: the same "random" values on every machine.
+        x = (x * 1103515245 + 12345) % 2**31
+        amounts.append(100 + x % 9900)
+        weights.append(round(0.2 + (x >> 8) % 3000 / 100, 2))
+        distances.append(0.5 + 40 * x / 2**31)
+    notes = ["", "gift wrap", "leave at door", "", "", ""]
+    return pa.table(
+        {
+            "order_id": pa.array(range(1, n + 1), pa.int64()),
+            "country": pa.array([["UK", "SE", "PL", "US", "DE"][(i * 7) % 5] for i in range(n)]),
+            "sku": pa.array([f"SKU-{(i * 13) % 40:04d}" for i in range(n)]),
+            "amount_cents": pa.array(amounts, pa.int64()),
+            "weight_kg": pa.array(weights, pa.float64()),
+            "distance_km": pa.array(distances, pa.float64()),
+            "note": pa.array([notes[(i * 5) % 6] for i in range(n)]),
+        },
+        schema=pa.schema(
+            [
+                pa.field("order_id", pa.int64(), nullable=False),
+                pa.field("country", pa.string(), nullable=False),
+                pa.field("sku", pa.string(), nullable=False),
+                pa.field("amount_cents", pa.int64(), nullable=False),
+                pa.field("weight_kg", pa.float64(), nullable=False),
+                pa.field("distance_km", pa.float64(), nullable=False),
+                pa.field("note", pa.string(), nullable=False),
+            ]
+        ),
+    )
+
+
+#: The same orders under every codec the format defines that pyarrow writes (ch07).
+ORDERS = _orders(256)
+CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
+
+
 FIXTURES = (
     Fixture(
         name="tiny",
@@ -301,6 +344,52 @@ FIXTURES = (
         ),
         table=PAGES_TABLE,
         options={**SMALL_PAGES, "data_page_version": "2.0", "write_page_checksum": True},
+    ),
+    *(
+        Fixture(
+            name=f"codec-{codec}",
+            why=(
+                f"256 orders, PLAIN-encoded with no dictionary, compressed with {codec}. The "
+                "codec-* files hold identical pages before compression, so any difference in "
+                "their sizes is the codec's."
+            )
+            if codec != "none"
+            else (
+                "256 orders, PLAIN-encoded with no dictionary and not compressed: the baseline "
+                "the other codec-* files are measured against."
+            ),
+            table=ORDERS,
+            options={"compression": codec},
+        )
+        for codec in CODECS
+    ),
+    Fixture(
+        name="pages-v2-snappy",
+        why=(
+            "pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values "
+            "are compressed: its levels stay as they were, so a reader can count rows and nulls "
+            "without decompressing anything."
+        ),
+        table=PAGES_TABLE,
+        options={
+            **SMALL_PAGES,
+            "data_page_version": "2.0",
+            "write_page_checksum": True,
+            "compression": "snappy",
+        },
+    ),
+    Fixture(
+        name="codec-zstd-split",
+        why=(
+            "codec-zstd.parquet with its two float columns written BYTE_STREAM_SPLIT. Comparing "
+            "the two files measures what splitting a float's bytes is worth to a compressor, "
+            "for decimal-looking floats and for noisy ones."
+        ),
+        table=ORDERS,
+        options={
+            "compression": "zstd",
+            "column_encoding": {"weight_kg": "BYTE_STREAM_SPLIT", "distance_km": "BYTE_STREAM_SPLIT"},
+        },
     ),
 )
 

@@ -25,6 +25,7 @@ const out = calls.map((c) => {
     case "levels": return lab.levels(id(c.file), c.column);
     case "encodings": return lab.encodings(id(c.file), c.column);
     case "pages": return lab.pages(id(c.file), c.column);
+    case "compression": return lab.compression(id(c.file), c.column, c.page ?? null);
     case "interpret": return lab.interpret(id(c.file), c.offset);
     case "layouts": return lab.layouts(c.options);
     default: throw new Error(`unknown call ${c.call}`);

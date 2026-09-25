@@ -12,6 +12,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
+use parquet_lab::compress::TokenKind;
 use parquet_lab::format::{footer_span, parse_trailer};
 use parquet_lab::json::Json;
 use parquet_lab::metadata::FileMetaData;
@@ -112,6 +113,26 @@ const FIGURES: &[Figure] = &[
     Figure {
         file: "page-header-fields.md",
         render: page_header_fields,
+    },
+    Figure {
+        file: "codec-files.md",
+        render: codec_files,
+    },
+    Figure {
+        file: "codec-columns.md",
+        render: codec_columns,
+    },
+    Figure {
+        file: "codec-split.md",
+        render: codec_split,
+    },
+    Figure {
+        file: "codec-country-page.md",
+        render: codec_country_page,
+    },
+    Figure {
+        file: "snappy-tokens-country.md",
+        render: snappy_tokens_country,
     },
 ];
 
@@ -1055,4 +1076,206 @@ fn page_header_fields(root: &Path) -> Result<String, String> {
     ));
     s.push_str(&conditions("pages.parquet", &bytes, None));
     Ok(s)
+}
+
+/// The codec-* fixtures in the order the book discusses them: none, the fast codecs, then the
+/// ones that trade speed for size.
+const CODECS: [&str; 6] = ["none", "snappy", "lz4", "gzip", "zstd", "brotli"];
+
+fn codec_files(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | Codec in the footer | File bytes | Column chunk bytes | Share of uncompressed |"
+            .to_string(),
+        "|---|---|--:|--:|--:|".to_string(),
+    ];
+    let mut base = 0i64;
+    for codec in CODECS {
+        let name = format!("codec-{codec}.parquet");
+        let bytes = fixture(root, &name)?;
+        let md = open_bytes(&bytes)?;
+        let cs = &md.row_groups[0].columns;
+        let compressed: i64 = cs.iter().map(|c| c.total_compressed_size).sum();
+        if codec == "none" {
+            base = compressed;
+        }
+        rows.push(format!(
+            "| `{name}` | `{}` | {} | {} | {}% |",
+            cs[0].codec,
+            thousands(bytes.len() as u64),
+            thousands(compressed as u64),
+            (compressed * 100 + base / 2) / base.max(1)
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the footers of the `fixtures/codec-*.parquet` files: \
+         256 orders, PLAIN-encoded, one row group, one data page per column chunk. Column chunk \
+         bytes include page headers.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn codec_columns(root: &Path) -> Result<String, String> {
+    let mut sizes = Vec::new();
+    let mut paths = Vec::new();
+    for codec in CODECS {
+        let md = open_bytes(&fixture(root, &format!("codec-{codec}.parquet"))?)?;
+        let cs = &md.row_groups[0].columns;
+        paths = cs.iter().map(|c| c.dotted_path()).collect();
+        sizes.push(
+            cs.iter()
+                .map(|c| c.total_compressed_size)
+                .collect::<Vec<_>>(),
+        );
+    }
+    let mut rows = vec![
+        format!("| Column | {} |", CODECS.join(" | ")),
+        format!("|---|{}", "--:|".repeat(CODECS.len())),
+    ];
+    for (i, path) in paths.iter().enumerate() {
+        let cells: Vec<String> = sizes.iter().map(|s| thousands(s[i] as u64)).collect();
+        rows.push(format!("| `{path}` | {} |", cells.join(" | ")));
+    }
+    Ok(format!(
+        "{}\n\n*Column chunk bytes, including page headers, from the footers of the \
+         `fixtures/codec-*.parquet` files.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn codec_split(root: &Path) -> Result<String, String> {
+    let plain = open_bytes(&fixture(root, "codec-zstd.parquet")?)?;
+    let split = open_bytes(&fixture(root, "codec-zstd-split.parquet")?)?;
+    let mut rows = vec![
+        "| Column | Encoding | Before ZSTD | After ZSTD |".to_string(),
+        "|---|---|--:|--:|".to_string(),
+    ];
+    for path in ["weight_kg", "distance_km"] {
+        for md in [&plain, &split] {
+            let c = md.row_groups[0]
+                .columns
+                .iter()
+                .find(|c| c.dotted_path() == path)
+                .ok_or(format!("no column {path}"))?;
+            let encoding = c
+                .encodings
+                .iter()
+                .find(|e| e.as_str() != "RLE")
+                .cloned()
+                .unwrap_or_default();
+            rows.push(format!(
+                "| `{path}` | `{encoding}` | {} | {} |",
+                thousands(c.total_uncompressed_size as u64),
+                thousands(c.total_compressed_size as u64)
+            ));
+        }
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the footers of `fixtures/codec-zstd.parquet` and \
+         `fixtures/codec-zstd-split.parquet`, which differ only in these two columns' encoding.*\n",
+        rows.join("\n")
+    ))
+}
+
+/// One page, the three decoders' tokens counted.
+fn codec_country_page(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| Codec | Compressed bytes | Tokens | Bytes written as literals | Bytes copied from earlier | Longest copy |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    let mut size = 0;
+    for codec in ["snappy", "lz4", "gzip"] {
+        let (page, d) = first_page(root, &format!("codec-{codec}.parquet"), 1)?;
+        size = d.bytes.len();
+        let (mut literal, mut copied, mut longest) = (0u64, 0u64, 0u64);
+        for t in &d.tokens {
+            match t.kind {
+                TokenKind::Literal => literal += t.output.len(),
+                TokenKind::Copy { .. } => {
+                    copied += t.output.len();
+                    longest = longest.max(t.output.len());
+                }
+                TokenKind::Header => {}
+            }
+        }
+        rows.push(format!(
+            "| {} | {} | {} | {} | {} | {} |",
+            page.0,
+            thousands(page.1),
+            d.tokens.len(),
+            thousands(literal),
+            thousands(copied),
+            thousands(longest)
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*The `country` column's data page, {} bytes before compression, decompressed by \
+         the reader from `fixtures/codec-snappy.parquet`, `codec-lz4.parquet` and \
+         `codec-gzip.parquet`. Tokens include headers and trailers.*\n",
+        rows.join("\n"),
+        thousands(size as u64)
+    ))
+}
+
+fn snappy_tokens_country(root: &Path) -> Result<String, String> {
+    let name = "codec-snappy.parquet";
+    let bytes = fixture(root, name)?;
+    let (_, d) = first_page(root, name, 1)?;
+    let mut rows = vec![
+        "| Compressed bytes | Token | Writes output | What it says |".to_string(),
+        "|---|---|--:|---|".to_string(),
+    ];
+    let shown = 9;
+    for t in d.tokens.iter().take(shown) {
+        let hexed =
+            parquet_lab::encoding::hex(&bytes[t.input.start as usize..t.input.end as usize]);
+        rows.push(format!(
+            "| `{hexed}` | {} | {} | {} |",
+            t.label,
+            if t.output.is_empty() {
+                "·".to_string()
+            } else {
+                format!("{}–{}", t.output.start, t.output.end - 1)
+            },
+            t.detail
+        ));
+    }
+    let rest = &d.tokens[shown.min(d.tokens.len())..];
+    let copies = rest
+        .iter()
+        .filter(|t| matches!(t.kind, TokenKind::Copy { .. }))
+        .count();
+    Ok(format!(
+        "{}\n\n{} more tokens follow, {copies} of them copies.\n{}",
+        rows.join("\n"),
+        rest.len(),
+        conditions(name, &bytes, None)
+    ))
+}
+
+/// The first data page of a column in the first row group: its codec's name and compressed
+/// size, and the page decompressed.
+fn first_page(
+    root: &Path,
+    name: &str,
+    column: usize,
+) -> Result<((String, u64), parquet_lab::compress::Decompressed), String> {
+    let bytes = fixture(root, name)?;
+    let md = open_bytes(&bytes)?;
+    let chunk = &md.row_groups[0].columns[column];
+    let r = chunk.byte_range();
+    let pages = parquet_lab::pages::walk_pages(&bytes[r.start as usize..r.end as usize], r.start)
+        .map_err(|e| e.to_string())?;
+    let page = pages
+        .iter()
+        .find(|p| p.page_type == "DATA_PAGE")
+        .ok_or(format!("{name}: no data page"))?;
+    let body = &bytes[page.body_span.start as usize..page.body_span.end as usize];
+    let d = parquet_lab::compress::decompress(
+        &chunk.codec,
+        body,
+        page.body_span.start,
+        page.uncompressed_page_size as usize,
+    )?;
+    Ok(((chunk.codec.clone(), page.body_span.len()), d))
 }

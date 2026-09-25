@@ -86,6 +86,11 @@ def cases():
             native.append(("encodings", f, str(column)))
             calls.append({"call": "pages", "file": f, "column": column})
             native.append(("pages", f, str(column)))
+            calls.append({"call": "compression", "file": f, "column": column})
+            native.append(("compression", f, str(column)))
+        for page in range(4):
+            calls.append({"call": "compression", "file": f, "column": 1, "page": page})
+            native.append(("compression", f, "1", str(page)))
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))
@@ -96,6 +101,19 @@ def cases():
             args += ["--row", str(row)]
         native.append(tuple(args))
     return calls, native
+
+
+def _numbers(v):
+    """JSON as a browser reads it. The reader writes every integer above 2^53 as a string, so a
+    bare number that large can only be a float, which ``JSON.stringify`` writes without an
+    exponent (1e20 as 100000000000000000000) and Python then parses as an exact integer."""
+    if isinstance(v, dict):
+        return {k: _numbers(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [_numbers(x) for x in v]
+    if isinstance(v, int) and not isinstance(v, bool) and abs(v) > 2**53:
+        return float(v)
+    return v
 
 
 def test_every_browser_call_matches_the_native_reader(tmp_path):
@@ -109,7 +127,7 @@ def test_every_browser_call_matches_the_native_reader(tmp_path):
         text=True,
         check=True,
     )
-    browser = json.loads(out.stdout)
+    browser = _numbers(json.loads(out.stdout))
     assert len(browser) == len(native)
     for call, args, got in zip(calls, native, browser, strict=True):
-        assert got == pqlab(*args), f"browser and native disagree on {call}"
+        assert got == _numbers(pqlab(*args)), f"browser and native disagree on {call}"

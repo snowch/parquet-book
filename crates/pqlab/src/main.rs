@@ -5,6 +5,8 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab compression FILE COLUMN [PAGE]
+//!                                    the codec's effect, and one page decompressed
 //! pqlab encodings FILE COLUMN       how one column's values are encoded, step by step
 //! pqlab levels FILE COLUMN          one column's levels, values and rebuilt records
 //! pqlab schema FILE                  the schema: flat, rebuilt, and read through logical types
@@ -39,6 +41,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab compression FILE COLUMN [PAGE]
   pqlab interpret FILE OFFSET
   pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
   pqlab figures [--out DIR] [--check]";
@@ -79,6 +82,21 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "compression" => {
+            let column: usize = args
+                .get(2)
+                .ok_or("compression needs a COLUMN number")?
+                .parse()
+                .map_err(|_| "COLUMN must be a whole number")?;
+            let page = match args.get(3) {
+                Some(p) => Some(p.parse().map_err(|_| "PAGE must be a whole number")?),
+                None => None,
+            };
+            println!(
+                "{}",
+                report::compression(&read(file()?)?, column, page).to_json_pretty()
+            );
+        }
         "pages" => {
             let column: usize = args
                 .get(2)

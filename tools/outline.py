@@ -167,9 +167,18 @@ _CHAPTERS = (
         "Compression",
         "the_values",
         "What does compression add on top of encoding, and what does it cost?",
-        "Decompression in the read path, and measured ratios for comparable datasets.",
-        (),
-        (),
+        "Snappy, LZ4 and DEFLATE decompressors in the read path, and every codec's sizes from footers.",
+        ("compression",),
+        (
+            "codec-none.parquet",
+            "codec-snappy.parquet",
+            "codec-gzip.parquet",
+            "codec-lz4.parquet",
+            "codec-zstd.parquet",
+            "codec-brotli.parquet",
+            "codec-zstd-split.parquet",
+            "pages-v2-snappy.parquet",
+        ),
     ),
     (
         "metadata_and_statistics",
@@ -261,4 +270,13 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
-EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels", "encodings", "pages")
+EXPERIMENTS = (
+    "layouts",
+    "footer",
+    "anatomy",
+    "schema",
+    "levels",
+    "encodings",
+    "pages",
+    "compression",
+)

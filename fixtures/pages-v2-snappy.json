@@ -1,0 +1,441 @@
+{
+  "name": "pages-v2-snappy",
+  "file": "pages-v2-snappy.parquet",
+  "why": "pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "snappy",
+      "use_dictionary": [
+        "country"
+      ],
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "2.0",
+      "write_page_index": false,
+      "data_page_size": 128,
+      "write_batch_size": 16,
+      "write_page_checksum": true
+    }
+  },
+  "file_size": 1854,
+  "sha256": "46e6c748a90443af3ee956bd3f40ebdeb9d940718045283fba97e94dcc7cd498",
+  "footer_length": 396,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 60,
+  "num_columns": 3,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount_cents",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "country": null,
+      "amount_cents": 0
+    },
+    {
+      "order_id": 2,
+      "country": "SE",
+      "amount_cents": 37
+    },
+    {
+      "order_id": 3,
+      "country": "PL",
+      "amount_cents": 74
+    },
+    {
+      "order_id": 4,
+      "country": "US",
+      "amount_cents": 111
+    },
+    {
+      "order_id": 5,
+      "country": "UK",
+      "amount_cents": 148
+    },
+    {
+      "order_id": 6,
+      "country": "SE",
+      "amount_cents": 185
+    },
+    {
+      "order_id": 7,
+      "country": "PL",
+      "amount_cents": 222
+    },
+    {
+      "order_id": 8,
+      "country": null,
+      "amount_cents": 259
+    },
+    {
+      "order_id": 9,
+      "country": "UK",
+      "amount_cents": 296
+    },
+    {
+      "order_id": 10,
+      "country": "SE",
+      "amount_cents": 333
+    },
+    {
+      "order_id": 11,
+      "country": "PL",
+      "amount_cents": 370
+    },
+    {
+      "order_id": 12,
+      "country": "US",
+      "amount_cents": 407
+    },
+    {
+      "order_id": 13,
+      "country": "UK",
+      "amount_cents": 444
+    },
+    {
+      "order_id": 14,
+      "country": "SE",
+      "amount_cents": 481
+    },
+    {
+      "order_id": 15,
+      "country": null,
+      "amount_cents": 518
+    },
+    {
+      "order_id": 16,
+      "country": "US",
+      "amount_cents": 555
+    },
+    {
+      "order_id": 17,
+      "country": "UK",
+      "amount_cents": 592
+    },
+    {
+      "order_id": 18,
+      "country": "SE",
+      "amount_cents": 629
+    },
+    {
+      "order_id": 19,
+      "country": "PL",
+      "amount_cents": 666
+    },
+    {
+      "order_id": 20,
+      "country": "US",
+      "amount_cents": 703
+    },
+    {
+      "order_id": 21,
+      "country": "UK",
+      "amount_cents": 740
+    },
+    {
+      "order_id": 22,
+      "country": null,
+      "amount_cents": 777
+    },
+    {
+      "order_id": 23,
+      "country": "PL",
+      "amount_cents": 814
+    },
+    {
+      "order_id": 24,
+      "country": "US",
+      "amount_cents": 851
+    },
+    {
+      "order_id": 25,
+      "country": "UK",
+      "amount_cents": 888
+    },
+    {
+      "order_id": 26,
+      "country": "SE",
+      "amount_cents": 925
+    },
+    {
+      "order_id": 27,
+      "country": "PL",
+      "amount_cents": 962
+    },
+    {
+      "order_id": 28,
+      "country": "US",
+      "amount_cents": 999
+    },
+    {
+      "order_id": 29,
+      "country": null,
+      "amount_cents": 1036
+    },
+    {
+      "order_id": 30,
+      "country": "SE",
+      "amount_cents": 1073
+    },
+    {
+      "order_id": 31,
+      "country": "PL",
+      "amount_cents": 1110
+    },
+    {
+      "order_id": 32,
+      "country": "US",
+      "amount_cents": 1147
+    },
+    {
+      "order_id": 33,
+      "country": "UK",
+      "amount_cents": 1184
+    },
+    {
+      "order_id": 34,
+      "country": "SE",
+      "amount_cents": 1221
+    },
+    {
+      "order_id": 35,
+      "country": "PL",
+      "amount_cents": 1258
+    },
+    {
+      "order_id": 36,
+      "country": null,
+      "amount_cents": 1295
+    },
+    {
+      "order_id": 37,
+      "country": "UK",
+      "amount_cents": 1332
+    },
+    {
+      "order_id": 38,
+      "country": "SE",
+      "amount_cents": 1369
+    },
+    {
+      "order_id": 39,
+      "country": "PL",
+      "amount_cents": 1406
+    },
+    {
+      "order_id": 40,
+      "country": "US",
+      "amount_cents": 1443
+    },
+    {
+      "order_id": 41,
+      "country": "UK",
+      "amount_cents": 1480
+    },
+    {
+      "order_id": 42,
+      "country": "SE",
+      "amount_cents": 1517
+    },
+    {
+      "order_id": 43,
+      "country": null,
+      "amount_cents": 1554
+    },
+    {
+      "order_id": 44,
+      "country": "US",
+      "amount_cents": 1591
+    },
+    {
+      "order_id": 45,
+      "country": "UK",
+      "amount_cents": 1628
+    },
+    {
+      "order_id": 46,
+      "country": "SE",
+      "amount_cents": 1665
+    },
+    {
+      "order_id": 47,
+      "country": "PL",
+      "amount_cents": 1702
+    },
+    {
+      "order_id": 48,
+      "country": "US",
+      "amount_cents": 1739
+    },
+    {
+      "order_id": 49,
+      "country": "UK",
+      "amount_cents": 1776
+    },
+    {
+      "order_id": 50,
+      "country": null,
+      "amount_cents": 1813
+    },
+    {
+      "order_id": 51,
+      "country": "PL",
+      "amount_cents": 1850
+    },
+    {
+      "order_id": 52,
+      "country": "US",
+      "amount_cents": 1887
+    },
+    {
+      "order_id": 53,
+      "country": "UK",
+      "amount_cents": 1924
+    },
+    {
+      "order_id": 54,
+      "country": "SE",
+      "amount_cents": 1961
+    },
+    {
+      "order_id": 55,
+      "country": "PL",
+      "amount_cents": 1998
+    },
+    {
+      "order_id": 56,
+      "country": "US",
+      "amount_cents": 2035
+    },
+    {
+      "order_id": 57,
+      "country": null,
+      "amount_cents": 2072
+    },
+    {
+      "order_id": 58,
+      "country": "SE",
+      "amount_cents": 2109
+    },
+    {
+      "order_id": 59,
+      "country": "PL",
+      "amount_cents": 2146
+    },
+    {
+      "order_id": 60,
+      "country": "US",
+      "amount_cents": 2183
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 60,
+      "total_byte_size": 1811,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "SNAPPY",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 60,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 595,
+          "total_uncompressed_size": 781,
+          "statistics": {
+            "min": 1,
+            "max": 60,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "SNAPPY",
+          "encodings": [
+            "PLAIN",
+            "RLE",
+            "RLE_DICTIONARY"
+          ],
+          "num_values": 60,
+          "data_page_offset": 644,
+          "dictionary_page_offset": 599,
+          "total_compressed_size": 249,
+          "total_uncompressed_size": 248,
+          "statistics": {
+            "min": "PL",
+            "max": "US",
+            "null_count": 9
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "SNAPPY",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 60,
+          "data_page_offset": 848,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 602,
+          "total_uncompressed_size": 782,
+          "statistics": {
+            "min": 0,
+            "max": 2183,
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

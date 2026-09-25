@@ -35,7 +35,7 @@ needs it, and each is finished, tested and quoted before the chapters that use i
 |---|---|---|---|
 | 1 | magic, trailer, footer discovery over an object store, Thrift compact decoding, `FileMetaData`, schema, row groups, column chunks, page headers | ch01, ch02, ch03 | done |
 | 2 | PLAIN, dictionary, RLE/bit-packing hybrid, delta encodings, BYTE_STREAM_SPLIT; levels | ch04, ch05 | done |
-| 3 | page walking with values, data page v1 and v2, decompression | ch06, ch07 | pages done; decompression to do |
+| 3 | page walking with values, data page v1 and v2, decompression | ch06, ch07 | done; ZSTD and Brotli sizes only |
 | 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | to do |
 | 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | object store and trace done; the rest to do |
 | 6 | encrypted modules, multi-file datasets, manifests | ch13, ch14 | to do |
@@ -104,6 +104,14 @@ would be a demonstration, never the source of a figure.
 consistency. pyarrow also writes a manifest describing each fixture, which is the tests' oracle.
 Writes are deterministic for a fixed pyarrow version, and `fixtures/generate.py --check` enforces
 that the committed bytes are what the generator writes.
+
+**Teaching decompressors for three codecs; none for ZSTD or Brotli.** The reader decodes SNAPPY,
+LZ4_RAW and GZIP (DEFLATE) itself, each short enough to quote whole and each recording its tokens
+for the laboratory. ZSTD and Brotli decoders would each be several times the size of all three
+together and would teach nothing DEFLATE does not; adding a crate for them would break the
+no-dependency rule. Their fixtures are still written and measured, from footers, and a page that
+needs them is refused with a message naming the codec. Decompressed output is checked against
+`codec-none.parquet`, pyarrow's own uncompressed pages, not against the reader.
 
 **Problems are Rust tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page
 under Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the

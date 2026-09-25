@@ -233,6 +233,18 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch07's experiment: every column chunk's sizes, and one page decompressed token by token.
+/// `page` is the page's index in the first row group's chunk, or `u32::MAX` for the first data
+/// page. See `report::compression`.
+#[no_mangle]
+pub extern "C" fn pl_compression(id: u32, column: u32, page: u32) -> usize {
+    let page = (page != u32::MAX).then_some(page as usize);
+    match with_file(id, |f| report::compression(&f.bytes, column as usize, page)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch06's experiment: every page of one column chunk. See `report::pages`.
 #[no_mangle]
 pub extern "C" fn pl_pages(id: u32, column: u32) -> usize {

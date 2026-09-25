@@ -1,0 +1,2571 @@
+{
+  "name": "codec-zstd-split",
+  "file": "codec-zstd-split.parquet",
+  "why": "codec-zstd.parquet with its two float columns written BYTE_STREAM_SPLIT. Comparing the two files measures what splitting a float's bytes is worth to a compressor, for decimal-looking floats and for noisy ones.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "zstd",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false,
+      "column_encoding": {
+        "weight_kg": "BYTE_STREAM_SPLIT",
+        "distance_km": "BYTE_STREAM_SPLIT"
+      }
+    }
+  },
+  "file_size": 5360,
+  "sha256": "b916da53758901c38ac2bb289be563895d7a0f76ac190ac3cc1f11f976ec330a",
+  "footer_length": 802,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 256,
+  "num_columns": 7,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "weight_kg",
+      "type": "double",
+      "nullable": false
+    },
+    {
+      "name": "distance_km",
+      "type": "double",
+      "nullable": false
+    },
+    {
+      "name": "note",
+      "type": "string",
+      "nullable": false
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "sku",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount_cents",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "weight_kg",
+      "physical_type": "DOUBLE",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "distance_km",
+      "physical_type": "DOUBLE",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "note",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 4106,
+      "weight_kg": 28.5,
+      "distance_km": 26.706161938607693,
+      "note": ""
+    },
+    {
+      "order_id": 2,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 5775,
+      "weight_kg": 9.87,
+      "distance_km": 12.692572932690382,
+      "note": ""
+    },
+    {
+      "order_id": 3,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 8024,
+      "weight_kg": 10.0,
+      "distance_km": 27.498425349593163,
+      "note": ""
+    },
+    {
+      "order_id": 4,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 9573,
+      "weight_kg": 16.58,
+      "distance_km": 4.77073935046792,
+      "note": ""
+    },
+    {
+      "order_id": 5,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 678,
+      "weight_kg": 13.6,
+      "distance_km": 21.162977881729603,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 6,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 2259,
+      "weight_kg": 6.38,
+      "distance_km": 20.086653616279364,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 7,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 7892,
+      "weight_kg": 19.23,
+      "distance_km": 24.598887890577316,
+      "note": ""
+    },
+    {
+      "order_id": 8,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 6793,
+      "weight_kg": 14.25,
+      "distance_km": 15.29819031432271,
+      "note": ""
+    },
+    {
+      "order_id": 9,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 5910,
+      "weight_kg": 20.99,
+      "distance_km": 10.76668231934309,
+      "note": ""
+    },
+    {
+      "order_id": 10,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 6867,
+      "weight_kg": 8.87,
+      "distance_km": 15.467288207262754,
+      "note": ""
+    },
+    {
+      "order_id": 11,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 8644,
+      "weight_kg": 15.28,
+      "distance_km": 33.52339918911457,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 12,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 9797,
+      "weight_kg": 28.99,
+      "distance_km": 7.408796671777964,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 13,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 6182,
+      "weight_kg": 22.46,
+      "distance_km": 12.412474073469639,
+      "note": ""
+    },
+    {
+      "order_id": 14,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 971,
+      "weight_kg": 13.46,
+      "distance_km": 26.24122643098235,
+      "note": ""
+    },
+    {
+      "order_id": 15,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 9928,
+      "weight_kg": 1.25,
+      "distance_km": 32.086194932460785,
+      "note": ""
+    },
+    {
+      "order_id": 16,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 5985,
+      "weight_kg": 3.81,
+      "distance_km": 40.01245145872235,
+      "note": ""
+    },
+    {
+      "order_id": 17,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 8646,
+      "weight_kg": 16.95,
+      "distance_km": 32.52283468097448,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 18,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 5127,
+      "weight_kg": 4.9,
+      "distance_km": 19.0702839307487,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 19,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 2680,
+      "weight_kg": 4.68,
+      "distance_km": 22.05994586646557,
+      "note": ""
+    },
+    {
+      "order_id": 20,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 4041,
+      "weight_kg": 0.35,
+      "distance_km": 25.5197190977633,
+      "note": ""
+    },
+    {
+      "order_id": 21,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 6362,
+      "weight_kg": 1.04,
+      "distance_km": 10.499676831066608,
+      "note": ""
+    },
+    {
+      "order_id": 22,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 6675,
+      "weight_kg": 6.6,
+      "distance_km": 28.6555219553411,
+      "note": ""
+    },
+    {
+      "order_id": 23,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 4804,
+      "weight_kg": 26.42,
+      "distance_km": 29.15134373307228,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 24,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 5453,
+      "weight_kg": 28.08,
+      "distance_km": 39.680702585726976,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 25,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 5810,
+      "weight_kg": 0.54,
+      "distance_km": 13.660867802798748,
+      "note": ""
+    },
+    {
+      "order_id": 26,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 5607,
+      "weight_kg": 17.88,
+      "distance_km": 18.318302046507597,
+      "note": ""
+    },
+    {
+      "order_id": 27,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 7256,
+      "weight_kg": 25.22,
+      "distance_km": 28.83606220781803,
+      "note": ""
+    },
+    {
+      "order_id": 28,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 1345,
+      "weight_kg": 27.06,
+      "distance_km": 30.095785681158304,
+      "note": ""
+    },
+    {
+      "order_id": 29,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 6254,
+      "weight_kg": 3.88,
+      "distance_km": 7.411127902567387,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 30,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 7775,
+      "weight_kg": 27.66,
+      "distance_km": 1.1282157264649868,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 31,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 7500,
+      "weight_kg": 7.54,
+      "distance_km": 31.80309283733368,
+      "note": ""
+    },
+    {
+      "order_id": 32,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 3653,
+      "weight_kg": 6.83,
+      "distance_km": 2.1482500918209553,
+      "note": ""
+    },
+    {
+      "order_id": 33,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 6134,
+      "weight_kg": 16.47,
+      "distance_km": 24.39730390161276,
+      "note": ""
+    },
+    {
+      "order_id": 34,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 483,
+      "weight_kg": 0.77,
+      "distance_km": 10.327889185398817,
+      "note": ""
+    },
+    {
+      "order_id": 35,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 2456,
+      "weight_kg": 29.56,
+      "distance_km": 22.758455976843834,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 36,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 889,
+      "weight_kg": 19.91,
+      "distance_km": 21.10876766219735,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 37,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 9714,
+      "weight_kg": 10.75,
+      "distance_km": 16.39801747351885,
+      "note": ""
+    },
+    {
+      "order_id": 38,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 7407,
+      "weight_kg": 19.18,
+      "distance_km": 7.804662968963385,
+      "note": ""
+    },
+    {
+      "order_id": 39,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 4456,
+      "weight_kg": 7.01,
+      "distance_km": 26.338286727666855,
+      "note": ""
+    },
+    {
+      "order_id": 40,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 129,
+      "weight_kg": 18.28,
+      "distance_km": 29.161767560988665,
+      "note": ""
+    },
+    {
+      "order_id": 41,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 3222,
+      "weight_kg": 20.6,
+      "distance_km": 12.69768863171339,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 42,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 7651,
+      "weight_kg": 13.73,
+      "distance_km": 39.359146665781736,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 43,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 7176,
+      "weight_kg": 15.85,
+      "distance_km": 33.88129587471485,
+      "note": ""
+    },
+    {
+      "order_id": 44,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 7909,
+      "weight_kg": 23.48,
+      "distance_km": 16.103678468614817,
+      "note": ""
+    },
+    {
+      "order_id": 45,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 4002,
+      "weight_kg": 29.26,
+      "distance_km": 28.69493416696787,
+      "note": ""
+    },
+    {
+      "order_id": 46,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 6719,
+      "weight_kg": 29.26,
+      "distance_km": 5.520648594945669,
+      "note": ""
+    },
+    {
+      "order_id": 47,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 9212,
+      "weight_kg": 13.23,
+      "distance_km": 24.810605823993683,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 48,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 2541,
+      "weight_kg": 10.04,
+      "distance_km": 22.46304576471448,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 49,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 230,
+      "weight_kg": 0.68,
+      "distance_km": 28.495341084897518,
+      "note": ""
+    },
+    {
+      "order_id": 50,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 6427,
+      "weight_kg": 22.12,
+      "distance_km": 36.65948049351573,
+      "note": ""
+    },
+    {
+      "order_id": 51,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 9408,
+      "weight_kg": 22.4,
+      "distance_km": 16.37496154010296,
+      "note": ""
+    },
+    {
+      "order_id": 52,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 3157,
+      "weight_kg": 9.68,
+      "distance_km": 33.792523715645075,
+      "note": ""
+    },
+    {
+      "order_id": 53,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 9882,
+      "weight_kg": 10.83,
+      "distance_km": 25.238615043461323,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 54,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 9627,
+      "weight_kg": 5.24,
+      "distance_km": 1.1461372040212154,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 55,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 3772,
+      "weight_kg": 16.04,
+      "distance_km": 15.499316483736038,
+      "note": ""
+    },
+    {
+      "order_id": 56,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 3505,
+      "weight_kg": 11.47,
+      "distance_km": 4.882742661982775,
+      "note": ""
+    },
+    {
+      "order_id": 57,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 6186,
+      "weight_kg": 17.59,
+      "distance_km": 22.910103790462017,
+      "note": ""
+    },
+    {
+      "order_id": 58,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 3623,
+      "weight_kg": 3.46,
+      "distance_km": 15.307351361960173,
+      "note": ""
+    },
+    {
+      "order_id": 59,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 4028,
+      "weight_kg": 2.19,
+      "distance_km": 6.494793549180031,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 60,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 9057,
+      "weight_kg": 9.54,
+      "distance_km": 32.6480512060225,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 61,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 3790,
+      "weight_kg": 24.03,
+      "distance_km": 3.3866956010460854,
+      "note": ""
+    },
+    {
+      "order_id": 62,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 3875,
+      "weight_kg": 21.38,
+      "distance_km": 3.9290230832993984,
+      "note": ""
+    },
+    {
+      "order_id": 63,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 332,
+      "weight_kg": 21.6,
+      "distance_km": 8.378021001815796,
+      "note": ""
+    },
+    {
+      "order_id": 64,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 5997,
+      "weight_kg": 29.53,
+      "distance_km": 36.434133399277925,
+      "note": ""
+    },
+    {
+      "order_id": 65,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 2010,
+      "weight_kg": 18.53,
+      "distance_km": 22.467092715203762,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 66,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 1279,
+      "weight_kg": 2.15,
+      "distance_km": 20.05602465197444,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 67,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 3816,
+      "weight_kg": 2.0,
+      "distance_km": 15.549843415617943,
+      "note": ""
+    },
+    {
+      "order_id": 68,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 2097,
+      "weight_kg": 13.56,
+      "distance_km": 4.49750092998147,
+      "note": ""
+    },
+    {
+      "order_id": 69,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 9070,
+      "weight_kg": 25.11,
+      "distance_km": 18.63645977526903,
+      "note": ""
+    },
+    {
+      "order_id": 70,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 9887,
+      "weight_kg": 16.7,
+      "distance_km": 12.838880207389593,
+      "note": ""
+    },
+    {
+      "order_id": 71,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 3980,
+      "weight_kg": 12.39,
+      "distance_km": 15.583407610654831,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 72,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 6057,
+      "weight_kg": 0.63,
+      "distance_km": 5.406860310584307,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 73,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 8466,
+      "weight_kg": 14.94,
+      "distance_km": 38.31544726341963,
+      "note": ""
+    },
+    {
+      "order_id": 74,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 1691,
+      "weight_kg": 12.35,
+      "distance_km": 32.177320431917906,
+      "note": ""
+    },
+    {
+      "order_id": 75,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 2540,
+      "weight_kg": 11.13,
+      "distance_km": 17.87162359058857,
+      "note": ""
+    },
+    {
+      "order_id": 76,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 1117,
+      "weight_kg": 30.13,
+      "distance_km": 23.116355065256357,
+      "note": ""
+    },
+    {
+      "order_id": 77,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 7390,
+      "weight_kg": 29.33,
+      "distance_km": 1.3435899391770363,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 78,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 9311,
+      "weight_kg": 3.3,
+      "distance_km": 38.910712238401175,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 79,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 516,
+      "weight_kg": 8.41,
+      "distance_km": 6.884000480175018,
+      "note": ""
+    },
+    {
+      "order_id": 80,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 9257,
+      "weight_kg": 27.87,
+      "distance_km": 14.460682917386293,
+      "note": ""
+    },
+    {
+      "order_id": 81,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 1830,
+      "weight_kg": 13.77,
+      "distance_km": 30.44708027690649,
+      "note": ""
+    },
+    {
+      "order_id": 82,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 7175,
+      "weight_kg": 19.42,
+      "distance_km": 29.305363457649946,
+      "note": ""
+    },
+    {
+      "order_id": 83,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 8904,
+      "weight_kg": 19.41,
+      "distance_km": 33.782857462763786,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 84,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 2405,
+      "weight_kg": 25.73,
+      "distance_km": 7.822087977081537,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 85,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 8754,
+      "weight_kg": 6.54,
+      "distance_km": 28.440916903316975,
+      "note": ""
+    },
+    {
+      "order_id": 86,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 9063,
+      "weight_kg": 0.52,
+      "distance_km": 2.5887025259435177,
+      "note": ""
+    },
+    {
+      "order_id": 87,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 6032,
+      "weight_kg": 19.99,
+      "distance_km": 40.14890971779823,
+      "note": ""
+    },
+    {
+      "order_id": 88,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 8001,
+      "weight_kg": 7.1,
+      "distance_km": 1.7192279286682606,
+      "note": ""
+    },
+    {
+      "order_id": 89,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 4770,
+      "weight_kg": 14.32,
+      "distance_km": 6.915428034961224,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 90,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 3075,
+      "weight_kg": 25.6,
+      "distance_km": 40.280333172529936,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 91,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 5024,
+      "weight_kg": 2.19,
+      "distance_km": 27.566229358315468,
+      "note": ""
+    },
+    {
+      "order_id": 92,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 7161,
+      "weight_kg": 18.35,
+      "distance_km": 2.0679162181913853,
+      "note": ""
+    },
+    {
+      "order_id": 93,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 2462,
+      "weight_kg": 2.75,
+      "distance_km": 10.157169915735722,
+      "note": ""
+    },
+    {
+      "order_id": 94,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 3495,
+      "weight_kg": 14.3,
+      "distance_km": 26.069964107125998,
+      "note": ""
+    },
+    {
+      "order_id": 95,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 4380,
+      "weight_kg": 17.03,
+      "distance_km": 6.81658136844635,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 96,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 3285,
+      "weight_kg": 0.48,
+      "distance_km": 36.86373924091458,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 97,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 3550,
+      "weight_kg": 4.02,
+      "distance_km": 18.054200254380703,
+      "note": ""
+    },
+    {
+      "order_id": 98,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 1623,
+      "weight_kg": 5.61,
+      "distance_km": 34.99221370741725,
+      "note": ""
+    },
+    {
+      "order_id": 99,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 1712,
+      "weight_kg": 13.01,
+      "distance_km": 20.43313454091549,
+      "note": ""
+    },
+    {
+      "order_id": 100,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 3077,
+      "weight_kg": 28.33,
+      "distance_km": 7.036548528820276,
+      "note": ""
+    },
+    {
+      "order_id": 101,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 4306,
+      "weight_kg": 16.26,
+      "distance_km": 31.735726661980152,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 102,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 1743,
+      "weight_kg": 11.18,
+      "distance_km": 0.6482897065579891,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 103,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 676,
+      "weight_kg": 12.9,
+      "distance_km": 32.363547414541245,
+      "note": ""
+    },
+    {
+      "order_id": 104,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 8681,
+      "weight_kg": 23.14,
+      "distance_km": 12.226827938109636,
+      "note": ""
+    },
+    {
+      "order_id": 105,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 3010,
+      "weight_kg": 7.27,
+      "distance_km": 5.696130089461803,
+      "note": ""
+    },
+    {
+      "order_id": 106,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 6683,
+      "weight_kg": 26.89,
+      "distance_km": 9.224543880671263,
+      "note": ""
+    },
+    {
+      "order_id": 107,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 8388,
+      "weight_kg": 23.05,
+      "distance_km": 18.492429211735725,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 108,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 5401,
+      "weight_kg": 13.74,
+      "distance_km": 10.233935836702585,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 109,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 3718,
+      "weight_kg": 27.81,
+      "distance_km": 30.15336326509714,
+      "note": ""
+    },
+    {
+      "order_id": 110,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 7475,
+      "weight_kg": 10.46,
+      "distance_km": 29.057901736348867,
+      "note": ""
+    },
+    {
+      "order_id": 111,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 7416,
+      "weight_kg": 1.76,
+      "distance_km": 11.773175776004791,
+      "note": ""
+    },
+    {
+      "order_id": 112,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 9681,
+      "weight_kg": 7.38,
+      "distance_km": 8.886222291737795,
+      "note": ""
+    },
+    {
+      "order_id": 113,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 1746,
+      "weight_kg": 26.23,
+      "distance_km": 27.3917241320014,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 114,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 5891,
+      "weight_kg": 18.0,
+      "distance_km": 24.49816719815135,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 115,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 4556,
+      "weight_kg": 30.17,
+      "distance_km": 35.71918050944805,
+      "note": ""
+    },
+    {
+      "order_id": 116,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 2045,
+      "weight_kg": 30.1,
+      "distance_km": 9.083021257072687,
+      "note": ""
+    },
+    {
+      "order_id": 117,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 1010,
+      "weight_kg": 6.9,
+      "distance_km": 5.839004285633564,
+      "note": ""
+    },
+    {
+      "order_id": 118,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 8175,
+      "weight_kg": 2.76,
+      "distance_km": 22.817202296108007,
+      "note": ""
+    },
+    {
+      "order_id": 119,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 516,
+      "weight_kg": 16.97,
+      "distance_km": 40.004420310258865,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 120,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 8817,
+      "weight_kg": 13.93,
+      "distance_km": 17.758517760783434,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 121,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 2882,
+      "weight_kg": 15.94,
+      "distance_km": 15.628012411296368,
+      "note": ""
+    },
+    {
+      "order_id": 122,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 3051,
+      "weight_kg": 24.78,
+      "distance_km": 2.9149818532168865,
+      "note": ""
+    },
+    {
+      "order_id": 123,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 4904,
+      "weight_kg": 16.84,
+      "distance_km": 11.923416510224342,
+      "note": ""
+    },
+    {
+      "order_id": 124,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 737,
+      "weight_kg": 14.28,
+      "distance_km": 29.517490092664957,
+      "note": ""
+    },
+    {
+      "order_id": 125,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 3394,
+      "weight_kg": 19.06,
+      "distance_km": 9.392472721636295,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 126,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 4335,
+      "weight_kg": 22.42,
+      "distance_km": 14.572523172944784,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 127,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 1412,
+      "weight_kg": 19.09,
+      "distance_km": 17.460570812225342,
+      "note": ""
+    },
+    {
+      "order_id": 128,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 3157,
+      "weight_kg": 2.07,
+      "distance_km": 15.692926991730928,
+      "note": ""
+    },
+    {
+      "order_id": 129,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 686,
+      "weight_kg": 9.67,
+      "distance_km": 32.04729839414358,
+      "note": ""
+    },
+    {
+      "order_id": 130,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 4299,
+      "weight_kg": 19.79,
+      "distance_km": 37.00169072672725,
+      "note": ""
+    },
+    {
+      "order_id": 131,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 4208,
+      "weight_kg": 28.01,
+      "distance_km": 25.718876227736473,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 132,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 3773,
+      "weight_kg": 14.46,
+      "distance_km": 19.57551983371377,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 133,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 5726,
+      "weight_kg": 2.06,
+      "distance_km": 23.30324000865221,
+      "note": ""
+    },
+    {
+      "order_id": 134,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 2663,
+      "weight_kg": 17.1,
+      "distance_km": 25.441875841468573,
+      "note": ""
+    },
+    {
+      "order_id": 135,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 4140,
+      "weight_kg": 6.68,
+      "distance_km": 30.458003014326096,
+      "note": ""
+    },
+    {
+      "order_id": 136,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 4445,
+      "weight_kg": 4.04,
+      "distance_km": 36.56502981856465,
+      "note": ""
+    },
+    {
+      "order_id": 137,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 7330,
+      "weight_kg": 2.56,
+      "distance_km": 16.665908984839916,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 138,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 5495,
+      "weight_kg": 12.63,
+      "distance_km": 14.553551387041807,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 139,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 1980,
+      "weight_kg": 7.22,
+      "distance_km": 2.4917596131563187,
+      "note": ""
+    },
+    {
+      "order_id": 140,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 3449,
+      "weight_kg": 26.79,
+      "distance_km": 17.9935301579535,
+      "note": ""
+    },
+    {
+      "order_id": 141,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 3310,
+      "weight_kg": 3.72,
+      "distance_km": 18.669176019728184,
+      "note": ""
+    },
+    {
+      "order_id": 142,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 3231,
+      "weight_kg": 13.93,
+      "distance_km": 7.358701463788748,
+      "note": ""
+    },
+    {
+      "order_id": 143,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 4920,
+      "weight_kg": 4.94,
+      "distance_km": 26.694928586483,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 144,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 5845,
+      "weight_kg": 13.29,
+      "distance_km": 37.370523262768984,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 145,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 5994,
+      "weight_kg": 15.4,
+      "distance_km": 32.09294452518225,
+      "note": ""
+    },
+    {
+      "order_id": 146,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 519,
+      "weight_kg": 26.1,
+      "distance_km": 38.47812609001994,
+      "note": ""
+    },
+    {
+      "order_id": 147,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 9104,
+      "weight_kg": 11.09,
+      "distance_km": 37.369477555155754,
+      "note": ""
+    },
+    {
+      "order_id": 148,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 2501,
+      "weight_kg": 13.82,
+      "distance_km": 37.799932930618525,
+      "note": ""
+    },
+    {
+      "order_id": 149,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 5470,
+      "weight_kg": 17.09,
+      "distance_km": 26.91529906541109,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 150,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 1955,
+      "weight_kg": 6.28,
+      "distance_km": 20.415620889514685,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 151,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 3032,
+      "weight_kg": 0.67,
+      "distance_km": 25.720145136117935,
+      "note": ""
+    },
+    {
+      "order_id": 152,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 8965,
+      "weight_kg": 19.48,
+      "distance_km": 39.318971533328295,
+      "note": ""
+    },
+    {
+      "order_id": 153,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 3514,
+      "weight_kg": 6.75,
+      "distance_km": 2.749028794467449,
+      "note": ""
+    },
+    {
+      "order_id": 154,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 9003,
+      "weight_kg": 18.92,
+      "distance_km": 1.6390317790210247,
+      "note": ""
+    },
+    {
+      "order_id": 155,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 8476,
+      "weight_kg": 1.8,
+      "distance_km": 13.189401879906654,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 156,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 8685,
+      "weight_kg": 9.33,
+      "distance_km": 24.908882204443216,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 157,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 3350,
+      "weight_kg": 12.42,
+      "distance_km": 26.512525893747807,
+      "note": ""
+    },
+    {
+      "order_id": 158,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 2039,
+      "weight_kg": 3.97,
+      "distance_km": 5.208184655755758,
+      "note": ""
+    },
+    {
+      "order_id": 159,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 9176,
+      "weight_kg": 25.87,
+      "distance_km": 24.40178620815277,
+      "note": ""
+    },
+    {
+      "order_id": 160,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 2037,
+      "weight_kg": 21.34,
+      "distance_km": 23.92755602672696,
+      "note": ""
+    },
+    {
+      "order_id": 161,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 270,
+      "weight_kg": 7.41,
+      "distance_km": 29.085059009492397,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 162,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 6963,
+      "weight_kg": 16.45,
+      "distance_km": 36.69969008490443,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 163,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 3572,
+      "weight_kg": 18.3,
+      "distance_km": 33.467615351080894,
+      "note": ""
+    },
+    {
+      "order_id": 164,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 9641,
+      "weight_kg": 27.71,
+      "distance_km": 11.714024219661951,
+      "note": ""
+    },
+    {
+      "order_id": 165,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 9374,
+      "weight_kg": 10.73,
+      "distance_km": 4.696421690285206,
+      "note": ""
+    },
+    {
+      "order_id": 166,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 3539,
+      "weight_kg": 20.78,
+      "distance_km": 30.178622987121344,
+      "note": ""
+    },
+    {
+      "order_id": 167,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 1344,
+      "weight_kg": 6.86,
+      "distance_km": 37.396071285009384,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 168,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 7481,
+      "weight_kg": 24.07,
+      "distance_km": 24.114825326949358,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 169,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 8526,
+      "weight_kg": 18.82,
+      "distance_km": 36.80095582455397,
+      "note": ""
+    },
+    {
+      "order_id": 170,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 9323,
+      "weight_kg": 19.73,
+      "distance_km": 0.9670773260295391,
+      "note": ""
+    },
+    {
+      "order_id": 171,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 4976,
+      "weight_kg": 27.22,
+      "distance_km": 30.36766166985035,
+      "note": ""
+    },
+    {
+      "order_id": 172,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 7813,
+      "weight_kg": 11.2,
+      "distance_km": 25.682247404009104,
+      "note": ""
+    },
+    {
+      "order_id": 173,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 8374,
+      "weight_kg": 24.75,
+      "distance_km": 34.185950078070164,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 174,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 5647,
+      "weight_kg": 27.01,
+      "distance_km": 13.959595795720816,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 175,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 4016,
+      "weight_kg": 2.45,
+      "distance_km": 32.61605578660965,
+      "note": ""
+    },
+    {
+      "order_id": 176,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 6773,
+      "weight_kg": 20.64,
+      "distance_km": 10.29444520547986,
+      "note": ""
+    },
+    {
+      "order_id": 177,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 7810,
+      "weight_kg": 13.86,
+      "distance_km": 1.0644133314490318,
+      "note": ""
+    },
+    {
+      "order_id": 178,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 2879,
+      "weight_kg": 2.92,
+      "distance_km": 36.23547450825572,
+      "note": ""
+    },
+    {
+      "order_id": 179,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 4244,
+      "weight_kg": 8.34,
+      "distance_km": 27.669295474886894,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 180,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 4361,
+      "weight_kg": 7.39,
+      "distance_km": 32.94743237271905,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 181,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 9854,
+      "weight_kg": 22.33,
+      "distance_km": 4.902223117649555,
+      "note": ""
+    },
+    {
+      "order_id": 182,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 7691,
+      "weight_kg": 1.56,
+      "distance_km": 2.7179426811635494,
+      "note": ""
+    },
+    {
+      "order_id": 183,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 5968,
+      "weight_kg": 27.58,
+      "distance_km": 1.7003810703754425,
+      "note": ""
+    },
+    {
+      "order_id": 184,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 9345,
+      "weight_kg": 23.75,
+      "distance_km": 11.468948621302843,
+      "note": ""
+    },
+    {
+      "order_id": 185,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 8370,
+      "weight_kg": 20.6,
+      "distance_km": 25.72964905947447,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 186,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 9763,
+      "weight_kg": 24.74,
+      "distance_km": 3.6302173249423504,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 187,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 3956,
+      "weight_kg": 26.44,
+      "distance_km": 18.737232342362404,
+      "note": ""
+    },
+    {
+      "order_id": 188,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 7509,
+      "weight_kg": 25.34,
+      "distance_km": 36.90420192852616,
+      "note": ""
+    },
+    {
+      "order_id": 189,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 8390,
+      "weight_kg": 4.41,
+      "distance_km": 10.687251307070255,
+      "note": ""
+    },
+    {
+      "order_id": 190,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 3851,
+      "weight_kg": 21.21,
+      "distance_km": 2.49843293055892,
+      "note": ""
+    },
+    {
+      "order_id": 191,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 2200,
+      "weight_kg": 8.26,
+      "distance_km": 5.482024431228638,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 192,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 8689,
+      "weight_kg": 21.73,
+      "distance_km": 31.32348572090268,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 193,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 2518,
+      "weight_kg": 12.58,
+      "distance_km": 37.55615397542715,
+      "note": ""
+    },
+    {
+      "order_id": 194,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 6695,
+      "weight_kg": 14.39,
+      "distance_km": 33.451446156948805,
+      "note": ""
+    },
+    {
+      "order_id": 195,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 628,
+      "weight_kg": 14.9,
+      "distance_km": 19.489898785948753,
+      "note": ""
+    },
+    {
+      "order_id": 196,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 2745,
+      "weight_kg": 1.52,
+      "distance_km": 11.80167106166482,
+      "note": ""
+    },
+    {
+      "order_id": 197,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 6934,
+      "weight_kg": 20.92,
+      "distance_km": 31.02269358187914,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 198,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 7659,
+      "weight_kg": 4.7,
+      "distance_km": 6.567515518516302,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 199,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 9892,
+      "weight_kg": 23.29,
+      "distance_km": 34.45704910159111,
+      "note": ""
+    },
+    {
+      "order_id": 200,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 1701,
+      "weight_kg": 20.74,
+      "distance_km": 39.31957383826375,
+      "note": ""
+    },
+    {
+      "order_id": 201,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 6066,
+      "weight_kg": 15.31,
+      "distance_km": 15.427442483603954,
+      "note": ""
+    },
+    {
+      "order_id": 202,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 5231,
+      "weight_kg": 13.63,
+      "distance_km": 30.01785607263446,
+      "note": ""
+    },
+    {
+      "order_id": 203,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 1848,
+      "weight_kg": 8.19,
+      "distance_km": 16.368182256817818,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 204,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 2305,
+      "weight_kg": 20.48,
+      "distance_km": 31.337196949869394,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 205,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 5266,
+      "weight_kg": 24.67,
+      "distance_km": 27.74860731512308,
+      "note": ""
+    },
+    {
+      "order_id": 206,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 343,
+      "weight_kg": 10.89,
+      "distance_km": 17.75706910714507,
+      "note": ""
+    },
+    {
+      "order_id": 207,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 2172,
+      "weight_kg": 11.55,
+      "distance_km": 4.253354251384735,
+      "note": ""
+    },
+    {
+      "order_id": 208,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 1965,
+      "weight_kg": 23.42,
+      "distance_km": 36.788847494870424,
+      "note": ""
+    },
+    {
+      "order_id": 209,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 4490,
+      "weight_kg": 19.75,
+      "distance_km": 34.569802425801754,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 210,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 9763,
+      "weight_kg": 20.78,
+      "distance_km": 11.510446827858686,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 211,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 5376,
+      "weight_kg": 13.9,
+      "distance_km": 9.304181143641472,
+      "note": ""
+    },
+    {
+      "order_id": 212,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 9969,
+      "weight_kg": 15.04,
+      "distance_km": 32.25012895837426,
+      "note": ""
+    },
+    {
+      "order_id": 213,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 3666,
+      "weight_kg": 6.44,
+      "distance_km": 16.782198317348957,
+      "note": ""
+    },
+    {
+      "order_id": 214,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 5567,
+      "weight_kg": 5.24,
+      "distance_km": 25.8081520460546,
+      "note": ""
+    },
+    {
+      "order_id": 215,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 3440,
+      "weight_kg": 13.04,
+      "distance_km": 6.099424988031387,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 216,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 5785,
+      "weight_kg": 9.62,
+      "distance_km": 38.02680839970708,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 217,
+      "country": "PL",
+      "sku": "SKU-0008",
+      "amount_cents": 5578,
+      "weight_kg": 14.38,
+      "distance_km": 5.771045081317425,
+      "note": ""
+    },
+    {
+      "order_id": 218,
+      "country": "DE",
+      "sku": "SKU-0021",
+      "amount_cents": 8835,
+      "weight_kg": 22.08,
+      "distance_km": 4.816272865980864,
+      "note": ""
+    },
+    {
+      "order_id": 219,
+      "country": "SE",
+      "sku": "SKU-0034",
+      "amount_cents": 3364,
+      "weight_kg": 15.97,
+      "distance_km": 29.68995477259159,
+      "note": ""
+    },
+    {
+      "order_id": 220,
+      "country": "US",
+      "sku": "SKU-0007",
+      "amount_cents": 8129,
+      "weight_kg": 27.51,
+      "distance_km": 12.915558639913797,
+      "note": ""
+    },
+    {
+      "order_id": 221,
+      "country": "UK",
+      "sku": "SKU-0020",
+      "amount_cents": 1210,
+      "weight_kg": 9.2,
+      "distance_km": 34.83657083660364,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 222,
+      "country": "PL",
+      "sku": "SKU-0033",
+      "amount_cents": 4263,
+      "weight_kg": 6.45,
+      "distance_km": 19.71475237235427,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 223,
+      "country": "DE",
+      "sku": "SKU-0006",
+      "amount_cents": 1688,
+      "weight_kg": 12.08,
+      "distance_km": 12.293082356452942,
+      "note": ""
+    },
+    {
+      "order_id": 224,
+      "country": "SE",
+      "sku": "SKU-0019",
+      "amount_cents": 5413,
+      "weight_kg": 15.24,
+      "distance_km": 6.386575449258089,
+      "note": ""
+    },
+    {
+      "order_id": 225,
+      "country": "US",
+      "sku": "SKU-0032",
+      "amount_cents": 4766,
+      "weight_kg": 5.76,
+      "distance_km": 29.59925516694784,
+      "note": ""
+    },
+    {
+      "order_id": 226,
+      "country": "UK",
+      "sku": "SKU-0005",
+      "amount_cents": 9899,
+      "weight_kg": 19.44,
+      "distance_km": 15.372193317860365,
+      "note": ""
+    },
+    {
+      "order_id": 227,
+      "country": "PL",
+      "sku": "SKU-0018",
+      "amount_cents": 5552,
+      "weight_kg": 0.78,
+      "distance_km": 13.34627340734005,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 228,
+      "country": "DE",
+      "sku": "SKU-0031",
+      "amount_cents": 361,
+      "weight_kg": 4.85,
+      "distance_km": 26.938069734722376,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 229,
+      "country": "SE",
+      "sku": "SKU-0004",
+      "amount_cents": 8490,
+      "weight_kg": 21.28,
+      "distance_km": 1.1394775584340096,
+      "note": ""
+    },
+    {
+      "order_id": 230,
+      "country": "US",
+      "sku": "SKU-0017",
+      "amount_cents": 6355,
+      "weight_kg": 13.58,
+      "distance_km": 35.06753781065345,
+      "note": ""
+    },
+    {
+      "order_id": 231,
+      "country": "UK",
+      "sku": "SKU-0030",
+      "amount_cents": 9516,
+      "weight_kg": 14.67,
+      "distance_km": 36.670233339071274,
+      "note": ""
+    },
+    {
+      "order_id": 232,
+      "country": "PL",
+      "sku": "SKU-0003",
+      "amount_cents": 7709,
+      "weight_kg": 21.89,
+      "distance_km": 25.37263472750783,
+      "note": ""
+    },
+    {
+      "order_id": 233,
+      "country": "DE",
+      "sku": "SKU-0016",
+      "amount_cents": 8030,
+      "weight_kg": 0.84,
+      "distance_km": 5.62154083698988,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 234,
+      "country": "SE",
+      "sku": "SKU-0029",
+      "amount_cents": 3263,
+      "weight_kg": 18.56,
+      "distance_km": 32.008622001856565,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 235,
+      "country": "US",
+      "sku": "SKU-0002",
+      "amount_cents": 7016,
+      "weight_kg": 19.31,
+      "distance_km": 8.491368249058723,
+      "note": ""
+    },
+    {
+      "order_id": 236,
+      "country": "UK",
+      "sku": "SKU-0015",
+      "amount_cents": 5949,
+      "weight_kg": 3.69,
+      "distance_km": 11.745488170534372,
+      "note": ""
+    },
+    {
+      "order_id": 237,
+      "country": "PL",
+      "sku": "SKU-0028",
+      "amount_cents": 1130,
+      "weight_kg": 13.7,
+      "distance_km": 34.152069605886936,
+      "note": ""
+    },
+    {
+      "order_id": 238,
+      "country": "DE",
+      "sku": "SKU-0001",
+      "amount_cents": 5135,
+      "weight_kg": 12.93,
+      "distance_km": 36.397605773061514,
+      "note": ""
+    },
+    {
+      "order_id": 239,
+      "country": "SE",
+      "sku": "SKU-0014",
+      "amount_cents": 9280,
+      "weight_kg": 10.57,
+      "distance_km": 30.073620855808258,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 240,
+      "country": "US",
+      "sku": "SKU-0027",
+      "amount_cents": 6917,
+      "weight_kg": 3.81,
+      "distance_km": 24.734589505940676,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 241,
+      "country": "UK",
+      "sku": "SKU-0000",
+      "amount_cents": 8658,
+      "weight_kg": 2.12,
+      "distance_km": 16.622783683240414,
+      "note": ""
+    },
+    {
+      "order_id": 242,
+      "country": "PL",
+      "sku": "SKU-0013",
+      "amount_cents": 8283,
+      "weight_kg": 1.19,
+      "distance_km": 26.79327742382884,
+      "note": ""
+    },
+    {
+      "order_id": 243,
+      "country": "DE",
+      "sku": "SKU-0026",
+      "amount_cents": 7552,
+      "weight_kg": 1.7,
+      "distance_km": 38.70968143641949,
+      "note": ""
+    },
+    {
+      "order_id": 244,
+      "country": "SE",
+      "sku": "SKU-0039",
+      "amount_cents": 2033,
+      "weight_kg": 20.45,
+      "distance_km": 12.182632062584162,
+      "note": ""
+    },
+    {
+      "order_id": 245,
+      "country": "US",
+      "sku": "SKU-0012",
+      "amount_cents": 158,
+      "weight_kg": 29.35,
+      "distance_km": 23.287646539509296,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 246,
+      "country": "UK",
+      "sku": "SKU-0025",
+      "amount_cents": 6371,
+      "weight_kg": 5.8,
+      "distance_km": 34.52023335918784,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 247,
+      "country": "PL",
+      "sku": "SKU-0038",
+      "amount_cents": 396,
+      "weight_kg": 19.14,
+      "distance_km": 30.82157376408577,
+      "note": ""
+    },
+    {
+      "order_id": 248,
+      "country": "DE",
+      "sku": "SKU-0011",
+      "amount_cents": 309,
+      "weight_kg": 8.13,
+      "distance_km": 21.560910243541002,
+      "note": ""
+    },
+    {
+      "order_id": 249,
+      "country": "SE",
+      "sku": "SKU-0024",
+      "amount_cents": 7126,
+      "weight_kg": 0.55,
+      "distance_km": 7.824388734996319,
+      "note": ""
+    },
+    {
+      "order_id": 250,
+      "country": "US",
+      "sku": "SKU-0037",
+      "amount_cents": 4595,
+      "weight_kg": 13.89,
+      "distance_km": 29.874932777136564,
+      "note": ""
+    },
+    {
+      "order_id": 251,
+      "country": "UK",
+      "sku": "SKU-0010",
+      "amount_cents": 7476,
+      "weight_kg": 15.33,
+      "distance_km": 20.920616045594215,
+      "note": "leave at door"
+    },
+    {
+      "order_id": 252,
+      "country": "PL",
+      "sku": "SKU-0023",
+      "amount_cents": 8769,
+      "weight_kg": 20.88,
+      "distance_km": 39.10506171360612,
+      "note": "gift wrap"
+    },
+    {
+      "order_id": 253,
+      "country": "DE",
+      "sku": "SKU-0036",
+      "amount_cents": 2706,
+      "weight_kg": 20.96,
+      "distance_km": 15.630406357347965,
+      "note": ""
+    },
+    {
+      "order_id": 254,
+      "country": "SE",
+      "sku": "SKU-0009",
+      "amount_cents": 9367,
+      "weight_kg": 26.01,
+      "distance_km": 38.878627356141806,
+      "note": ""
+    },
+    {
+      "order_id": 255,
+      "country": "US",
+      "sku": "SKU-0022",
+      "amount_cents": 4628,
+      "weight_kg": 13.83,
+      "distance_km": 10.176756858825684,
+      "note": ""
+    },
+    {
+      "order_id": 256,
+      "country": "UK",
+      "sku": "SKU-0035",
+      "amount_cents": 3689,
+      "weight_kg": 20.67,
+      "distance_km": 36.372684586793184,
+      "note": ""
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 256,
+      "total_byte_size": 15133,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "ZSTD",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 430,
+          "total_uncompressed_size": 2114,
+          "statistics": {
+            "min": 1,
+            "max": 256,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "ZSTD",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 434,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 80,
+          "total_uncompressed_size": 1569,
+          "statistics": {
+            "min": "DE",
+            "max": "US",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "sku",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "ZSTD",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 514,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 313,
+          "total_uncompressed_size": 3118,
+          "statistics": {
+            "min": "SKU-0000",
+            "max": "SKU-0039",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "ZSTD",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 827,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 640,
+          "total_uncompressed_size": 2114,
+          "statistics": {
+            "min": 129,
+            "max": 9969,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "weight_kg",
+          "physical_type": "DOUBLE",
+          "compression": "ZSTD",
+          "encodings": [
+            "BYTE_STREAM_SPLIT",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 1467,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 1569,
+          "total_uncompressed_size": 2114,
+          "statistics": {
+            "min": 0.35,
+            "max": 30.17,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "distance_km",
+          "physical_type": "DOUBLE",
+          "compression": "ZSTD",
+          "encodings": [
+            "BYTE_STREAM_SPLIT",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 3036,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 1416,
+          "total_uncompressed_size": 2114,
+          "statistics": {
+            "min": 0.6482897065579891,
+            "max": 40.280333172529936,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "note",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "ZSTD",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 256,
+          "data_page_offset": 4452,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 98,
+          "total_uncompressed_size": 1990,
+          "statistics": {
+            "min": "",
+            "max": "leave at door",
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}
