@@ -214,3 +214,12 @@ pub extern "C" fn pl_schema(id: u32) -> usize {
         None => no_such_file(id),
     }
 }
+
+/// Ch04's experiment: one column's levels, values, and rebuilt records. See `report::levels`.
+#[no_mangle]
+pub extern "C" fn pl_levels(id: u32, column: u32) -> usize {
+    match with_file(id, |f| report::levels(&f.bytes, column as usize)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}

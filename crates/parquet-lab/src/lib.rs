@@ -15,6 +15,10 @@
 //! | [`metadata`] | `FileMetaData` as Rust types | ch03, ch08 |
 //! | [`schema`] | the schema tree, leaf paths, and maximum levels | ch03 |
 //! | [`pages`] | walking a column chunk's page headers | ch06 |
+//! | [`rle`] | the RLE / bit-packing hybrid, for levels and indices | ch04, ch05 |
+//! | [`plain`] | PLAIN values, with the bytes of each | ch04, ch05 |
+//! | [`column`] | a column chunk read into (repetition, definition, value) triples | ch04 |
+//! | [`nested`] | what the levels mean, and records rebuilt from them | ch04 |
 //! | [`encoding`] | turning encoded bytes back into values | ch05 |
 //! | [`object_store`] | a simulated S3: `HEAD`, `GET`, ranges, and a trace | ch02, ch10 |
 //! | [`reader`] | opening a file in an object store | ch02, ch10 |
@@ -31,16 +35,20 @@
 //! and to WebAssembly for the browser, from the same source.
 
 pub mod bytes;
+pub mod column;
 pub mod encoding;
 pub mod format;
 pub mod json;
 pub mod layout;
 pub mod logical;
 pub mod metadata;
+pub mod nested;
 pub mod object_store;
 pub mod pages;
 pub mod parquet_thrift;
+pub mod plain;
 pub mod reader;
 pub mod report;
+pub mod rle;
 pub mod schema;
 pub mod thrift;

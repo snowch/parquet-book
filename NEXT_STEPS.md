@@ -22,14 +22,22 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: the schema panel (flat list, rebuilt tree, statistics read through logical types).
 - Problems 3.1 to 3.3 with tests; 3.4 about the reader's own schema.
 
-## Next: ch04, nested data
+## Done: ch04, nested data
 
-1. Fixture: `nested.parquet` with a list of structs containing a list (the sales `items` example),
-   nullable at every level, a handful of records including an empty list and a null list.
-2. Reader: the RLE/bit-packing hybrid decoder for levels (written here, reused by ch05), data page
-   v1 bodies split into repetition levels, definition levels and values.
-3. Record assembly: levels and values back into records, checked against pyarrow's rows.
-4. Experiment: a levels panel stepping through (r, d, value) triples with the bytes of each.
+- Reader: the RLE / bit-packing hybrid with runs and spans (`rle.rs`), PLAIN values with spans
+  (`plain.rs`), data page v1 bodies split into levels and values (`column.rs`), path levels,
+  plain-English explanations of each triple, and record assembly (`nested.rs`), checked against
+  pyarrow's rows for every column of every fixture.
+- Fixture: `nested.parquet`. Experiment: the levels panel. Problems 4.1, 4.2 with tests; 4.3 open.
+
+## Next: ch05, encodings
+
+1. Fixture: `dictionary.parquet` (low-cardinality strings, dictionary on) and an encodings fixture
+   with `DELTA_BINARY_PACKED`, `DELTA_LENGTH_BYTE_ARRAY`, `DELTA_BYTE_ARRAY` and
+   `BYTE_STREAM_SPLIT` set per column.
+2. Reader: dictionary pages and RLE_DICTIONARY indices (reusing `rle.rs`), the delta decoders,
+   BYTE_STREAM_SPLIT; `column.rs` accepts them.
+3. Experiment: an encoding stepper that decodes one run or miniblock at a time from its bytes.
 
 ## Then
 

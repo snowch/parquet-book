@@ -157,6 +157,24 @@ check(litDate[0] === minSpan[0] && litDate.length === minSpan[1] - minSpan[0],
   `clicking the minimum highlights its bytes [${minSpan[0]}, ${minSpan[1]})`);
 if (shots) await schemaLab.screenshot({ path: path.join(shots, "schema-lab.png") });
 
+// ch04: levels. The records the page rebuilds are the reader's.
+await page.goto(base + "nested-data.html");
+const levelsLab = page.locator('.lab[data-experiment="levels"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]')?.dataset.state === "ok");
+const nativeLevels = native(["levels", "fixtures/nested.parquet", "2"]);
+check(await levelsLab.getAttribute("data-records") === JSON.stringify(nativeLevels.records),
+  `tags[] rebuilds to the reader's records: ${JSON.stringify(nativeLevels.records)}`);
+await levelsLab.locator('button[data-column="4"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]').dataset.triples === "6");
+const deep = native(["levels", "fixtures/nested.parquet", "4"]);
+check(await levelsLab.getAttribute("data-records") === JSON.stringify(deep.records),
+  "switching column reruns the reader: items[].discounts[] rebuilt");
+await levelsLab.locator(".runs-list button.span").first().click();
+const hdr = deep.pages[0].repetition_levels.runs[0].header;
+const litHdr = await levelsLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
+check(litHdr[0] === hdr[0] && litHdr.length === hdr[1] - hdr[0], `a run header highlights its byte [${hdr[0]}, ${hdr[1]})`);
+if (shots) await levelsLab.screenshot({ path: path.join(shots, "levels-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -147,6 +147,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .schema-grid .p-flat { border-right: 1px solid var(--edge); }
 @media (max-width: 90rem) {
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
+  .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
+  .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
 }
 .flat-list, .values-table { border-collapse: collapse; font-size: 12.5px; width: 100%; }
@@ -167,6 +169,29 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .values-table td.logical { font-weight: 600; }
 .values-table td.same { color: var(--faint); }
 .values-table button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+
+/* Ch04: levels. */
+.column-picker button { margin: 0 .3rem .3rem 0; }
+.column-picker button[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); }
+.column-picker small { color: var(--faint); }
+.levels-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+               grid-template-areas: "path runs" "triples triples" "records records"; border-bottom: 1px solid var(--edge); }
+.levels-grid .p-path { grid-area: path; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.levels-grid .p-runs { grid-area: runs; border-bottom: 1px solid var(--edge); }
+.levels-grid .p-triples { grid-area: triples; border-bottom: 1px solid var(--edge); }
+.levels-grid .p-records { grid-area: records; }
+.path-table, .triples-table { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.path-table th, .path-table td, .triples-table th, .triples-table td { padding: .22rem .45rem;
+  border-bottom: 1px solid var(--edge); text-align: left; vertical-align: top; }
+.path-table th, .triples-table th { font-size: 10.5px; }
+.triples-table tr.record-start td { border-top: 2px solid var(--rule); }
+.triples-table td.meaning { color: var(--muted); }
+.lab .note { color: var(--faint); font-size: 12.5px; margin: .4rem 0; }
+.stream-title { margin: .4rem 0 .2rem; font-weight: 600; font-size: 12.5px; }
+.runs-list, .records-list { margin: 0; padding-left: 1.4rem; font-size: 12.5px; }
+.records-list code { white-space: pre-wrap; }
+.levels-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.levels-picked { outline: 2px solid var(--accent); }
 
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
@@ -192,6 +217,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 
 @media (max-width: 52rem) {
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
+  .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
+  .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
   .lab-story, .lab-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hex" "tree" "inspect"; }
   .lab-story .p-steps, .lab-grid .p-hex { border-right: 0; border-bottom: 1px solid var(--edge); }

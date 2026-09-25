@@ -140,9 +140,9 @@ _CHAPTERS = (
         "Nested data",
         "the_file",
         "How can nested, nullable records live in flat columns without losing their shape?",
-        "Repetition and definition levels, computed by hand and then by code, and records rebuilt.",
-        (),
-        (),
+        "The RLE/bit-packing hybrid for levels, a column read into triples, and records rebuilt from them.",
+        ("levels",),
+        ("nested.parquet",),
     ),
     (
         "encodings",
@@ -261,4 +261,4 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
-EXPERIMENTS = ("layouts", "footer", "anatomy", "schema")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels")

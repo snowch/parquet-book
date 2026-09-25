@@ -57,6 +57,30 @@ const FIGURES: &[Figure] = &[
         file: "types-values.md",
         render: types_values,
     },
+    Figure {
+        file: "nested-schema-text.md",
+        render: nested_schema_text,
+    },
+    Figure {
+        file: "nested-columns.md",
+        render: nested_columns,
+    },
+    Figure {
+        file: "nested-levels-email.md",
+        render: |root| nested_levels(root, "email"),
+    },
+    Figure {
+        file: "nested-levels-tags.md",
+        render: |root| nested_levels(root, "tags.list.element"),
+    },
+    Figure {
+        file: "nested-levels-discounts.md",
+        render: |root| nested_levels(root, "items.list.element.discounts.list.element"),
+    },
+    Figure {
+        file: "nested-runs-discounts.md",
+        render: nested_runs_discounts,
+    },
 ];
 
 pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
@@ -499,5 +523,138 @@ fn types_values(root: &Path) -> Result<String, String> {
         ));
     }
     s.push_str(&conditions("types.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn nested_levels_json(root: &Path, path: &str) -> Result<(Vec<u8>, Json), String> {
+    let bytes = fixture(root, "nested.parquet")?;
+    let all = parquet_lab::report::levels(&bytes, 0);
+    let column = all
+        .get("columns")
+        .and_then(Json::as_array)
+        .and_then(|cs| cs.iter().find(|c| text_of(c.get("path")) == path))
+        .and_then(|c| c.get("column"))
+        .and_then(Json::as_u64)
+        .ok_or(format!("nested.parquet has no column {path}"))?;
+    let j = parquet_lab::report::levels(&bytes, column as usize);
+    if j.get("ok") != Some(&Json::Bool(true)) {
+        return Err(format!("nested.parquet {path}: {}", j.to_json()));
+    }
+    Ok((bytes, j))
+}
+
+fn nested_schema_text(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, "nested.parquet")?;
+    let j = parquet_lab::report::schema(&bytes);
+    let mut s = String::from(HEADER);
+    s.push_str("```text\n");
+    s.push_str(&text_of(j.get("text")));
+    s.push_str("```\n");
+    s.push_str(&conditions("nested.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn nested_columns(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, "nested.parquet")?;
+    let j = parquet_lab::report::levels(&bytes, 0);
+    let mut s = String::from(HEADER);
+    s.push_str("| Column | Path in the file | Max definition level | Max repetition level |\n|---|---|--:|--:|\n");
+    for c in j
+        .get("columns")
+        .and_then(Json::as_array)
+        .ok_or("no columns")?
+    {
+        s.push_str(&format!(
+            "| `{}` | `{}` | {} | {} |\n",
+            text_of(c.get("label")),
+            text_of(c.get("path")),
+            text_of(c.get("max_definition_level")),
+            text_of(c.get("max_repetition_level")),
+        ));
+    }
+    s.push_str(&conditions("nested.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn nested_levels(root: &Path, path: &str) -> Result<String, String> {
+    let (bytes, j) = nested_levels_json(root, path)?;
+    let mut s = String::from(HEADER);
+    s.push_str("| r | d | Value | What the levels say |\n|--:|--:|---|---|\n");
+    for t in j
+        .get("triples")
+        .and_then(Json::as_array)
+        .ok_or("no triples")?
+    {
+        let value = match t.get("value") {
+            Some(Json::Null) | None => "·".to_string(),
+            Some(v) => format!("`{}`", v.to_json()),
+        };
+        s.push_str(&format!(
+            "| {} | {} | {value} | {} |\n",
+            text_of(t.get("rep")),
+            text_of(t.get("def")),
+            text_of(t.get("explain")),
+        ));
+    }
+    s.push_str("\nThe records rebuilt from these triples:\n\n```text\n");
+    for r in j
+        .get("records")
+        .and_then(Json::as_array)
+        .ok_or("no records")?
+    {
+        s.push_str(&r.to_json());
+        s.push('\n');
+    }
+    s.push_str("```\n");
+    s.push_str(&conditions("nested.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn nested_runs_discounts(root: &Path) -> Result<String, String> {
+    let (bytes, j) = nested_levels_json(root, "items.list.element.discounts.list.element")?;
+    let page = j
+        .get("pages")
+        .and_then(Json::as_array)
+        .and_then(|p| p.first())
+        .ok_or("no pages")?;
+    let mut s = String::from(HEADER);
+    s.push_str("| Levels | Run | Header byte | Body bytes | Values |\n|---|---|---|---|---|\n");
+    for (name, key) in [
+        ("repetition", "repetition_levels"),
+        ("definition", "definition_levels"),
+    ] {
+        let stream = page.get(key).ok_or("no levels")?;
+        for run in stream
+            .get("runs")
+            .and_then(Json::as_array)
+            .ok_or("no runs")?
+        {
+            let span_bytes = |k: &str| -> String {
+                let sp = run
+                    .get(k)
+                    .and_then(Json::as_array)
+                    .cloned()
+                    .unwrap_or_default();
+                let (a, b) = (
+                    sp.first().and_then(Json::as_u64).unwrap_or(0) as usize,
+                    sp.get(1).and_then(Json::as_u64).unwrap_or(0) as usize,
+                );
+                parquet_lab::encoding::hex(&bytes[a..b])
+            };
+            let values: Vec<String> = run
+                .get("values")
+                .and_then(Json::as_array)
+                .map(|v| v.iter().map(|x| x.to_json()).collect())
+                .unwrap_or_default();
+            s.push_str(&format!(
+                "| {name} | {} | `{}` | `{}` | {} |\n",
+                text_of(run.get("kind")),
+                span_bytes("header"),
+                span_bytes("body"),
+                values.join(", ")
+            ));
+        }
+    }
+    s.push_str(&conditions("nested.parquet", &bytes, None));
     Ok(s)
 }

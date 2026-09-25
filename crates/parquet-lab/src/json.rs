@@ -76,7 +76,10 @@ impl Json {
             Json::UInt(v) if *v > MAX_SAFE => write_str(out, &v.to_string()),
             Json::Int(v) => out.push_str(&v.to_string()),
             Json::UInt(v) => out.push_str(&v.to_string()),
-            Json::Float(v) if v.is_finite() => out.push_str(&format!("{v}")),
+            // `{:?}` is the shortest form that round-trips, and always has a point or an
+            // exponent. `{}` writes 4.49e21 as twenty-two digits, which a JSON reader may take
+            // for an integer. The parity test in tests/test_wasm.py found this too.
+            Json::Float(v) if v.is_finite() => out.push_str(&format!("{v:?}")),
             Json::Float(_) => out.push_str("null"),
             Json::Str(s) => write_str(out, s),
             Json::Arr(items) => {
@@ -441,5 +444,7 @@ mod tests {
     fn spans_are_pairs_and_non_finite_floats_are_null() {
         assert_eq!(Json::from(Span::new(3, 9)).to_json(), "[3,9]");
         assert_eq!(Json::from(f64::NAN).to_json(), "null");
+        assert_eq!(Json::from(4.49e21).to_json(), "4.49e21");
+        assert_eq!(Json::from(1.0).to_json(), "1.0");
     }
 }

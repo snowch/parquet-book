@@ -75,6 +75,9 @@ def cases():
         native.append(("structure", f))
         calls.append({"call": "schema", "file": f})
         native.append(("schema", f))
+        for column in range(12):
+            calls.append({"call": "levels", "file": f, "column": column})
+            native.append(("levels", f, str(column)))
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))

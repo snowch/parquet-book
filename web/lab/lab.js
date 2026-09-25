@@ -10,9 +10,10 @@ import { Lab } from "./wasm.js";
 import { mountFooter, mountAnatomy } from "./footer.js";
 import { mountLayouts } from "./layouts.js";
 import { mountSchema } from "./schema.js";
+import { mountLevels } from "./levels.js";
 
 const EXPERIMENTS = {
-  footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema,
+  footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
 };
 
 class Fixtures {

@@ -819,3 +819,149 @@ pub fn schema(file: &[u8]) -> Json {
         ("leaves", leaves_json),
     ])
 }
+
+fn runs_json(stream: &Option<(Span, Vec<crate::rle::Run>)>) -> Json {
+    match stream {
+        None => Json::Null,
+        Some((span, runs)) => obj([
+            ("span", (*span).into()),
+            (
+                "runs",
+                Json::Arr(
+                    runs.iter()
+                        .map(|r| {
+                            obj([
+                                ("kind", r.kind.name().into()),
+                                ("header", r.header.into()),
+                                ("body", r.body.into()),
+                                ("values", r.values.clone().into()),
+                            ])
+                        })
+                        .collect(),
+                ),
+            ),
+        ]),
+    }
+}
+
+/// Ch04's experiment: one column's levels and values, what each triple means, and the records
+/// rebuilt from them.
+pub fn levels(file: &[u8], column: usize) -> Json {
+    use crate::column::read_column;
+    use crate::logical::value_json;
+    use crate::nested::{assemble, explain, path_fields};
+    use crate::schema::{build, leaves};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let columns = Json::Arr(
+        all.iter()
+            .map(|l| {
+                let fields = path_fields(&root, l);
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                    (
+                        "label",
+                        fields
+                            .last()
+                            .map(|f| f.label.clone())
+                            .unwrap_or_default()
+                            .into(),
+                    ),
+                    ("max_definition_level", l.max_definition_level.into()),
+                    ("max_repetition_level", l.max_repetition_level.into()),
+                ])
+            })
+            .collect(),
+    );
+    let Some(leaf) = all.get(column) else {
+        return fail(format!("the file has no column {column}"));
+    };
+    let fields = path_fields(&root, leaf);
+    let mut pages = Vec::new();
+    let mut triples = Vec::new();
+    for (g, rg) in md.row_groups.iter().enumerate() {
+        let data = match read_column(file, &rg.columns[leaf.column], leaf) {
+            Ok(d) => d,
+            Err(e) => return fail(e.to_string()).with("columns", columns),
+        };
+        for p in &data.pages {
+            pages.push(obj([
+                ("row_group", g.into()),
+                ("span", p.page.span().into()),
+                ("header", p.page.header_span.into()),
+                ("repetition_levels", runs_json(&p.rep_levels)),
+                ("definition_levels", runs_json(&p.def_levels)),
+                ("values", p.values.into()),
+            ]));
+        }
+        triples.extend(data.triples);
+    }
+    let records = assemble(&fields, leaf, &triples);
+    obj([
+        ("ok", true.into()),
+        ("columns", columns),
+        ("column", column.into()),
+        ("path", leaf.dotted_path().into()),
+        (
+            "fields",
+            Json::Arr(
+                fields
+                    .iter()
+                    .map(|f| {
+                        obj([
+                            ("name", f.name.clone().into()),
+                            ("label", f.label.clone().into()),
+                            ("repetition", f.repetition.word().into()),
+                            ("definition_level", f.def.into()),
+                            ("repetition_level", f.rep.into()),
+                            ("list", f.is_list.into()),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("max_definition_level", leaf.max_definition_level.into()),
+        ("max_repetition_level", leaf.max_repetition_level.into()),
+        ("pages", Json::Arr(pages)),
+        (
+            "triples",
+            Json::Arr(
+                triples
+                    .iter()
+                    .map(|t| {
+                        obj([
+                            ("rep", t.rep.into()),
+                            ("def", t.def.into()),
+                            (
+                                "value",
+                                t.value
+                                    .as_ref()
+                                    .map(|v| {
+                                        value_json(
+                                            leaf.physical_type,
+                                            leaf.logical_type.as_ref(),
+                                            v,
+                                        )
+                                    })
+                                    .unwrap_or(Json::Null),
+                            ),
+                            ("value_span", t.value_span.into()),
+                            ("explain", explain(&fields, t).into()),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("records", Json::Arr(records)),
+    ])
+}

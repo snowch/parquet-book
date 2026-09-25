@@ -15,5 +15,6 @@
 //! your function against it across many cases.
 
 pub mod anatomy_of_a_parquet_file;
+pub mod nested_data;
 pub mod the_type_system;
 pub mod why_parquet_exists;

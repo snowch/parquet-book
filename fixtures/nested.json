@@ -1,0 +1,243 @@
+{
+  "name": "nested",
+  "file": "nested.parquet",
+  "why": "Four orders whose fields are missing in every way a nested value can be: a null string, a null list, an empty list, a list holding a null, and a list of structs each holding a list of its own. Every column stores repetition and definition levels, which is ch04's subject.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false
+    }
+  },
+  "file_size": 1191,
+  "sha256": "30bedb7fb46e30b632e6dbe56a0a12d00d4df80487b977bd97f07b5bf74a96e8",
+  "footer_length": 749,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 4,
+  "num_columns": 5,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "tags",
+      "type": "list<item: string>",
+      "nullable": true
+    },
+    {
+      "name": "items",
+      "type": "list<item: struct<sku: string, discounts: list<item: int32>>>",
+      "nullable": true
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "email",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "tags.list.element",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 3,
+      "max_repetition_level": 1
+    },
+    {
+      "path": "items.list.element.sku",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 4,
+      "max_repetition_level": 1
+    },
+    {
+      "path": "items.list.element.discounts.list.element",
+      "physical_type": "INT32",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 6,
+      "max_repetition_level": 2
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "email": "ann@example.com",
+      "tags": [
+        "gift",
+        "express"
+      ],
+      "items": [
+        {
+          "sku": "A1",
+          "discounts": [
+            5,
+            10
+          ]
+        },
+        {
+          "sku": "B2",
+          "discounts": []
+        }
+      ]
+    },
+    {
+      "order_id": 2,
+      "email": null,
+      "tags": [],
+      "items": []
+    },
+    {
+      "order_id": 3,
+      "email": "cat@example.com",
+      "tags": null,
+      "items": [
+        {
+          "sku": "C3",
+          "discounts": [
+            7
+          ]
+        }
+      ]
+    },
+    {
+      "order_id": 4,
+      "email": "dan@example.com",
+      "tags": [
+        "sale",
+        null
+      ],
+      "items": null
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 4,
+      "total_byte_size": 430,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 95,
+          "total_uncompressed_size": 95,
+          "statistics": {
+            "min": 1,
+            "max": 4,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "email",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 99,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 120,
+          "total_uncompressed_size": 120,
+          "statistics": {
+            "min": "ann@example.com",
+            "max": "dan@example.com",
+            "null_count": 1
+          }
+        },
+        {
+          "path": "tags.list.element",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 6,
+          "data_page_offset": 219,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 78,
+          "total_uncompressed_size": 78,
+          "statistics": {
+            "min": "express",
+            "max": "sale",
+            "null_count": 3
+          }
+        },
+        {
+          "path": "items.list.element.sku",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 5,
+          "data_page_offset": 297,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 63,
+          "total_uncompressed_size": 63,
+          "statistics": {
+            "min": "A1",
+            "max": "C3",
+            "null_count": 2
+          }
+        },
+        {
+          "path": "items.list.element.discounts.list.element",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 6,
+          "data_page_offset": 360,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 74,
+          "total_uncompressed_size": 74,
+          "statistics": {
+            "min": 5,
+            "max": 10,
+            "null_count": 3
+          }
+        }
+      ]
+    }
+  ]
+}

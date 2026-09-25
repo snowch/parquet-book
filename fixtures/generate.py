@@ -96,6 +96,20 @@ TYPES = pa.schema(
     ]
 )
 
+#: Orders with a nullable string, a list of strings, and a list of structs that each hold a list:
+#: the shape the Dremel paper's levels were designed for.
+NESTED = pa.schema(
+    [
+        pa.field("order_id", pa.int64(), nullable=False),
+        pa.field("email", pa.string()),
+        pa.field("tags", pa.list_(pa.string())),
+        pa.field(
+            "items",
+            pa.list_(pa.struct([pa.field("sku", pa.string()), pa.field("discounts", pa.list_(pa.int32()))])),
+        ),
+    ]
+)
+
 FIXTURES = (
     Fixture(
         name="tiny",
@@ -166,6 +180,34 @@ FIXTURES = (
             schema=TYPES,
         ),
     ),
+    Fixture(
+        name="nested",
+        why=(
+            "Four orders whose fields are missing in every way a nested value can be: a null "
+            "string, a null list, an empty list, a list holding a null, and a list of structs "
+            "each holding a list of its own. Every column stores repetition and definition "
+            "levels, which is ch04's subject."
+        ),
+        table=pa.Table.from_pylist(
+            [
+                {
+                    "order_id": 1,
+                    "email": "ann@example.com",
+                    "tags": ["gift", "express"],
+                    "items": [{"sku": "A1", "discounts": [5, 10]}, {"sku": "B2", "discounts": []}],
+                },
+                {"order_id": 2, "email": None, "tags": [], "items": []},
+                {
+                    "order_id": 3,
+                    "email": "cat@example.com",
+                    "tags": None,
+                    "items": [{"sku": "C3", "discounts": [7]}],
+                },
+                {"order_id": 4, "email": "dan@example.com", "tags": ["sale", None], "items": None},
+            ],
+            schema=NESTED,
+        ),
+    ),
 )
 
 
@@ -181,6 +223,8 @@ def _stat(value):
         return value.decode("utf-8", "replace")
     if isinstance(value, dict):
         return {k: _stat(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_stat(v) for v in value]
     if value is None or isinstance(value, bool | int | float | str):
         return value
     return str(value)

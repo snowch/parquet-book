@@ -334,6 +334,39 @@ pub fn interpret(physical: PhysicalType, logical: &LogicalType, bytes: &[u8]) ->
     }
 }
 
+/// A decoded value as JSON, read through its logical type when it has one.
+///
+/// Numbers without a logical type stay numbers. A value a logical type changes (a date, a
+/// timestamp, a decimal, an unsigned integer) becomes the string `interpret` produces.
+pub fn value_json(
+    physical: PhysicalType,
+    logical: Option<&LogicalType>,
+    value: &crate::plain::PlainValue,
+) -> crate::json::Json {
+    use crate::json::Json;
+    use crate::plain::PlainValue;
+    let raw = match (physical.0, value) {
+        (1, PlainValue::Int(v)) => (*v as i32).to_le_bytes().to_vec(),
+        (2, PlainValue::Int(v)) => v.to_le_bytes().to_vec(),
+        (_, PlainValue::Bytes(b)) => b.clone(),
+        _ => return value.to_json(),
+    };
+    match logical {
+        Some(LogicalType::String | LogicalType::Enum | LogicalType::Json) => value.to_json(),
+        Some(LogicalType::Integer { signed: true, .. }) => value.to_json(),
+        Some(LogicalType::Integer { signed: false, .. }) => {
+            match interpret(physical, logical.unwrap(), &raw) {
+                Some(s) => s.parse::<u64>().map(Json::UInt).unwrap_or(Json::Str(s)),
+                None => value.to_json(),
+            }
+        }
+        Some(l) => interpret(physical, l, &raw)
+            .map(Json::Str)
+            .unwrap_or_else(|| value.to_json()),
+        None => value.to_json(),
+    }
+}
+
 /// An `INT96` value: eight bytes of nanoseconds within the day, then a four-byte Julian day.
 ///
 /// Deprecated, and still written by some engines. It has no logical type: the convention lives

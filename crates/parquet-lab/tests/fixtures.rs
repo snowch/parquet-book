@@ -342,3 +342,69 @@ fn logical_types_read_statistics_the_way_pyarrow_does() {
         "only {compared} values compared; the types fixture should give more"
     );
 }
+
+/// A pyarrow row, reduced to the one leaf a column holds: the same shape, with only the keys on
+/// the leaf's path. Lists stay lists, structs keep one key, and nulls stay null.
+fn project(value: &Json, keys: &[String]) -> Json {
+    match value {
+        Json::Null => Json::Null,
+        Json::Arr(items) => Json::Arr(items.iter().map(|v| project(v, keys)).collect()),
+        Json::Obj(_) if !keys.is_empty() => Json::Obj(vec![(
+            keys[0].clone(),
+            project(value.get(&keys[0]).unwrap_or(&Json::Null), &keys[1..]),
+        )]),
+        // pyarrow prints a UTC timestamp with a space and "+00:00"; the reader uses ISO 8601.
+        Json::Str(s) if s.ends_with("+00:00") => {
+            Json::Str(s.replacen(' ', "T", 1).replace("+00:00", "Z"))
+        }
+        other => other.clone(),
+    }
+}
+
+#[test]
+fn records_rebuilt_from_levels_match_pyarrows_rows() {
+    let mut checked = 0;
+    for (name, bytes, manifest) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        let leaves = parquet_lab::schema::leaves(&root);
+        let rows = manifest.get("rows").and_then(Json::as_array).unwrap();
+        for leaf in &leaves {
+            let fields = parquet_lab::nested::path_fields(&root, leaf);
+            // The keys a pyarrow row uses: a LIST's repeated group and its element are not keys.
+            let keys: Vec<String> = fields
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| {
+                    let under_list = *i > 0 && fields[i - 1].is_list;
+                    let element = *i > 1 && fields[i - 2].is_list;
+                    !under_list && !element
+                })
+                .map(|(_, f)| f.name.clone())
+                .collect();
+            let mut records = Vec::new();
+            for rg in &md.row_groups {
+                let data = parquet_lab::column::read_column(&bytes, &rg.columns[leaf.column], leaf)
+                    .unwrap_or_else(|e| panic!("{name} {}: {e}", leaf.dotted_path()));
+                records.extend(parquet_lab::nested::assemble(&fields, leaf, &data.triples));
+            }
+            assert_eq!(
+                records.len(),
+                rows.len(),
+                "{name} {}: one record per row",
+                leaf.dotted_path()
+            );
+            for (i, (mine, row)) in records.iter().zip(rows).enumerate() {
+                let theirs = project(row, &keys);
+                assert_eq!(
+                    mine.to_json(),
+                    theirs.to_json(),
+                    "{name} {} record {i}",
+                    leaf.dotted_path()
+                );
+                checked += 1;
+            }
+        }
+    }
+    assert!(checked > 40, "only {checked} records compared");
+}

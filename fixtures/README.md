@@ -112,3 +112,37 @@ store_schema=False
 data_page_version='1.0'
 write_page_index=False
 ```
+
+## `nested.parquet`
+
+Four orders whose fields are missing in every way a nested value can be: a null string, a null list, an empty list, a list holding a null, and a list of structs each holding a list of its own. Every column stores repetition and definition levels, which is ch04's subject.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 1191 bytes |
+| Rows | 4 |
+| Row groups | 1 |
+| Footer length | 749 bytes |
+| SHA-256 | `30bedb7fb46e30b6…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `email` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `tags.list.element` | BYTE_ARRAY | String | 3 | 1 | PLAIN, RLE | UNCOMPRESSED |
+| `items.list.element.sku` | BYTE_ARRAY | String | 4 | 1 | PLAIN, RLE | UNCOMPRESSED |
+| `items.list.element.discounts.list.element` | INT32 | None | 6 | 2 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
