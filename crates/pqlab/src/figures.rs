@@ -159,6 +159,18 @@ const FIGURES: &[Figure] = &[
         render: scan_networks,
     },
     Figure {
+        file: "writing-files.md",
+        render: writing_files,
+    },
+    Figure {
+        file: "writing-queries.md",
+        render: writing_queries,
+    },
+    Figure {
+        file: "writing-lookups.md",
+        render: writing_lookups,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -1964,6 +1976,192 @@ fn scan_networks(root: &Path) -> Result<String, String> {
     Ok(format!(
         "{}\n\n*`SELECT * WHERE order_id = 431` against `fixtures/{SORTED}`, by the reader, under four \
          simulated networks. The faster strategy on each is in bold.*\n",
+        rows.join("\n")
+    ))
+}
+
+/// ch11's files, and what each changes from the baseline.
+const WRITING: [(&str, &str); 7] = [
+    ("writing-baseline.parquet", "the baseline"),
+    ("writing-one-group.parquet", "one row group"),
+    ("writing-small-groups.parquet", "row groups of 40 rows"),
+    ("writing-by-country.parquet", "sorted by country"),
+    ("writing-shuffled.parquet", "shuffled"),
+    ("writing-plain.parquet", "no dictionary"),
+    ("writing-no-index.parquet", "no page index"),
+];
+
+/// The reader for ch11's comparison: the footer found exactly, every skipping mechanism, only
+/// ranges that touch merged, one connection. What it reads after the footer is then exactly
+/// what the file's layout lets it skip, and nothing else.
+fn exact() -> Strategy {
+    strategy(SizeSource::Head, 8, 1, Some(0), false, Mechanisms::ALL)
+}
+
+/// Bytes and requests after the footer: the indexes and pages a query needed.
+fn after_footer(bytes: &[u8], q: &Query) -> Result<(u64, usize), String> {
+    let r = parquet_lab::scan::scan(bytes, "data.parquet", q, exact(), NetworkModel::default())?;
+    let later: Vec<_> = r
+        .requests
+        .iter()
+        .filter(|x| x.why.starts_with("read the indexes") || x.why.starts_with("read the pages"))
+        .collect();
+    Ok((later.iter().map(|x| x.bytes_returned).sum(), later.len()))
+}
+
+fn writing_files(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | Change | File bytes | Footer bytes | Row groups | Data pages | `country` bytes | `order_id` bytes |"
+            .to_string(),
+        "|---|---|--:|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    for (name, change) in WRITING {
+        let bytes = fixture(root, name)?;
+        let md = open_bytes(&bytes)?;
+        let size = bytes.len() as u64;
+        let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
+        let footer = parse_trailer(last8, size)
+            .map_err(|e| e.to_string())?
+            .footer_length;
+        let mut pages = 0;
+        for rg in &md.row_groups {
+            for c in &rg.columns {
+                let r = c.byte_range();
+                pages += parquet_lab::pages::walk_pages(
+                    &bytes[r.start as usize..r.end as usize],
+                    r.start,
+                )
+                .map_err(|e| e.to_string())?
+                .iter()
+                .filter(|p| p.page_type != "DICTIONARY_PAGE")
+                .count();
+            }
+        }
+        let column_bytes = |path: &str| -> u64 {
+            md.row_groups
+                .iter()
+                .flat_map(|rg| &rg.columns)
+                .filter(|c| c.dotted_path() == path)
+                .map(|c| c.total_compressed_size as u64)
+                .sum()
+        };
+        rows.push(format!(
+            "| `{name}` | {change} | {} | {} | {} | {pages} | {} | {} |",
+            thousands(size),
+            thousands(footer as u64),
+            md.row_groups.len(),
+            thousands(column_bytes("country")),
+            thousands(column_bytes("order_id")),
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the `fixtures/writing-*.parquet` files: the same 800 \
+         orders, Snappy-compressed. Column bytes are summed over row groups and include page \
+         headers.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn writing_queries(root: &Path) -> Result<String, String> {
+    // A label, and a condition as column, comparison and value.
+    type Condition<'a> = Option<(usize, Op, &'a str)>;
+    let queries: [(&str, Condition); 5] = [
+        ("`order_id = 431`", Some((0, Op::Eq, "431"))),
+        ("`country = 'FR'`", Some((3, Op::Eq, "FR"))),
+        ("`status = 'refunded'`", Some((4, Op::Eq, "refunded"))),
+        ("`amount_cents > 9900`", Some((5, Op::Gt, "9900"))),
+        ("everything", None),
+    ];
+    let mut rows = vec![
+        format!(
+            "| File | {} |",
+            queries.iter().map(|q| q.0).collect::<Vec<_>>().join(" | ")
+        ),
+        format!("|---|{}", "--:|".repeat(queries.len())),
+    ];
+    for (name, change) in WRITING {
+        let bytes = fixture(root, name)?;
+        let columns = parquet_lab::report::flat_columns(&bytes)?;
+        let mut cells = Vec::new();
+        for (_, cond) in &queries {
+            let q = Query {
+                columns: columns.clone(),
+                condition: cond.map(|(c, op, v)| (c, op, v.to_string())),
+            };
+            let (b, n) = after_footer(&bytes, &q)?;
+            cells.push(format!("{} in {n}", thousands(b)));
+        }
+        rows.push(format!("| {change} | {} |", cells.join(" | ")));
+    }
+    Ok(format!(
+        "{}\n\n*`SELECT *` with each condition, run by the reader against each file. Each cell is \
+         bytes and requests after the footer, which every query reads first. The reader \
+         uses statistics, Bloom filters where written and the page index, and merges only ranges \
+         that touch.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn writing_lookups(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | Row groups | `order_id`: row groups per lookup | `customer_id`: row groups per lookup |"
+            .to_string(),
+        "|---|--:|--:|--:|".to_string(),
+    ];
+    for (name, change) in WRITING {
+        let bytes = fixture(root, name)?;
+        let md = open_bytes(&bytes)?;
+        let root_node = parquet_lab::schema::build(&md.schema).map_err(|e| e.to_string())?;
+        let leaves = parquet_lab::schema::leaves(&root_node);
+        let mut means = Vec::new();
+        for path in ["order_id", "customer_id"] {
+            let leaf = leaves
+                .iter()
+                .find(|l| l.dotted_path() == path)
+                .ok_or("no column")?;
+            // Each row group's bounds, from the footer, and every distinct value, decoded.
+            let int = |b: &[u8]| i64::from_le_bytes(b.try_into().unwrap_or([0; 8]));
+            let mut bounds = Vec::new();
+            let mut values = Vec::new();
+            for rg in &md.row_groups {
+                let c = &rg.columns[leaf.column];
+                let s = c.statistics.as_ref().ok_or("no statistics")?;
+                bounds.push((
+                    int(s.min_value.as_deref().unwrap_or(&[])),
+                    int(s.max_value.as_deref().unwrap_or(&[])),
+                ));
+                let d =
+                    parquet_lab::column::read_column(&bytes, c, leaf).map_err(|e| e.to_string())?;
+                values.extend(
+                    d.triples
+                        .iter()
+                        .filter_map(|t| t.value.as_ref())
+                        .map(|v| int(&v.to_plain_bytes(leaf.physical_type))),
+                );
+            }
+            values.sort();
+            values.dedup();
+            let total: usize = values
+                .iter()
+                .map(|&v| {
+                    bounds
+                        .iter()
+                        .filter(|&&(lo, hi)| lo <= v && v <= hi)
+                        .count()
+                })
+                .sum();
+            means.push(total as f64 / values.len() as f64);
+        }
+        rows.push(format!(
+            "| {change} | {} | {:.2} | {:.2} |",
+            md.row_groups.len(),
+            means[0],
+            means[1]
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*For every value in the column, the row groups whose footer bounds include it, \
+         averaged. Computed by the reader from the `fixtures/writing-*.parquet` files.*\n",
         rows.join("\n")
     ))
 }

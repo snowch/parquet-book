@@ -301,6 +301,16 @@ check(true, `four connections: ${scan4.totals.elapsed_us / 1000} ms`);
 check(await scanLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
 if (shots) await scanLab.screenshot({ path: path.join(shots, "scan-lab.png") });
 
+// ch11: writer settings. Every file's cost is the reader's.
+await page.goto(base + "writing-parquet-well.html");
+const writeLab = page.locator('.lab[data-experiment="writing"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="writing"]')?.dataset.state === "ok", null, { timeout: 60000 });
+const baseline = native(["scan", "fixtures/writing-baseline.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8", "--gap", "0"]);
+check((await writeLab.getAttribute("data-bytes")).split(",")[0] === String(baseline.totals.bytes_after_footer),
+  `order_id = 431 reads the reader's ${baseline.totals.bytes_after_footer} bytes after the footer of the baseline`);
+check((await writeLab.getAttribute("data-bytes")).split(",").length === 7, "and the query runs against all seven files");
+if (shots) await writeLab.screenshot({ path: path.join(shots, "writing-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -24,3 +24,4 @@ pub mod pages;
 pub mod skipping_data;
 pub mod the_type_system;
 pub mod why_parquet_exists;
+pub mod writing_parquet_well;

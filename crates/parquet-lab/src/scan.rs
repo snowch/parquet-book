@@ -74,8 +74,25 @@ impl Fetched {
         self.have.push(span);
     }
 
-    fn covers(&self, s: Span) -> bool {
-        self.have.iter().any(|h| h.contains(s))
+    /// The parts of `s` not yet fetched.
+    fn missing(&self, s: Span) -> Vec<Span> {
+        let mut parts = vec![s];
+        for h in &self.have {
+            parts = parts
+                .into_iter()
+                .flat_map(|p| {
+                    let mut out = Vec::new();
+                    if p.start < h.start.min(p.end) {
+                        out.push(Span::new(p.start, h.start.min(p.end)));
+                    }
+                    if h.end.max(p.start) < p.end {
+                        out.push(Span::new(h.end.max(p.start), p.end));
+                    }
+                    out
+                })
+                .collect();
+        }
+        parts
     }
 }
 
@@ -108,15 +125,16 @@ fn fetch<S: ObjectStore>(
     gap: Option<u64>,
     why: &str,
 ) -> Result<u64, String> {
-    let missing: Vec<Span> = wanted
-        .into_iter()
-        .filter(|s| !s.is_empty() && !have.covers(*s))
-        .collect();
+    // Only the bytes not already held: a merged request must not fetch the tail again.
+    let missing: Vec<Span> = wanted.into_iter().flat_map(|s| have.missing(s)).collect();
     let planned: u64 = coalesce(missing.clone(), Some(0))
         .iter()
         .map(|s| s.len())
         .sum();
-    let requests = coalesce(missing, gap);
+    let requests: Vec<Span> = coalesce(missing, gap)
+        .into_iter()
+        .flat_map(|r| have.missing(r))
+        .collect();
     if requests.is_empty() {
         return Ok(0);
     }

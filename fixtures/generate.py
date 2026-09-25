@@ -60,6 +60,9 @@ class Fixture:
     table: pa.Table
     #: Passed to ``pyarrow.parquet.write_table`` as written, and printed in the README.
     options: dict = field(default_factory=dict)
+    #: When the table holds the same rows as another fixture's, in some order: that fixture's
+    #: name. The manifest then lists the rows' ``order_id`` in file order instead of the rows.
+    rows_same_as: str | None = None
 
 
 #: Options every fixture starts from. Each is chosen to keep a file small enough to read byte by
@@ -284,6 +287,63 @@ PRUNING_OPTIONS = {
     "write_page_index": True,
     "bloom_filter_options": {"customer_id": {"ndv": 200, "fpp": 0.05}},
 }
+
+
+def _writing_rows(n: int) -> list[dict]:
+    """``n`` orders for ch11: increasing ids and times, random customers and amounts, a country
+    that is usually UK, and a status that is usually paid."""
+    x = 4242
+    countries = ["UK", "UK", "UK", "SE", "PL", "US", "DE", "FR"]
+    statuses = ["paid"] * 18 + ["refunded", "cancelled"]
+    start = datetime.datetime(2026, 1, 1, tzinfo=datetime.UTC)
+    rows = []
+    for i in range(n):
+        x = (x * 1103515245 + 12345) % 2**31
+        rows.append(
+            {
+                "order_id": i + 1,
+                "ordered_at": start + datetime.timedelta(seconds=97 * i + x % 60),
+                "customer_id": 100_000 + x % 900_000,
+                "country": countries[(x >> 4) % 8],
+                "status": statuses[(x >> 9) % 20],
+                "amount_cents": 100 + (x >> 12) % 9900,
+            }
+        )
+    return rows
+
+
+WRITING_SCHEMA = pa.schema(
+    [
+        pa.field("order_id", pa.int64(), nullable=False),
+        pa.field("ordered_at", pa.timestamp("ms", tz="UTC"), nullable=False),
+        pa.field("customer_id", pa.int64(), nullable=False),
+        pa.field("country", pa.string(), nullable=False),
+        pa.field("status", pa.string(), nullable=False),
+        pa.field("amount_cents", pa.int64(), nullable=False),
+    ]
+)
+WRITING_ROWS = _writing_rows(800)
+
+#: What ch11's files share: Snappy, a page index, row groups of 200 and pages of 40 rows. Each
+#: variant changes one thing.
+WRITING_OPTIONS = {
+    "compression": "snappy",
+    "use_dictionary": True,
+    "row_group_size": 200,
+    "max_rows_per_page": 40,
+    "write_page_index": True,
+}
+
+
+def _writing(name: str, why: str, rows: list, **options) -> Fixture:
+    return Fixture(
+        name=f"writing-{name}",
+        why=why,
+        table=pa.Table.from_pylist(rows, schema=WRITING_SCHEMA),
+        options={**WRITING_OPTIONS, **options},
+        rows_same_as=None if name == "baseline" else "writing-baseline",
+    )
+
 
 #: The same orders under every codec the format defines that pyarrow writes (ch07).
 ORDERS = _orders(256)
@@ -516,6 +576,49 @@ FIXTURES = (
         table=pa.Table.from_pylist(_shuffled(PRUNING_ROWS), schema=PRUNING_SCHEMA),
         options=PRUNING_OPTIONS,
     ),
+    _writing(
+        "baseline",
+        "800 orders in order_id order, written the way ch11 starts from: Snappy, dictionary "
+        "encoding, four row groups of 200, pages of 40 rows, and a page index. Every other "
+        "writing-* file changes one of these.",
+        WRITING_ROWS,
+    ),
+    _writing(
+        "one-group",
+        "writing-baseline.parquet in one row group of 800 rows.",
+        WRITING_ROWS,
+        row_group_size=800,
+    ),
+    _writing(
+        "small-groups",
+        "writing-baseline.parquet in row groups of 40 rows: twenty row groups, each with its own "
+        "column chunks, statistics and page index.",
+        WRITING_ROWS,
+        row_group_size=40,
+    ),
+    _writing(
+        "by-country",
+        "writing-baseline.parquet's rows sorted by country, then order_id.",
+        sorted(WRITING_ROWS, key=lambda r: (r["country"], r["order_id"])),
+    ),
+    _writing(
+        "shuffled",
+        "writing-baseline.parquet's rows in a pseudo-random order.",
+        _shuffled(WRITING_ROWS),
+    ),
+    _writing(
+        "plain",
+        "writing-baseline.parquet without dictionary encoding.",
+        WRITING_ROWS,
+        use_dictionary=False,
+    ),
+    _writing(
+        "no-index",
+        "writing-baseline.parquet without a page index. pyarrow then writes each page's "
+        "statistics into its page header instead.",
+        WRITING_ROWS,
+        write_page_index=False,
+    ),
     Fixture(
         name="pages-v2-snappy",
         why=(
@@ -642,7 +745,14 @@ def manifest(fixture: Fixture, data: bytes) -> dict:
             }
             for i in range(md.num_columns)
         ],
-        "rows": [{k: _stat(v) for k, v in row.items()} for row in fixture.table.to_pylist()],
+        **(
+            {
+                "rows_same_as": fixture.rows_same_as,
+                "row_order": fixture.table.column("order_id").to_pylist(),
+            }
+            if fixture.rows_same_as
+            else {"rows": [{k: _stat(v) for k, v in row.items()} for row in fixture.table.to_pylist()]}
+        ),
         "row_groups": row_groups,
     }
 
@@ -690,6 +800,18 @@ def readme(manifests: list[dict]) -> str:
     return "\n".join(out)
 
 
+def dump_manifest(m: dict) -> str:
+    """The manifest as indented JSON, except that each row is on one line: the rows are most of
+    a manifest, and one line each keeps them readable and the file small."""
+    rows = m.get("rows")
+    if rows is None:
+        return json.dumps(m, indent=2)
+    placeholder = "@@ROWS@@"
+    text = json.dumps({**m, "rows": placeholder}, indent=2)
+    body = ",\n".join("    " + json.dumps(r) for r in rows)
+    return text.replace(json.dumps(placeholder), "[\n" + body + "\n  ]" if rows else "[]")
+
+
 def outputs() -> dict[Path, bytes]:
     files: dict[Path, bytes] = {}
     manifests = []
@@ -698,7 +820,7 @@ def outputs() -> dict[Path, bytes]:
         m = manifest(fixture, data)
         manifests.append(m)
         files[HERE / m["file"]] = data
-        files[HERE / f"{fixture.name}.json"] = (json.dumps(m, indent=2) + "\n").encode()
+        files[HERE / f"{fixture.name}.json"] = (dump_manifest(m) + "\n").encode()
     files[HERE / "README.md"] = readme(manifests).encode()
     return files
 

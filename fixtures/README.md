@@ -610,6 +610,265 @@ max_rows_per_page=40
 bloom_filter_options={'customer_id': {'ndv': 200, 'fpp': 0.05}}
 ```
 
+## `writing-baseline.parquet`
+
+800 orders in order_id order, written the way ch11 starts from: Snappy, dictionary encoding, four row groups of 200, pages of 40 rows, and a page index. Every other writing-* file changes one of these.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 28779 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 2935 bytes |
+| SHA-256 | `62e6ffef5da3611b…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+```
+
+## `writing-one-group.parquet`
+
+writing-baseline.parquet in one row group of 800 rows.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 26339 bytes |
+| Rows | 800 |
+| Row groups | 1 |
+| Footer length | 889 bytes |
+| SHA-256 | `02973f9b4bf9bc24…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=800
+max_rows_per_page=40
+```
+
+## `writing-small-groups.parquet`
+
+writing-baseline.parquet in row groups of 40 rows: twenty row groups, each with its own column chunks, statistics and page index.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 44190 bytes |
+| Rows | 800 |
+| Row groups | 20 |
+| Footer length | 13648 bytes |
+| SHA-256 | `2746a47c6997008b…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=40
+max_rows_per_page=40
+```
+
+## `writing-by-country.parquet`
+
+writing-baseline.parquet's rows sorted by country, then order_id.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 28430 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 2935 bytes |
+| SHA-256 | `d6f68b80f3ab65b8…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+```
+
+## `writing-shuffled.parquet`
+
+writing-baseline.parquet's rows in a pseudo-random order.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 28740 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 2935 bytes |
+| SHA-256 | `56aee95056cb7f35…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+```
+
+## `writing-plain.parquet`
+
+writing-baseline.parquet without dictionary encoding.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 28910 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 2665 bytes |
+| SHA-256 | `82221f0512144758…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+```
+
+## `writing-no-index.parquet`
+
+writing-baseline.parquet without a page index. pyarrow then writes each page's statistics into its page header instead.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 29253 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 2633 bytes |
+| SHA-256 | `a1d69a275b01b231…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `ordered_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=milliseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `status` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | SNAPPY |
+
+Writer options:
+
+```python
+compression='snappy'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+row_group_size=200
+max_rows_per_page=40
+```
+
 ## `pages-v2-snappy.parquet`
 
 pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.

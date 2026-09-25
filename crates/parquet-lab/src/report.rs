@@ -2112,6 +2112,21 @@ pub fn scan(
             return j;
         }
     };
+    let after: Vec<&Request> = r
+        .requests
+        .iter()
+        .filter(|q| q.why.starts_with("read the indexes") || q.why.starts_with("read the pages"))
+        .collect();
+    let (footer_bytes, row_groups) = match (
+        parse_trailer(
+            file[file.len() - 8..].try_into().unwrap(),
+            file.len() as u64,
+        ),
+        open_bytes(file),
+    ) {
+        (Ok(t), Ok(md)) => (u64::from(t.footer_length), md.row_groups.len()),
+        _ => (0, 0),
+    };
     obj([
         ("ok", true.into()),
         ("columns", columns),
@@ -2137,6 +2152,14 @@ pub fn scan(
                 ("bytes_planned", r.bytes_planned.into()),
                 ("rows_decoded", r.rows_decoded.into()),
                 ("rows_matching", r.matches.len().into()),
+                // What the query read once it had the footer: its indexes and pages.
+                ("requests_after_footer", after.len().into()),
+                (
+                    "bytes_after_footer",
+                    after.iter().map(|q| q.bytes_returned).sum::<u64>().into(),
+                ),
+                ("footer_bytes", footer_bytes.into()),
+                ("row_groups", row_groups.into()),
             ]),
         ),
         ("requests", requests_json(&r.requests)),

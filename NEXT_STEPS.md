@@ -88,13 +88,22 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: the read-path panel with a request timeline. Problems 10.1 (merge ranges) and 10.2
   (time the requests); 10.3 open.
 
-## Next: ch11, writing Parquet well
+## Done: ch11, writing Parquet well
 
-1. Fixtures written from one table with different writer settings: row group size, page size,
-   dictionary on and off, sorted and unsorted, statistics truncation if pyarrow exposes it.
-2. Measure each with the reader: file size, footer size, what ch09's conditions skip, and ch10's
-   request counts.
-3. Experiment: pick settings, see the consequences, all from committed files.
+- Fixtures `writing-*.parquet`: the same 800 orders written seven ways (baseline, one row group,
+  small row groups, sorted by country, shuffled, no dictionary, no page index). Their manifests
+  share the baseline's rows by `order_id`, and every manifest now writes one row per line.
+- The read path never fetches a byte twice; the scan test asserts it.
+- Experiment: one query against every file. Figures: the files, lookups per row group, five
+  queries' costs. Problems 11.1 and 11.2 with tests; 11.3 open.
+
+## Next: ch12, a tiny query engine
+
+1. A parser for a small SQL subset: `SELECT cols | aggregates FROM t WHERE conjunction GROUP BY
+   col ORDER BY col LIMIT n`.
+2. Operators over the read path: scan (with pruning from the WHERE clause), filter, project,
+   hash aggregate, sort, limit; each stage's rows and costs shown.
+3. Experiment: a query box over the fixtures, with the plan and every stage's output.
 
 ## Then
 

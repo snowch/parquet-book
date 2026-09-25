@@ -388,6 +388,30 @@ fn project(value: &Json, keys: &[String]) -> Json {
     }
 }
 
+/// A manifest's rows. A fixture that holds another's rows in another order names that fixture
+/// and lists its rows' order_id in file order.
+fn manifest_rows(manifest: &Json) -> Vec<Json> {
+    if let Some(rows) = manifest.get("rows").and_then(Json::as_array) {
+        return rows.clone();
+    }
+    let other = manifest.get("rows_same_as").and_then(Json::as_str).unwrap();
+    let text =
+        std::fs::read_to_string(root().join("fixtures").join(format!("{other}.json"))).unwrap();
+    let base = Json::parse(&text).unwrap();
+    let rows = base.get("rows").and_then(Json::as_array).unwrap().clone();
+    let id = |r: &Json| r.get("order_id").and_then(Json::as_u64).unwrap();
+    manifest
+        .get("row_order")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .map(|want| {
+            let want = want.as_u64().unwrap();
+            rows.iter().find(|r| id(r) == want).unwrap().clone()
+        })
+        .collect()
+}
+
 #[test]
 fn records_rebuilt_from_levels_match_pyarrows_rows() {
     let mut checked = 0;
@@ -395,7 +419,7 @@ fn records_rebuilt_from_levels_match_pyarrows_rows() {
         let md = report::open_bytes(&bytes).unwrap();
         let root = parquet_lab::schema::build(&md.schema).unwrap();
         let leaves = parquet_lab::schema::leaves(&root);
-        let rows = manifest.get("rows").and_then(Json::as_array).unwrap();
+        let rows = &manifest_rows(&manifest);
         for leaf in &leaves {
             let fields = parquet_lab::nested::path_fields(&root, leaf);
             // The keys a pyarrow row uses: a LIST's repeated group and its element are not keys.
@@ -810,7 +834,16 @@ fn skipping_never_loses_a_matching_row() {
     ];
     let mut plans = 0;
     let mut skipped_something = 0;
-    for (name, bytes, _) in fixtures() {
+    // The ch11 variants differ from their baseline in ways that do not change the logic under
+    // test, except sort order; two of them are enough and keep the test quick.
+    let slow = |n: &str| {
+        n.starts_with("writing-")
+            && !matches!(
+                n,
+                "writing-by-country.parquet" | "writing-small-groups.parquet"
+            )
+    };
+    for (name, bytes, _) in fixtures().into_iter().filter(|f| !slow(&f.0)) {
         let md = report::open_bytes(&bytes).unwrap();
         let root = parquet_lab::schema::build(&md.schema).unwrap();
         let leaves = parquet_lab::schema::leaves(&root);
@@ -1005,9 +1038,20 @@ fn every_strategy_returns_the_rows_a_full_read_finds() {
                 let r = scan(&bytes, "data.parquet", &q, s, NetworkModel::default())
                     .unwrap_or_else(|e| panic!("{name} {condition:?} {s:?}: {e}"));
                 assert_eq!(r.matches, expected, "{name} {condition:?} {s:?}");
+                // No byte is fetched twice, so no scan fetches more than the file.
+                let mut got: Vec<Span> = r.requests.iter().filter_map(|q| q.returned).collect();
+                got.sort();
+                for pair in got.windows(2) {
+                    assert!(
+                        pair[0].end <= pair[1].start,
+                        "{name} {condition:?} {s:?}: {} and {} overlap",
+                        pair[0],
+                        pair[1]
+                    );
+                }
                 assert!(
-                    r.bytes_fetched <= bytes.len() as u64 * 2,
-                    "{name}: fetched far more than the file"
+                    r.bytes_fetched <= bytes.len() as u64,
+                    "{name}: fetched more than the file"
                 );
                 scans += 1;
             }

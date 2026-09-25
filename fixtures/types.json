@@ -165,48 +165,9 @@
     }
   ],
   "rows": [
-    {
-      "is_paid": true,
-      "quantity": 1,
-      "store_id": 7,
-      "order_id": 1,
-      "weight_kg": 0.5,
-      "amount": "19.99",
-      "country": "UK",
-      "order_date": "2026-01-03",
-      "paid_at": "2026-01-03 09:30:00+00:00",
-      "shipping": {
-        "city": "Leeds",
-        "postcode": "LS1"
-      }
-    },
-    {
-      "is_paid": false,
-      "quantity": 3,
-      "store_id": 65000,
-      "order_id": 2,
-      "weight_kg": 1.25,
-      "amount": "5.00",
-      "country": null,
-      "order_date": "2026-01-04",
-      "paid_at": "2026-01-04 17:05:00+00:00",
-      "shipping": null
-    },
-    {
-      "is_paid": true,
-      "quantity": 2,
-      "store_id": 12,
-      "order_id": 3,
-      "weight_kg": 2.0,
-      "amount": "42.10",
-      "country": "PL",
-      "order_date": "2026-01-05",
-      "paid_at": "2026-01-05 00:00:00+00:00",
-      "shipping": {
-        "city": "Krak\u00f3w",
-        "postcode": null
-      }
-    }
+    {"is_paid": true, "quantity": 1, "store_id": 7, "order_id": 1, "weight_kg": 0.5, "amount": "19.99", "country": "UK", "order_date": "2026-01-03", "paid_at": "2026-01-03 09:30:00+00:00", "shipping": {"city": "Leeds", "postcode": "LS1"}},
+    {"is_paid": false, "quantity": 3, "store_id": 65000, "order_id": 2, "weight_kg": 1.25, "amount": "5.00", "country": null, "order_date": "2026-01-04", "paid_at": "2026-01-04 17:05:00+00:00", "shipping": null},
+    {"is_paid": true, "quantity": 2, "store_id": 12, "order_id": 3, "weight_kg": 2.0, "amount": "42.10", "country": "PL", "order_date": "2026-01-05", "paid_at": "2026-01-05 00:00:00+00:00", "shipping": {"city": "Krak\u00f3w", "postcode": null}}
   ],
   "row_groups": [
     {

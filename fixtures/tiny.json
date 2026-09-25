@@ -66,26 +66,10 @@
     }
   ],
   "rows": [
-    {
-      "order_id": 1,
-      "country": "UK",
-      "amount_cents": 1999
-    },
-    {
-      "order_id": 2,
-      "country": "SE",
-      "amount_cents": 500
-    },
-    {
-      "order_id": 3,
-      "country": "UK",
-      "amount_cents": 4210
-    },
-    {
-      "order_id": 4,
-      "country": "PL",
-      "amount_cents": 1250
-    }
+    {"order_id": 1, "country": "UK", "amount_cents": 1999},
+    {"order_id": 2, "country": "SE", "amount_cents": 500},
+    {"order_id": 3, "country": "UK", "amount_cents": 4210},
+    {"order_id": 4, "country": "PL", "amount_cents": 1250}
   ],
   "row_groups": [
     {

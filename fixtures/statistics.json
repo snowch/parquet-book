@@ -147,126 +147,18 @@
     }
   ],
   "rows": [
-    {
-      "order_id": 1,
-      "customer_id": 7,
-      "delta": -5,
-      "city": "Leeds",
-      "temp_c": 12.5,
-      "amount": "19.99",
-      "coupon": "SPRING",
-      "note": "gift"
-    },
-    {
-      "order_id": 2,
-      "customer_id": 3000000000,
-      "delta": 3,
-      "city": "\u0141\u00f3d\u017a",
-      "temp_c": "NaN",
-      "amount": "-5.00",
-      "coupon": null,
-      "note": null
-    },
-    {
-      "order_id": 3,
-      "customer_id": 42,
-      "delta": -120,
-      "city": "Z\u00fcrich",
-      "temp_c": -3.0,
-      "amount": "42.10",
-      "coupon": "SPRING",
-      "note": ""
-    },
-    {
-      "order_id": 4,
-      "customer_id": 2147483648,
-      "delta": 7,
-      "city": "Aarhus",
-      "temp_c": 3.0,
-      "amount": "-0.50",
-      "coupon": "WELCOME",
-      "note": "leave at door"
-    },
-    {
-      "order_id": 5,
-      "customer_id": 15,
-      "delta": 0,
-      "city": "Oslo",
-      "temp_c": 0.0,
-      "amount": "7.25",
-      "coupon": null,
-      "note": null
-    },
-    {
-      "order_id": 6,
-      "customer_id": 99,
-      "delta": 9,
-      "city": "\u00c5rhus",
-      "temp_c": -0.0,
-      "amount": "3.00",
-      "coupon": null,
-      "note": "gift"
-    },
-    {
-      "order_id": 7,
-      "customer_id": 4000000000,
-      "delta": -1,
-      "city": "Bergen",
-      "temp_c": 20.0,
-      "amount": "-19.99",
-      "coupon": null,
-      "note": ""
-    },
-    {
-      "order_id": 8,
-      "customer_id": 8,
-      "delta": 100,
-      "city": "\u00c9cija",
-      "temp_c": "NaN",
-      "amount": "0.01",
-      "coupon": null,
-      "note": ""
-    },
-    {
-      "order_id": 9,
-      "customer_id": 1,
-      "delta": 12,
-      "city": "Malm\u00f6",
-      "temp_c": 7.5,
-      "amount": "12.00",
-      "coupon": "SUMMER",
-      "note": null
-    },
-    {
-      "order_id": 10,
-      "customer_id": 2,
-      "delta": -3,
-      "city": "York",
-      "temp_c": 1.0,
-      "amount": "-100.00",
-      "coupon": null,
-      "note": "fragile"
-    },
-    {
-      "order_id": 11,
-      "customer_id": 3,
-      "delta": 4,
-      "city": "\u00c4ngelholm",
-      "temp_c": 2.0,
-      "amount": "8.40",
-      "coupon": "SUMMER",
-      "note": ""
-    },
-    {
-      "order_id": 12,
-      "customer_id": 2500000000,
-      "delta": 5,
-      "city": "Cork",
-      "temp_c": 4.5,
-      "amount": "1.10",
-      "coupon": null,
-      "note": "gift"
-    }
+    {"order_id": 1, "customer_id": 7, "delta": -5, "city": "Leeds", "temp_c": 12.5, "amount": "19.99", "coupon": "SPRING", "note": "gift"},
+    {"order_id": 2, "customer_id": 3000000000, "delta": 3, "city": "\u0141\u00f3d\u017a", "temp_c": "NaN", "amount": "-5.00", "coupon": null, "note": null},
+    {"order_id": 3, "customer_id": 42, "delta": -120, "city": "Z\u00fcrich", "temp_c": -3.0, "amount": "42.10", "coupon": "SPRING", "note": ""},
+    {"order_id": 4, "customer_id": 2147483648, "delta": 7, "city": "Aarhus", "temp_c": 3.0, "amount": "-0.50", "coupon": "WELCOME", "note": "leave at door"},
+    {"order_id": 5, "customer_id": 15, "delta": 0, "city": "Oslo", "temp_c": 0.0, "amount": "7.25", "coupon": null, "note": null},
+    {"order_id": 6, "customer_id": 99, "delta": 9, "city": "\u00c5rhus", "temp_c": -0.0, "amount": "3.00", "coupon": null, "note": "gift"},
+    {"order_id": 7, "customer_id": 4000000000, "delta": -1, "city": "Bergen", "temp_c": 20.0, "amount": "-19.99", "coupon": null, "note": ""},
+    {"order_id": 8, "customer_id": 8, "delta": 100, "city": "\u00c9cija", "temp_c": "NaN", "amount": "0.01", "coupon": null, "note": ""},
+    {"order_id": 9, "customer_id": 1, "delta": 12, "city": "Malm\u00f6", "temp_c": 7.5, "amount": "12.00", "coupon": "SUMMER", "note": null},
+    {"order_id": 10, "customer_id": 2, "delta": -3, "city": "York", "temp_c": 1.0, "amount": "-100.00", "coupon": null, "note": "fragile"},
+    {"order_id": 11, "customer_id": 3, "delta": 4, "city": "\u00c4ngelholm", "temp_c": 2.0, "amount": "8.40", "coupon": "SUMMER", "note": ""},
+    {"order_id": 12, "customer_id": 2500000000, "delta": 5, "city": "Cork", "temp_c": 4.5, "amount": "1.10", "coupon": null, "note": "gift"}
   ],
   "row_groups": [
     {

@@ -212,9 +212,17 @@ _CHAPTERS = (
         "Writing Parquet well",
         "writing_and_querying",
         "Which writer settings decide how cheap a file is to read?",
-        "Generated files with different row-group sizes, sort orders and codecs, compared by what reading them costs.",
-        (),
-        (),
+        "The same rows written seven ways, each measured by what the reader must fetch to query it.",
+        ("writing",),
+        (
+            "writing-baseline.parquet",
+            "writing-one-group.parquet",
+            "writing-small-groups.parquet",
+            "writing-by-country.parquet",
+            "writing-shuffled.parquet",
+            "writing-plain.parquet",
+            "writing-no-index.parquet",
+        ),
     ),
     (
         "a_tiny_query_engine",
@@ -282,4 +290,5 @@ EXPERIMENTS = (
     "statistics",
     "skipping",
     "scan",
+    "writing",
 )

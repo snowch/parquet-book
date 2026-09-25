@@ -87,55 +87,10 @@
     }
   ],
   "rows": [
-    {
-      "order_id": 1,
-      "email": "ann@example.com",
-      "tags": [
-        "gift",
-        "express"
-      ],
-      "items": [
-        {
-          "sku": "A1",
-          "discounts": [
-            5,
-            10
-          ]
-        },
-        {
-          "sku": "B2",
-          "discounts": []
-        }
-      ]
-    },
-    {
-      "order_id": 2,
-      "email": null,
-      "tags": [],
-      "items": []
-    },
-    {
-      "order_id": 3,
-      "email": "cat@example.com",
-      "tags": null,
-      "items": [
-        {
-          "sku": "C3",
-          "discounts": [
-            7
-          ]
-        }
-      ]
-    },
-    {
-      "order_id": 4,
-      "email": "dan@example.com",
-      "tags": [
-        "sale",
-        null
-      ],
-      "items": null
-    }
+    {"order_id": 1, "email": "ann@example.com", "tags": ["gift", "express"], "items": [{"sku": "A1", "discounts": [5, 10]}, {"sku": "B2", "discounts": []}]},
+    {"order_id": 2, "email": null, "tags": [], "items": []},
+    {"order_id": 3, "email": "cat@example.com", "tags": null, "items": [{"sku": "C3", "discounts": [7]}]},
+    {"order_id": 4, "email": "dan@example.com", "tags": ["sale", null], "items": null}
   ],
   "row_groups": [
     {

@@ -321,6 +321,11 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .timeline .req.data { background: var(--accent); }
 .scan-grid button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
 
+/* Ch11: writer settings. */
+.p-writing { border-bottom: 1px solid var(--edge); }
+.p-writing tr.chosen td { background: var(--wash); }
+.p-writing td button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
