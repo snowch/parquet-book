@@ -5,6 +5,8 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab skipping FILE COLUMN OP [VALUE] [--use statistics,bloom,page-index]
+//!                                    what a condition lets the reader skip
 //! pqlab statistics FILE ROW_GROUP COLUMN
 //!                                    every chunk's statistics, and one in detail
 //! pqlab compression FILE COLUMN [PAGE]
@@ -54,6 +56,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab skipping FILE COLUMN OP [VALUE] [--use statistics,bloom,page-index]
   pqlab statistics FILE ROW_GROUP COLUMN
   pqlab compression FILE COLUMN [PAGE]
   pqlab interpret FILE OFFSET
@@ -96,6 +99,41 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "skipping" => {
+            let column: usize = args
+                .get(2)
+                .ok_or("skipping needs a COLUMN number")?
+                .parse()
+                .map_err(|_| "COLUMN must be a whole number")?;
+            let op = args
+                .get(3)
+                .ok_or("skipping needs an OP, such as = or \"is null\"")?;
+            let mut value = "";
+            let mut mechanisms = 7;
+            let mut i = 4;
+            while let Some(a) = args.get(i) {
+                if a == "--use" {
+                    let list = args.get(i + 1).ok_or("--use needs a list")?;
+                    mechanisms = 0;
+                    for m in list.split(',').filter(|m| !m.is_empty()) {
+                        mechanisms |= match m {
+                            "statistics" => 1,
+                            "bloom" => 2,
+                            "page-index" => 4,
+                            other => return Err(format!("unknown mechanism {other}")),
+                        };
+                    }
+                    i += 2;
+                } else {
+                    value = a;
+                    i += 1;
+                }
+            }
+            out!(
+                "{}",
+                report::skipping(&read(file()?)?, column, op, value, mechanisms).to_json_pretty()
+            );
+        }
         "statistics" => {
             let number = |i: usize, what: &str| -> Result<usize, String> {
                 args.get(i)

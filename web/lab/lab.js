@@ -15,11 +15,13 @@ import { mountEncodings } from "./encodings.js";
 import { mountPages } from "./pages.js";
 import { mountCompression } from "./compression.js";
 import { mountStatistics } from "./statistics.js";
+import { mountSkipping } from "./skipping.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
   encodings: mountEncodings, pages: mountPages, compression: mountCompression,
   statistics: mountStatistics,
+  skipping: mountSkipping,
 };
 
 class Fixtures {

@@ -25,6 +25,7 @@ const out = calls.map((c) => {
     case "levels": return lab.levels(id(c.file), c.column);
     case "encodings": return lab.encodings(id(c.file), c.column);
     case "pages": return lab.pages(id(c.file), c.column);
+    case "skipping": return lab.skipping(id(c.file), c.column, c.op, c.value, c.mechanisms);
     case "statistics": return lab.statistics(id(c.file), c.row_group, c.column);
     case "compression": return lab.compression(id(c.file), c.column, c.page ?? null);
     case "interpret": return lab.interpret(id(c.file), c.offset);

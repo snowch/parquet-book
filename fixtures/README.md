@@ -538,6 +538,78 @@ row_group_size=4
 sorting_columns=[{'column_index': 0, 'descending': False, 'nulls_first': False}]
 ```
 
+## `pruning-sorted.parquet`
+
+800 orders written in order_id order: four row groups of 200, pages of 40 rows, a page index for every column, and a Bloom filter for customer_id. Because the rows are sorted, each row group and page covers a narrow range of order_id, and a reader can skip most of the file for a query on it.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 26926 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 1892 bytes |
+| SHA-256 | `007f6565c1518742…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=['country']
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+bloom_filter_options={'customer_id': {'ndv': 200, 'fpp': 0.05}}
+```
+
+## `pruning-shuffled.parquet`
+
+The same 800 orders as pruning-sorted.parquet, shuffled, and written the same way. Every row group and page now covers nearly the whole range of order_id, and the statistics can rule out almost nothing.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 26895 bytes |
+| Rows | 800 |
+| Row groups | 4 |
+| Footer length | 1892 bytes |
+| SHA-256 | `906bc2255f0439c6…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=['country']
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=True
+row_group_size=200
+max_rows_per_page=40
+bloom_filter_options={'customer_id': {'ndv': 200, 'fpp': 0.05}}
+```
+
 ## `pages-v2-snappy.parquet`
 
 pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.

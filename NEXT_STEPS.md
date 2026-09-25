@@ -64,19 +64,28 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   chunk of every fixture. NaN is written to JSON as `"NaN"` instead of `null`.
 - Experiment: the statistics panel. Problems 8.1 (sort orders) and 8.2 (which bounds); 8.3 open.
 
-## Next: ch09, skipping data
+## Done: ch09, skipping data
 
-1. Fixture `pruning.parquet`: sorted and unsorted copies of the same rows, many row groups,
-   page indexes (`write_page_index=True`), and Bloom filters if pyarrow 25 writes them.
-2. Reader: predicates (`=`, `<`, `>`, `IN`, `IS NULL`) evaluated against bounds with three
-   answers (cannot match, may match, all match); ColumnIndex and OffsetIndex; Bloom filter probes.
-3. Experiment: a predicate builder showing, row group by row group and page by page, what is
-   skipped and why, and the bytes a reader would still fetch.
+- Reader: `prune.rs` (conditions judged against bounds, plans over statistics, Bloom filters and
+  the page index, and the bytes of every column a plan reads); `page_index.rs` (ColumnIndex and
+  OffsetIndex); `bloom.rs` (xxHash64 and split block Bloom filters). Indexes and filters appear
+  in the structure view.
+- Fixtures `pruning-sorted.parquet` and `pruning-shuffled.parquet`. Tests: the OffsetIndex
+  matches the walked pages, the ColumnIndex matches each page's decoded values, every value
+  passes its filter, and no plan skips a matching row, over hundreds of conditions.
+- Experiment: the skipping panel. Problems 9.1 (can this be skipped?) and 9.2 (probe a filter);
+  9.3 open.
+
+## Next: ch10, how readers read
+
+1. `TracingStore` gains a clock per connection, so concurrent requests overlap in time.
+2. Reader: turn a plan into requests (one per page, coalesced within a gap, or whole chunks), and
+   measure requests, bytes and simulated time under the network model.
+3. Experiment: the same query under each strategy, with the request timeline.
+4. The cost of large footers: a fixture with many columns and row groups.
 
 ## Then
 
-- **ch10**: request coalescing and concurrency in `TracingStore` (a clock per connection); the
-  cost of large footers.
 - **ch11**: writing well, measured: row group and page sizes, sorting, dictionary fallback.
 - **ch12**: a tiny query engine over the reader.
 

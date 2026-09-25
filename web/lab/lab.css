@@ -270,6 +270,32 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .sorted-values li { font: 12px var(--mono); padding: 0 .3rem; border: 1px solid var(--edge); border-radius: 3px; }
 .sorted-values li.lo, .sorted-values li.hi { border-color: var(--accent); background: var(--wash); }
 
+/* Ch09: skipping. */
+.skip-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--edge); font-size: 13px; }
+.skip-form .mechanisms { display: flex; flex-wrap: wrap; gap: .8rem; border: 0; padding: 0; margin: 0; }
+.skip-form .mechanisms legend { float: left; margin-right: .6rem; color: var(--muted); }
+.skip-grid { display: grid; grid-template-columns: minmax(0, 1fr); border-bottom: 1px solid var(--edge); }
+.skip-grid .p-skip-sum { border-bottom: 1px solid var(--edge); }
+.skip-grid .bar-row { grid-template-columns: 6.5rem 1fr 7rem; }
+.skip-grid .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }
+.skip-grid .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
+.skip-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: .6rem; }
+.skip-groups .rg { border: 1px solid var(--edge); border-radius: 4px; padding: .5rem .6rem; font-size: 12.5px; }
+.skip-groups .rg.skipped { opacity: .75; background: var(--panel); }
+.skip-groups h5 { margin: 0 0 .3rem; font-size: 13px; display: flex; gap: .4rem; align-items: baseline; }
+.skip-groups h5 .verdict { margin-left: auto; font-weight: 600; }
+.skip-groups .rg.skipped h5 .verdict { color: var(--go); }
+.skip-groups .steps { margin: 0 0 .3rem; padding-left: 1.1rem; }
+.skip-groups .steps li.skip strong { color: var(--go); }
+.skip-groups .bloom .set { color: var(--go); font-weight: 600; }
+.skip-groups .bloom .clear { color: var(--stop); font-weight: 600; text-decoration: line-through; }
+.page-strip { display: flex; gap: 2px; margin: .3rem 0; }
+.page-strip .pg { font: 10.5px var(--mono); padding: .1rem 0; min-width: 0; border-radius: 2px; border: 1px solid var(--edge); }
+.page-strip .pg.keep { background: var(--wash); border-color: var(--accent); }
+.page-strip .pg.skip { background: transparent; color: var(--faint); text-decoration: line-through; }
+.skip-groups .reads { margin: .2rem 0 0; padding-left: 1.1rem; }
+.skip-grid button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }

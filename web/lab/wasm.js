@@ -74,6 +74,14 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
+  skipping(id, column, op, value, mechanisms = 7) {
+    const OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];
+    const text = encoder.encode(value ?? "");
+    const ptr = this.#copyIn(text);
+    return this.#result(this.exports.pl_skipping(id, column, OPS.indexOf(op), ptr, text.length, mechanisms));
+  }
+
   statistics(id, rowGroup, column) {
     return this.#result(this.exports.pl_statistics(id, rowGroup, column));
   }

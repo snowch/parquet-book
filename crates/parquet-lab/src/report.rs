@@ -238,6 +238,72 @@ fn structure_inner(file: &[u8]) -> Result<Json, String> {
             chunks,
         ));
     }
+    // Bloom filters and the page index (ch09), between the last row group and the footer.
+    let mut extra: Vec<(Span, Json)> = Vec::new();
+    for (g, rg) in md.row_groups.iter().enumerate() {
+        for c in &rg.columns {
+            let name = format!("{} (row group {g})", c.dotted_path());
+            if let Ok(Some(b)) = crate::bloom::read(file, c) {
+                let span = Span::new(b.header_span.start, b.bitset_span.end);
+                let bitset = region(
+                    "Bitset",
+                    "bloom_bitset",
+                    b.bitset_span,
+                    format!("{} blocks of 32 bytes", b.num_blocks()).into(),
+                    vec![],
+                );
+                let header = annotate(&b.header, "BloomFilterHeader", "BloomFilterHeader", None);
+                extra.push((
+                    span,
+                    region(
+                        &format!("Bloom filter {name}"),
+                        "bloom",
+                        span,
+                        Json::Null,
+                        vec![header, bitset],
+                    ),
+                ));
+            }
+            if let Ok(Some(ci)) = crate::page_index::column_index(file, c) {
+                let tree = annotate(&ci.tree, "ColumnIndex", "ColumnIndex", Some(c));
+                extra.push((
+                    ci.span,
+                    region(
+                        &format!("Column index {name}"),
+                        "column_index",
+                        ci.span,
+                        Json::Null,
+                        vec![tree],
+                    ),
+                ));
+            }
+            if let Ok(Some(oi)) = crate::page_index::offset_index(file, c) {
+                let tree = annotate(&oi.tree, "OffsetIndex", "OffsetIndex", None);
+                extra.push((
+                    oi.span,
+                    region(
+                        &format!("Offset index {name}"),
+                        "offset_index",
+                        oi.span,
+                        Json::Null,
+                        vec![tree],
+                    ),
+                ));
+            }
+        }
+    }
+    extra.sort_by_key(|(s, _)| *s);
+    if let (Some(first), Some(last)) = (extra.first(), extra.last()) {
+        let span = Span::new(first.0.start, last.0.end);
+        let count = extra.len();
+        top.push(region(
+            "Indexes and filters",
+            "indexes",
+            span,
+            format!("{count} structures").into(),
+            extra.into_iter().map(|(_, j)| j).collect(),
+        ));
+    }
     top.push(region(
         "Footer",
         "footer",
@@ -1762,5 +1828,237 @@ pub fn statistics(file: &[u8], row_group: usize, column: usize) -> Json {
                 ("values", values_json),
             ]),
         ),
+    ])
+}
+
+/// The comparisons `report::skipping` accepts, in the order the WASM interface numbers them.
+pub const OPS: [&str; 8] = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];
+
+/// Ch09's experiment: a condition on one column, and what the reader skips to answer
+/// `SELECT *` with it. `mechanisms` is a bit set: 1 row group statistics, 2 Bloom filters,
+/// 4 the page index.
+pub fn skipping(file: &[u8], column: usize, op: &str, value: &str, mechanisms: u32) -> Json {
+    use crate::column::read_column;
+    use crate::prune::{plan, Mechanisms, Op, Predicate};
+    use crate::schema::{build, leaves};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let flat: Vec<&crate::schema::Leaf> =
+        all.iter().filter(|l| l.max_repetition_level == 0).collect();
+    let columns = Json::Arr(
+        flat.iter()
+            .map(|l| {
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                    (
+                        "type",
+                        crate::schema::physical_word(l.physical_type, l.type_length).into(),
+                    ),
+                ])
+            })
+            .collect(),
+    );
+    let with_columns = |mut j: Json| {
+        if let Json::Obj(ref mut fields) = j {
+            fields.push(("columns".into(), columns.clone()));
+        }
+        j
+    };
+    let Some(leaf) = flat.iter().find(|l| l.column == column) else {
+        return with_columns(fail(format!("no column {column} that does not repeat")));
+    };
+    let op = match Op::parse(op) {
+        Ok(op) => op,
+        Err(e) => return with_columns(fail(e)),
+    };
+    let converted = md.schema[leaf.element].converted_type.clone();
+    let p = match Predicate::new(leaf, converted.as_deref(), op, value) {
+        Ok(p) => p,
+        Err(e) => return with_columns(fail(e)),
+    };
+    let use_ = Mechanisms {
+        statistics: mechanisms & 1 != 0,
+        bloom: mechanisms & 2 != 0,
+        page_index: mechanisms & 4 != 0,
+    };
+    let projection: Vec<usize> = flat.iter().map(|l| l.column).collect();
+    let pl = match plan(file, &md, leaf, &p, &projection, use_) {
+        Ok(pl) => pl,
+        Err(e) => return with_columns(fail(e)),
+    };
+    let full = match plan(file, &md, leaf, &p, &projection, Mechanisms::NONE) {
+        Ok(pl) => pl,
+        Err(e) => return with_columns(fail(e)),
+    };
+    // The answer, by reading everything: how many rows match, and in which row groups.
+    let mut matching = Vec::new();
+    for rg in &md.row_groups {
+        let n = match read_column(file, &rg.columns[leaf.column], leaf) {
+            Ok(d) => d
+                .triples
+                .iter()
+                .filter(|t| {
+                    let v = t
+                        .value
+                        .as_ref()
+                        .map(|v| v.to_plain_bytes(leaf.physical_type));
+                    p.row_matches(v.as_deref())
+                })
+                .count(),
+            Err(e) => return with_columns(fail(e.to_string())),
+        };
+        matching.push(n);
+    }
+    let path_of = |c: usize| all.get(c).map(|l| l.dotted_path()).unwrap_or_default();
+    let groups = Json::Arr(
+        pl.row_groups
+            .iter()
+            .map(|g| {
+                let chunk = &md.row_groups[g.index].columns[leaf.column];
+                // For equality, the Bloom filter probe in full, whether or not it decided.
+                let probe = match (&p.value, p.op) {
+                    (Some(x), Op::Eq) if use_.bloom => crate::bloom::read(file, chunk)
+                        .ok()
+                        .flatten()
+                        .map(|f| {
+                            let pr = f.probe(x);
+                            obj([
+                                ("hash", format!("{:016x}", pr.hash).into()),
+                                ("block", pr.block.into()),
+                                ("blocks", f.num_blocks().into()),
+                                ("block_span", f.block_span(pr.block).into()),
+                                (
+                                    "bits",
+                                    Json::Arr(
+                                        pr.bits
+                                            .iter()
+                                            .map(|&(b, set)| {
+                                                obj([("bit", b.into()), ("set", set.into())])
+                                            })
+                                            .collect(),
+                                    ),
+                                ),
+                                ("may_contain", pr.may_contain.into()),
+                            ])
+                        })
+                        .unwrap_or(Json::Null),
+                    _ => Json::Null,
+                };
+                obj([
+                    ("index", g.index.into()),
+                    ("num_rows", g.num_rows.into()),
+                    ("skipped", g.skipped.into()),
+                    ("matching", matching[g.index].into()),
+                    (
+                        "steps",
+                        Json::Arr(
+                            g.steps
+                                .iter()
+                                .map(|(m, d)| {
+                                    obj([
+                                        ("mechanism", (*m).into()),
+                                        ("skip", d.skip.into()),
+                                        ("why", d.why.clone().into()),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                    ("bloom", probe),
+                    (
+                        "pages",
+                        Json::Arr(
+                            g.pages
+                                .iter()
+                                .map(|q| {
+                                    obj([
+                                        ("span", q.span.into()),
+                                        ("rows", Json::Arr(vec![q.rows.0.into(), q.rows.1.into()])),
+                                        ("skip", q.decision.skip.into()),
+                                        ("why", q.decision.why.clone().into()),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                    (
+                        "rows",
+                        Json::Arr(
+                            g.rows
+                                .iter()
+                                .map(|&(a, b)| Json::Arr(vec![a.into(), b.into()]))
+                                .collect(),
+                        ),
+                    ),
+                    (
+                        "reads",
+                        Json::Arr(
+                            g.reads
+                                .iter()
+                                .map(|r| {
+                                    obj([
+                                        ("column", r.column.into()),
+                                        ("path", path_of(r.column).into()),
+                                        (
+                                            "spans",
+                                            Json::Arr(
+                                                r.spans.iter().map(|s| (*s).into()).collect(),
+                                            ),
+                                        ),
+                                        (
+                                            "bytes",
+                                            r.spans.iter().map(|s| s.len()).sum::<u64>().into(),
+                                        ),
+                                        ("pages_read", r.pages_read.into()),
+                                        ("pages_total", r.pages_total.into()),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                    ("index_bytes", g.index_bytes.into()),
+                ])
+            })
+            .collect(),
+    );
+    let condition = match &p.value {
+        Some(_) => format!("{} {} {}", leaf.dotted_path(), op.symbol(), value.trim()),
+        None => format!("{} {}", leaf.dotted_path(), op.symbol()),
+    };
+    obj([
+        ("ok", true.into()),
+        ("columns", columns),
+        ("column", column.into()),
+        ("condition", condition.into()),
+        (
+            "mechanisms",
+            obj([
+                ("statistics", use_.statistics.into()),
+                ("bloom", use_.bloom.into()),
+                ("page_index", use_.page_index.into()),
+            ]),
+        ),
+        (
+            "totals",
+            obj([
+                ("rows", md.num_rows.into()),
+                ("rows_read", pl.rows_read().into()),
+                ("rows_matching", matching.iter().sum::<usize>().into()),
+                ("bytes_full_scan", full.bytes_read().into()),
+                ("bytes_read", pl.bytes_read().into()),
+                ("index_bytes", pl.index_bytes().into()),
+            ]),
+        ),
+        ("row_groups", groups),
     ])
 }

@@ -47,8 +47,8 @@ make problems                                           # the chapter exercises 
 ## Status
 
 ch01 (row and column layouts), ch02 (footer discovery through a simulated object store), ch03
-(the type system), ch04 (nested data), ch05 (encodings), ch06 (pages), ch07 (compression) and ch08
-(metadata and statistics) are written, with
+(the type system), ch04 (nested data), ch05 (encodings), ch06 (pages), ch07 (compression), ch08
+(metadata and statistics) and ch09 (skipping data) are written, with
 working experiments and graded problems.
 The other chapters are planned in `tools/outline.py` and appear in the book as outlines. See
 `PLAN.md` for the plan and `NEXT_STEPS.md` for what comes next.

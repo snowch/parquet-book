@@ -7,6 +7,9 @@ title: Glossary
 
 Terms the book uses, with the chapter that introduces each.
 
+**Bloom filter.** A bitset per column chunk that can prove a value was never written to it. It has
+false positives and no false negatives. [ch09](#skipping-data)
+
 **Codec.** The general-purpose compressor applied to every page of a column chunk after encoding,
 named in the chunk's metadata: SNAPPY, GZIP, LZ4_RAW, ZSTD, BROTLI, or UNCOMPRESSED.
 [ch07](#compression)
@@ -59,8 +62,15 @@ such as S3. [ch02](#anatomy-of-a-parquet-file)
 **Page.** The unit a column chunk is divided into for encoding and compression, with a header of
 its own. [ch02](#anatomy-of-a-parquet-file)
 
+**Page index.** Two structures per column chunk, written after the row groups: the ColumnIndex, with
+each page's bounds and null count, and the OffsetIndex, with each page's position and first row.
+[ch09](#skipping-data)
+
 **Physical type.** How a value is stored: BOOLEAN, INT32, INT64, INT96, FLOAT, DOUBLE, BYTE_ARRAY or
 FIXED_LEN_BYTE_ARRAY. [ch03](#the-type-system)
+
+**Predicate pushdown.** Evaluating a query's condition against metadata before reading data, so that
+row groups and pages that cannot match are never read. [ch09](#skipping-data)
 
 **Prefetch.** Reading more of a file's tail than the trailer, so that the footer arrives in the
 same request. [ch02](#anatomy-of-a-parquet-file)

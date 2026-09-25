@@ -233,6 +233,32 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch09's experiment: what a condition lets the reader skip. `op` indexes
+/// `report::OPS`; `text` is the condition's value, in a buffer from `pl_alloc` that this call
+/// takes and frees; `mechanisms` is the bit set `report::skipping` describes.
+///
+/// # Safety
+/// `text_ptr` and `text_len` must come from one call to `pl_alloc`.
+#[no_mangle]
+pub unsafe extern "C" fn pl_skipping(
+    id: u32,
+    column: u32,
+    op: u32,
+    text_ptr: *mut u8,
+    text_len: usize,
+    mechanisms: u32,
+) -> usize {
+    let text = Box::from_raw(std::ptr::slice_from_raw_parts_mut(text_ptr, text_len));
+    let text = String::from_utf8_lossy(&text).into_owned();
+    let op = report::OPS.get(op as usize).copied().unwrap_or("?");
+    match with_file(id, |f| {
+        report::skipping(&f.bytes, column as usize, op, &text, mechanisms)
+    }) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch08's experiment: every column chunk's statistics, and one chunk's in detail. See
 /// `report::statistics`.
 #[no_mangle]

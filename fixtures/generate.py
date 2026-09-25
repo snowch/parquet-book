@@ -233,6 +233,58 @@ STATISTICS_TABLE = pa.table(
     }
 )
 
+
+def _pruning_rows(n: int) -> list[dict]:
+    """``n`` orders in order_id order, with random customers and amounts, and a country that is
+    null for every eleventh order (ch09)."""
+    x = 12345
+    rows = []
+    countries = ["UK", "SE", "PL", "US", "DE", "FR"]
+    for i in range(n):
+        x = (x * 1103515245 + 12345) % 2**31
+        rows.append(
+            {
+                "order_id": i + 1,
+                "customer_id": 100_000 + x % 900_000,
+                "country": countries[(i * 7) % 6] if i % 11 else None,
+                "amount_cents": 100 + (x >> 8) % 9900,
+            }
+        )
+    return rows
+
+
+def _shuffled(rows: list) -> list:
+    """The same rows in a fixed pseudo-random order: a Fisher-Yates shuffle driven by the same
+    generator, so every machine shuffles alike."""
+    order = list(range(len(rows)))
+    y = 777
+    for i in range(len(order) - 1, 0, -1):
+        y = (y * 1103515245 + 12345) % 2**31
+        j = y % (i + 1)
+        order[i], order[j] = order[j], order[i]
+    return [rows[k] for k in order]
+
+
+PRUNING_SCHEMA = pa.schema(
+    [
+        pa.field("order_id", pa.int64(), nullable=False),
+        pa.field("customer_id", pa.int64(), nullable=False),
+        pa.field("country", pa.string()),
+        pa.field("amount_cents", pa.int64(), nullable=False),
+    ]
+)
+PRUNING_ROWS = _pruning_rows(800)
+
+#: Four row groups of small pages, a page index, a dictionary for country, and a Bloom filter
+#: for customer_id, whose values are nearly all distinct.
+PRUNING_OPTIONS = {
+    "use_dictionary": ["country"],
+    "row_group_size": 200,
+    "max_rows_per_page": 40,
+    "write_page_index": True,
+    "bloom_filter_options": {"customer_id": {"ndv": 200, "fpp": 0.05}},
+}
+
 #: The same orders under every codec the format defines that pyarrow writes (ch07).
 ORDERS = _orders(256)
 CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
@@ -442,6 +494,27 @@ FIXTURES = (
             "write_statistics": ["order_id", "customer_id", "delta", "city", "temp_c", "amount", "coupon"],
             "sorting_columns": [pq.SortingColumn(0)],
         },
+    ),
+    Fixture(
+        name="pruning-sorted",
+        why=(
+            "800 orders written in order_id order: four row groups of 200, pages of 40 rows, a "
+            "page index for every column, and a Bloom filter for customer_id. Because the rows "
+            "are sorted, each row group and page covers a narrow range of order_id, and a reader "
+            "can skip most of the file for a query on it."
+        ),
+        table=pa.Table.from_pylist(PRUNING_ROWS, schema=PRUNING_SCHEMA),
+        options=PRUNING_OPTIONS,
+    ),
+    Fixture(
+        name="pruning-shuffled",
+        why=(
+            "The same 800 orders as pruning-sorted.parquet, shuffled, and written the same way. "
+            "Every row group and page now covers nearly the whole range of order_id, and the "
+            "statistics can rule out almost nothing."
+        ),
+        table=pa.Table.from_pylist(_shuffled(PRUNING_ROWS), schema=PRUNING_SCHEMA),
+        options=PRUNING_OPTIONS,
     ),
     Fixture(
         name="pages-v2-snappy",

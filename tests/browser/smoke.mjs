@@ -262,6 +262,29 @@ if (shots) {
   await statsLab.screenshot({ path: path.join(shots, "statistics-lab.png") });
 }
 
+// ch09: skipping. Every plan is the reader's.
+await page.goto(base + "skipping-data.html");
+const skipLab = page.locator('.lab[data-experiment="skipping"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]')?.dataset.state === "ok");
+const plan431 = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431"]);
+check(await skipLab.getAttribute("data-bytes-read") === String(plan431.totals.bytes_read),
+  `order_id = 431 reads the reader's ${plan431.totals.bytes_read} bytes`);
+check(await skipLab.getAttribute("data-skipped") === plan431.row_groups.map((g) => (g.skipped ? "skip" : "read")).join(","),
+  "and skips the row groups the reader skips");
+await skipLab.locator('input[name="m"][value="4"]').uncheck();
+const noIndex = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431", "--use", "statistics,bloom"]);
+await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="skipping"]').dataset.bytesRead === String(n), noIndex.totals.bytes_read);
+check(true, `without the page index it reads ${noIndex.totals.bytes_read} bytes`);
+await skipLab.locator('input[name="m"][value="4"]').check();
+await skipLab.locator(".lab-head select").selectOption("pruning-shuffled.parquet");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]').dataset.state === "ok");
+await skipLab.locator('select[name="column"]').selectOption("1");
+await skipLab.locator('input[name="value"]').fill("424242");
+await skipLab.locator('button[type="submit"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]').dataset.skipped === "skip,skip,skip,skip");
+check(true, "an absent customer number is ruled out in every row group by its Bloom filter");
+if (shots) await skipLab.screenshot({ path: path.join(shots, "skipping-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -132,6 +132,13 @@ pub struct ColumnChunk {
     pub data_page_offset: i64,
     pub dictionary_page_offset: Option<i64>,
     pub statistics: Option<Statistics>,
+    /// The page index (ch09): where this chunk's ColumnIndex and OffsetIndex are, if written.
+    pub column_index: Option<Span>,
+    pub offset_index: Option<Span>,
+    /// Where this chunk's Bloom filter is (ch09), if written. The length is optional in the
+    /// format; without it the filter's header says how long its bitset is.
+    pub bloom_filter_offset: Option<i64>,
+    pub bloom_filter_length: Option<i64>,
     /// Where this chunk's description sits in the footer.
     pub span: Span,
 }
@@ -346,6 +353,10 @@ fn column_chunk(node: &Node) -> Result<ColumnChunk, MetadataError> {
             Some(f) => Some(statistics(&f.node)?),
             None => None,
         },
+        column_index: offset_and_length(chunk, 6, 7),
+        offset_index: offset_and_length(chunk, 4, 5),
+        bloom_filter_offset: opt_int(m, 14),
+        bloom_filter_length: opt_int(m, 15),
         span: node.span,
     })
 }
@@ -372,6 +383,12 @@ pub(crate) fn statistics(node: &Node) -> Result<Statistics, MetadataError> {
         is_min_value_exact: opt_bool(s, 8),
         span: node.span,
     })
+}
+
+/// A region given as an offset field and a length field, when both are present and sensible.
+fn offset_and_length(s: &Struct, offset: i16, length: i16) -> Option<Span> {
+    let (o, l) = (opt_int(s, offset)?, opt_int(s, length)?);
+    (o >= 0 && l >= 0).then(|| Span::new(o as u64, (o + l) as u64))
 }
 
 /// The span of a binary field's bytes, without the varint length in front of them.

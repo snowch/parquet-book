@@ -194,9 +194,9 @@ _CHAPTERS = (
         "Skipping data",
         "reading_less",
         "Given a predicate, which bytes can a reader prove it does not need?",
-        "Row-group pruning, page indexes and Bloom filters, each deciding which ranges to skip.",
-        (),
-        (),
+        "Conditions judged against statistics, Bloom filters and the page index, with the bytes each saves.",
+        ("skipping",),
+        ("pruning-sorted.parquet", "pruning-shuffled.parquet"),
     ),
     (
         "how_readers_read",
@@ -280,4 +280,5 @@ EXPERIMENTS = (
     "pages",
     "compression",
     "statistics",
+    "skipping",
 )

@@ -40,6 +40,7 @@
 //! The crate has no dependencies. It is compiled natively for the tests and the command line,
 //! and to WebAssembly for the browser, from the same source.
 
+pub mod bloom;
 pub mod bytes;
 pub mod column;
 pub mod compress;
@@ -53,9 +54,11 @@ pub mod logical;
 pub mod metadata;
 pub mod nested;
 pub mod object_store;
+pub mod page_index;
 pub mod pages;
 pub mod parquet_thrift;
 pub mod plain;
+pub mod prune;
 pub mod reader;
 pub mod report;
 pub mod rle;

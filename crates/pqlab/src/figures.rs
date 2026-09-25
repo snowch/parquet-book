@@ -131,6 +131,22 @@ const FIGURES: &[Figure] = &[
         render: statistics_cost,
     },
     Figure {
+        file: "skipping-compare.md",
+        render: skipping_compare,
+    },
+    Figure {
+        file: "skipping-mechanisms.md",
+        render: skipping_mechanisms,
+    },
+    Figure {
+        file: "page-index-order-id.md",
+        render: page_index_order_id,
+    },
+    Figure {
+        file: "bloom-rate.md",
+        render: bloom_rate,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -1467,5 +1483,220 @@ fn statistics_cost(root: &Path) -> Result<String, String> {
          `Statistics` structures in the column chunks' metadata; page headers carry their own \
          copies, which are not counted.*\n",
         rows.join("\n")
+    ))
+}
+
+const SORTED: &str = "pruning-sorted.parquet";
+const SHUFFLED: &str = "pruning-shuffled.parquet";
+
+fn num(j: &Json, key: &str) -> u64 {
+    j.get(key).and_then(Json::as_u64).unwrap_or(0)
+}
+
+/// The conditions the chapter compares, as (column, op, value). The customer number that is
+/// present is read from the fixture, so it stays true if the fixture changes.
+fn skipping_conditions(root: &Path) -> Result<Vec<(usize, &'static str, String)>, String> {
+    let bytes = fixture(root, SORTED)?;
+    let md = open_bytes(&bytes)?;
+    let root_node = parquet_lab::schema::build(&md.schema).map_err(|e| e.to_string())?;
+    let leaves = parquet_lab::schema::leaves(&root_node);
+    let data = parquet_lab::column::read_column(&bytes, &md.row_groups[2].columns[1], &leaves[1])
+        .map_err(|e| e.to_string())?;
+    let present = data.triples[17]
+        .value
+        .as_ref()
+        .map(|v| v.to_json().to_json())
+        .ok_or("no customer")?;
+    Ok(vec![
+        (0, "=", "431".into()),
+        (0, "<", "100".into()),
+        (3, ">", "9800".into()),
+        (1, "=", present),
+        (1, "=", "424242".into()),
+        (2, "is null", String::new()),
+    ])
+}
+
+fn skipping_compare(root: &Path) -> Result<String, String> {
+    let sorted = fixture(root, SORTED)?;
+    let shuffled = fixture(root, SHUFFLED)?;
+    let mut rows = vec![
+        "| Condition | Matching rows | Sorted: bytes read | Sorted: rows decoded | Shuffled: bytes read | Shuffled: rows decoded |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    let (mut full_a, mut full_b, mut total_rows) = (0, 0, 0);
+    for (column, op, value) in skipping_conditions(root)? {
+        let a = parquet_lab::report::skipping(&sorted, column, op, &value, 7);
+        let b = parquet_lab::report::skipping(&shuffled, column, op, &value, 7);
+        let (ta, tb) = (
+            a.get("totals").cloned().unwrap_or(Json::Null),
+            b.get("totals").cloned().unwrap_or(Json::Null),
+        );
+        (full_a, full_b, total_rows) = (
+            num(&ta, "bytes_full_scan"),
+            num(&tb, "bytes_full_scan"),
+            num(&ta, "rows"),
+        );
+        rows.push(format!(
+            "| `{}` | {} | {} | {} | {} | {} |",
+            text_of(a.get("condition")),
+            num(&ta, "rows_matching"),
+            thousands(num(&ta, "bytes_read")),
+            thousands(num(&ta, "rows_read")),
+            thousands(num(&tb, "bytes_read")),
+            thousands(num(&tb, "rows_read")),
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from `fixtures/{SORTED}` and `fixtures/{SHUFFLED}`, using \
+         row group statistics, Bloom filters and the page index. A full scan decodes {} rows and \
+         reads {} bytes of column chunks from the sorted file, {} from the shuffled one. Bytes \
+         read do not include the indexes and filters fetched to decide.*\n",
+        rows.join("\n"),
+        thousands(total_rows),
+        thousands(full_a),
+        thousands(full_b)
+    ))
+}
+
+fn skipping_mechanisms(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | Condition | Mechanisms | Row groups skipped | Bytes read | Bytes fetched to decide |"
+            .to_string(),
+        "|---|---|---|--:|--:|--:|".to_string(),
+    ];
+    let conditions = skipping_conditions(root)?;
+    let cases = [
+        (SORTED, &conditions[0], [0u32, 1, 5]),
+        (SHUFFLED, &conditions[4], [0, 1, 3]),
+    ];
+    let names = |m: u32| {
+        let v: Vec<&str> = [(1, "statistics"), (2, "Bloom filters"), (4, "page index")]
+            .iter()
+            .filter(|(b, _)| m & b != 0)
+            .map(|(_, n)| *n)
+            .collect();
+        if v.is_empty() {
+            "none".to_string()
+        } else {
+            v.join(", ")
+        }
+    };
+    for (file, (column, op, value), masks) in cases {
+        let bytes = fixture(root, file)?;
+        for m in masks {
+            let r = parquet_lab::report::skipping(&bytes, *column, op, value, m);
+            let t = r.get("totals").cloned().unwrap_or(Json::Null);
+            let skipped = arr(r.get("row_groups"))
+                .iter()
+                .filter(|g| matches!(g.get("skipped"), Some(Json::Bool(true))))
+                .count();
+            rows.push(format!(
+                "| `{file}` | `{}` | {} | {skipped} of {} | {} | {} |",
+                text_of(r.get("condition")),
+                names(m),
+                arr(r.get("row_groups")).len(),
+                thousands(num(&t, "bytes_read")),
+                thousands(num(&t, "index_bytes")),
+            ));
+        }
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the pruning fixtures, with each set of mechanisms \
+         allowed in turn.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn page_index_order_id(root: &Path) -> Result<String, String> {
+    let mut cols = Vec::new();
+    for file in [SORTED, SHUFFLED] {
+        let bytes = fixture(root, file)?;
+        let md = open_bytes(&bytes)?;
+        let chunk = &md.row_groups[2].columns[0];
+        let ci = parquet_lab::page_index::column_index(&bytes, chunk)?.ok_or("no column index")?;
+        let oi = parquet_lab::page_index::offset_index(&bytes, chunk)?.ok_or("no offset index")?;
+        let rows = oi.row_ranges(md.row_groups[2].num_rows);
+        let int = |b: &[u8]| i64::from_le_bytes(b.try_into().unwrap_or([0; 8]));
+        cols.push((
+            ci.boundary_order.clone(),
+            (0..rows.len())
+                .map(|i| (rows[i], int(&ci.min_values[i]), int(&ci.max_values[i])))
+                .collect::<Vec<_>>(),
+        ));
+    }
+    let mut out = vec![
+        format!("| Page | Rows | Sorted: `order_id` min … max | Shuffled: `order_id` min … max |"),
+        "|--:|---|---|---|".to_string(),
+    ];
+    for i in 0..cols[0].1.len() {
+        let (r, a0, a1) = cols[0].1[i];
+        let (_, b0, b1) = cols[1].1[i];
+        out.push(format!(
+            "| {i} | {}–{} | {a0} … {a1} | {b0} … {b1} |",
+            r.0,
+            r.1 - 1
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*The ColumnIndex of `order_id` in row group 2 of each pruning fixture, read by the \
+         reader. Its boundary order is `{}` in the sorted file and `{}` in the shuffled one.*\n",
+        out.join("\n"),
+        cols[0].0,
+        cols[1].0
+    ))
+}
+
+fn bloom_rate(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | Row group | Filter bytes | Values in the chunk | Absent values tested | Passed anyway |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    let (mut tested, mut passed) = (0u64, 0u64);
+    for file in [SHUFFLED] {
+        let bytes = fixture(root, file)?;
+        let md = open_bytes(&bytes)?;
+        let root_node = parquet_lab::schema::build(&md.schema).map_err(|e| e.to_string())?;
+        let leaf = &parquet_lab::schema::leaves(&root_node)[1];
+        for (g, rg) in md.row_groups.iter().enumerate() {
+            let chunk = &rg.columns[1];
+            let filter = parquet_lab::bloom::read(&bytes, chunk)?.ok_or("no Bloom filter")?;
+            let data =
+                parquet_lab::column::read_column(&bytes, chunk, leaf).map_err(|e| e.to_string())?;
+            let values: Vec<Vec<u8>> = data
+                .triples
+                .iter()
+                .filter_map(|t| t.value.as_ref())
+                .map(|v| v.to_plain_bytes(leaf.physical_type))
+                .collect();
+            let (mut t, mut p) = (0u64, 0u64);
+            for candidate in (100_000i64..1_000_000).step_by(97) {
+                let b = candidate.to_le_bytes().to_vec();
+                if !values.contains(&b) {
+                    t += 1;
+                    p += u64::from(filter.probe(&b).may_contain);
+                }
+            }
+            tested += t;
+            passed += p;
+            rows.push(format!(
+                "| `{file}` | {g} | {} | {} | {} | {} |",
+                filter.bitset_span.end - filter.header_span.start,
+                values.len(),
+                thousands(t),
+                thousands(p)
+            ));
+        }
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader: every customer number from 100,000 in steps of 97 that the \
+         row group does not hold, probed against its `customer_id` Bloom filter. {} of {} passed, \
+         {:.1}%. The writer was asked for a false positive rate of 5% at 200 distinct values.*\n",
+        rows.join("\n"),
+        thousands(passed),
+        thousands(tested),
+        100.0 * passed as f64 / tested.max(1) as f64
     ))
 }

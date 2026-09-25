@@ -7,6 +7,7 @@
 use std::cmp::Ordering;
 use std::path::PathBuf;
 
+use parquet_lab::bytes::Span;
 use parquet_lab::format::{footer_span, parse_trailer, MAGIC};
 use parquet_lab::json::Json;
 use parquet_lab::metadata::Statistics;
@@ -171,8 +172,8 @@ fn every_column_chunk_is_where_pyarrow_says_it_is() {
 
 #[test]
 fn column_chunks_and_the_footer_tile_the_file() {
-    // Opening magic, then the chunks end to end, then the footer, then the trailer: no gaps and
-    // no overlaps, because these fixtures have no page indexes or Bloom filters between them.
+    // Opening magic, then the chunks end to end, then any Bloom filters and page indexes, then
+    // the footer, then the trailer: no gaps and no overlaps.
     for (name, bytes, _) in fixtures() {
         let md = report::open_bytes(&bytes).unwrap();
         let mut at = 4;
@@ -188,12 +189,32 @@ fn column_chunks_and_the_footer_tile_the_file() {
                 at = r.end;
             }
         }
+        // Between the last chunk and the footer: Bloom filters, then the page index, each where
+        // the footer says, end to end.
+        let mut extra = Vec::new();
+        for rg in &md.row_groups {
+            for c in &rg.columns {
+                if let Some(b) = parquet_lab::bloom::read(&bytes, c).unwrap() {
+                    extra.push(Span::new(b.header_span.start, b.bitset_span.end));
+                }
+                extra.extend(c.column_index);
+                extra.extend(c.offset_index);
+            }
+        }
+        extra.sort();
+        for span in extra {
+            assert_eq!(
+                span.start, at,
+                "{name}: an index or filter starts where the last region ended"
+            );
+            at = span.end;
+        }
         let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
         let t = parse_trailer(last8, bytes.len() as u64).unwrap();
         let footer = footer_span(bytes.len() as u64, t.footer_length).unwrap();
         assert_eq!(
             footer.start, at,
-            "{name}: the footer follows the last chunk"
+            "{name}: the footer follows the last chunk, filter or index"
         );
     }
 }
@@ -631,4 +652,247 @@ fn deprecated_fields_are_used_only_where_signed_order_is_right() {
             stats::bounds(&s, comparator, true)
         );
     }
+}
+
+#[test]
+fn the_page_index_agrees_with_the_pages() {
+    // The OffsetIndex must list the data pages the walker finds, with the rows each starts at;
+    // the ColumnIndex must hold each page's own minimum, maximum and null count, which the reader
+    // computes from the values it decodes.
+    let mut pages_checked = 0;
+    for (name, bytes, _) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        for leaf in parquet_lab::schema::leaves(&root) {
+            let cmp =
+                Comparator::for_leaf(&leaf, md.schema[leaf.element].converted_type.as_deref());
+            for rg in &md.row_groups {
+                let chunk = &rg.columns[leaf.column];
+                let Some(oi) = parquet_lab::page_index::offset_index(&bytes, chunk).unwrap() else {
+                    continue;
+                };
+                let data = parquet_lab::column::read_column(&bytes, chunk, &leaf).unwrap();
+                let walked: Vec<Span> = data.pages.iter().map(|p| p.page.span()).collect();
+                let listed: Vec<Span> = oi.pages.iter().map(|p| p.span()).collect();
+                assert_eq!(
+                    listed,
+                    walked,
+                    "{name} {}: page locations",
+                    leaf.dotted_path()
+                );
+                let reps: Vec<Vec<u32>> = (0..data.pages.len())
+                    .map(|i| {
+                        let first = usize::from(data.dictionary.is_some());
+                        data.triples
+                            .iter()
+                            .filter(|t| t.page == i + first)
+                            .map(|t| t.rep)
+                            .collect()
+                    })
+                    .collect();
+                let firsts: Vec<i64> = parquet_lab::column::first_rows(&reps)
+                    .iter()
+                    .map(|&r| r as i64)
+                    .collect();
+                let listed: Vec<i64> = oi.pages.iter().map(|p| p.first_row_index).collect();
+                assert_eq!(listed, firsts, "{name} {}: first rows", leaf.dotted_path());
+                let ci = parquet_lab::page_index::column_index(&bytes, chunk)
+                    .unwrap()
+                    .unwrap();
+                for i in 0..data.pages.len() {
+                    let page_no = i + usize::from(data.dictionary.is_some());
+                    let values: Vec<Vec<u8>> = data
+                        .triples
+                        .iter()
+                        .filter(|t| t.page == page_no)
+                        .filter_map(|t| t.value.as_ref())
+                        .map(|v| v.to_plain_bytes(leaf.physical_type))
+                        .collect();
+                    let nulls = data
+                        .triples
+                        .iter()
+                        .filter(|t| t.page == page_no && t.value.is_none())
+                        .count();
+                    assert_eq!(
+                        ci.null_counts.as_ref().map(|n| n[i]),
+                        Some(nulls as i64),
+                        "{name} {}: page {i} nulls",
+                        leaf.dotted_path()
+                    );
+                    match cmp.min_max(values.iter().map(|v| &v[..])) {
+                        None => assert!(
+                            ci.null_pages[i],
+                            "{name}: page {i} has no values, so it is a null page"
+                        ),
+                        Some((lo, hi)) => {
+                            assert!(!ci.null_pages[i]);
+                            assert_eq!(
+                                cmp.compare(lo, &ci.min_values[i]),
+                                Some(Ordering::Equal),
+                                "{name} {} page {i} min",
+                                leaf.dotted_path()
+                            );
+                            assert_eq!(
+                                cmp.compare(hi, &ci.max_values[i]),
+                                Some(Ordering::Equal),
+                                "{name} {} page {i} max",
+                                leaf.dotted_path()
+                            );
+                        }
+                    }
+                    pages_checked += 1;
+                }
+            }
+        }
+    }
+    assert!(pages_checked > 100, "only {pages_checked} pages checked");
+}
+
+#[test]
+fn bloom_filters_hold_every_value_and_few_others() {
+    let mut present = 0;
+    let (mut absent, mut false_positives) = (0, 0);
+    for (name, bytes, _) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        for leaf in parquet_lab::schema::leaves(&root) {
+            for rg in &md.row_groups {
+                let chunk = &rg.columns[leaf.column];
+                let Some(filter) = parquet_lab::bloom::read(&bytes, chunk).unwrap() else {
+                    continue;
+                };
+                let data = parquet_lab::column::read_column(&bytes, chunk, &leaf).unwrap();
+                let values: Vec<Vec<u8>> = data
+                    .triples
+                    .iter()
+                    .filter_map(|t| t.value.as_ref())
+                    .map(|v| v.to_plain_bytes(leaf.physical_type))
+                    .collect();
+                for v in &values {
+                    assert!(
+                        filter.probe(v).may_contain,
+                        "{name} {}: a value in the chunk must pass",
+                        leaf.dotted_path()
+                    );
+                    present += 1;
+                }
+                // Integers the chunk does not hold: the filter may pass a few, never most.
+                for candidate in (100_000i64..1_000_000).step_by(997) {
+                    let bytes = candidate.to_le_bytes().to_vec();
+                    if !values.contains(&bytes) {
+                        absent += 1;
+                        false_positives += usize::from(filter.probe(&bytes).may_contain);
+                    }
+                }
+            }
+        }
+    }
+    assert!(present >= 800, "only {present} values probed");
+    let rate = false_positives as f64 / absent as f64;
+    assert!(
+        rate < 0.15,
+        "false positive rate {rate} for {absent} absent values"
+    );
+}
+
+#[test]
+fn skipping_never_loses_a_matching_row() {
+    use parquet_lab::prune::{plan, Mechanisms, Op, Predicate};
+    let ops = [
+        Op::Eq,
+        Op::NotEq,
+        Op::Lt,
+        Op::LtEq,
+        Op::Gt,
+        Op::GtEq,
+        Op::IsNull,
+        Op::IsNotNull,
+    ];
+    let mut plans = 0;
+    let mut skipped_something = 0;
+    for (name, bytes, _) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        let leaves = parquet_lab::schema::leaves(&root);
+        let flat: Vec<_> = leaves
+            .iter()
+            .filter(|l| l.max_repetition_level == 0)
+            .collect();
+        let projection: Vec<usize> = flat.iter().map(|l| l.column).collect();
+        for leaf in &flat {
+            let converted = md.schema[leaf.element].converted_type.clone();
+            // Candidate values: a spread of the column's own values, as text the parser reads.
+            let Ok(first) = parquet_lab::column::read_column(
+                &bytes,
+                &md.row_groups[0].columns[leaf.column],
+                leaf,
+            ) else {
+                continue;
+            };
+            let mut texts: Vec<String> = first
+                .triples
+                .iter()
+                .filter_map(|t| t.value.as_ref())
+                .step_by(7)
+                .map(|v| match v.to_json() {
+                    Json::Str(s) => s,
+                    other => other.to_json(),
+                })
+                .take(6)
+                .collect();
+            texts.push("0".into());
+            for op in ops {
+                for text in &texts {
+                    let Ok(p) = Predicate::new(leaf, converted.as_deref(), op, text) else {
+                        continue;
+                    };
+                    let pl = plan(&bytes, &md, leaf, &p, &projection, Mechanisms::ALL).unwrap();
+                    plans += 1;
+                    for (g, rg) in md.row_groups.iter().enumerate() {
+                        let data = parquet_lab::column::read_column(
+                            &bytes,
+                            &rg.columns[leaf.column],
+                            leaf,
+                        )
+                        .unwrap();
+                        let gp = &pl.row_groups[g];
+                        if gp.skipped || gp.rows.len() != 1 || gp.rows[0] != (0, rg.num_rows) {
+                            skipped_something += 1;
+                        }
+                        for (row, t) in data.triples.iter().enumerate() {
+                            let v = t
+                                .value
+                                .as_ref()
+                                .map(|v| v.to_plain_bytes(leaf.physical_type));
+                            if !p.row_matches(v.as_deref()) {
+                                continue;
+                            }
+                            let row = row as i64;
+                            let kept = gp.rows.iter().any(|&(a, b)| a <= row && row < b);
+                            assert!(kept, "{name} {} {} {text}: row {row} of row group {g} matches but was skipped: {:?}", leaf.dotted_path(), op.symbol(), gp.steps);
+                            // And every projected column reads the page holding that row.
+                            for r in &gp.reads {
+                                let c = &rg.columns[r.column];
+                                if let Some(oi) =
+                                    parquet_lab::page_index::offset_index(&bytes, c).unwrap()
+                                {
+                                    let ranges = oi.row_ranges(rg.num_rows);
+                                    let page = ranges
+                                        .iter()
+                                        .position(|&(a, b)| a <= row && row < b)
+                                        .unwrap();
+                                    assert!(r.spans.iter().any(|s| s.contains(oi.pages[page].span())), "{name}: column {} does not read the page holding row {row}", r.column);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(plans > 500, "only {plans} plans checked");
+    assert!(
+        skipped_something > 100,
+        "the plans skipped almost nothing: {skipped_something}"
+    );
 }

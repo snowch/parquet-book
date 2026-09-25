@@ -262,6 +262,44 @@ const DATA_PAGE_HEADER_V2: &[FieldDef] = &[
     f(8, "statistics", Kind::Struct("Statistics")),
 ];
 
+// The page index (ch09): one ColumnIndex and one OffsetIndex per column chunk, written between
+// the last row group and the footer.
+const COLUMN_INDEX: &[FieldDef] = &[
+    f(1, "null_pages", Kind::ListOf(&Kind::Bool)),
+    f(2, "min_values", Kind::ListOf(&Kind::Bytes)),
+    f(3, "max_values", Kind::ListOf(&Kind::Bytes)),
+    f(4, "boundary_order", Kind::Enum(EnumName::BoundaryOrder)),
+    f(5, "null_counts", INT_LIST),
+    f(6, "repetition_level_histograms", INT_LIST),
+    f(7, "definition_level_histograms", INT_LIST),
+];
+
+const OFFSET_INDEX: &[FieldDef] = &[
+    f(
+        1,
+        "page_locations",
+        Kind::ListOf(&Kind::Struct("PageLocation")),
+    ),
+    f(2, "unencoded_byte_array_data_bytes", INT_LIST),
+];
+
+const PAGE_LOCATION: &[FieldDef] = &[
+    f(1, "offset", Kind::Int),
+    f(2, "compressed_page_size", Kind::Int),
+    f(3, "first_row_index", Kind::Int),
+];
+
+// A Bloom filter's header (ch09). The three unions each have one member so far.
+const BLOOM_FILTER_HEADER: &[FieldDef] = &[
+    f(1, "numBytes", Kind::Int),
+    f(2, "algorithm", Kind::Struct("BloomFilterAlgorithm")),
+    f(3, "hash", Kind::Struct("BloomFilterHash")),
+    f(4, "compression", Kind::Struct("BloomFilterCompression")),
+];
+const BLOOM_FILTER_ALGORITHM: &[FieldDef] = &[f(1, "BLOCK", Kind::Struct("SplitBlockAlgorithm"))];
+const BLOOM_FILTER_HASH: &[FieldDef] = &[f(1, "XXHASH", Kind::Struct("XxHash"))];
+const BLOOM_FILTER_COMPRESSION: &[FieldDef] = &[f(1, "UNCOMPRESSED", Kind::Struct("Uncompressed"))];
+
 /// The fields of a named struct, or an empty list for one this table does not describe.
 pub fn fields_of(struct_name: &str) -> &'static [FieldDef] {
     match struct_name {
@@ -285,6 +323,13 @@ pub fn fields_of(struct_name: &str) -> &'static [FieldDef] {
         "DataPageHeader" => DATA_PAGE_HEADER,
         "DictionaryPageHeader" => DICTIONARY_PAGE_HEADER,
         "DataPageHeaderV2" => DATA_PAGE_HEADER_V2,
+        "ColumnIndex" => COLUMN_INDEX,
+        "OffsetIndex" => OFFSET_INDEX,
+        "PageLocation" => PAGE_LOCATION,
+        "BloomFilterHeader" => BLOOM_FILTER_HEADER,
+        "BloomFilterAlgorithm" => BLOOM_FILTER_ALGORITHM,
+        "BloomFilterHash" => BLOOM_FILTER_HASH,
+        "BloomFilterCompression" => BLOOM_FILTER_COMPRESSION,
         _ => &[],
     }
 }
