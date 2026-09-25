@@ -149,9 +149,9 @@ _CHAPTERS = (
         "Encodings",
         "the_values",
         "How do values become compact bytes before any compressor sees them?",
-        "Decoders for PLAIN, dictionary, the RLE/bit-packing hybrid and the delta encodings.",
-        (),
-        (),
+        "Decoders for dictionary pages and indices, the delta encodings and BYTE_STREAM_SPLIT, each with a trace.",
+        ("encodings",),
+        ("encodings.parquet", "dictionary.parquet"),
     ),
     (
         "pages",
@@ -261,4 +261,4 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
-EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels", "encodings")

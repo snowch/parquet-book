@@ -81,6 +81,26 @@ const FIGURES: &[Figure] = &[
         file: "nested-runs-discounts.md",
         render: nested_runs_discounts,
     },
+    Figure {
+        file: "encodings-sizes.md",
+        render: encodings_sizes,
+    },
+    Figure {
+        file: "dictionary-country.md",
+        render: dictionary_country,
+    },
+    Figure {
+        file: "delta-ordered-at.md",
+        render: delta_ordered_at,
+    },
+    Figure {
+        file: "delta-urls.md",
+        render: delta_urls,
+    },
+    Figure {
+        file: "split-weights.md",
+        render: split_weights,
+    },
 ];
 
 pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
@@ -656,5 +676,245 @@ fn nested_runs_discounts(root: &Path) -> Result<String, String> {
         }
     }
     s.push_str(&conditions("nested.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn encodings_json(root: &Path, file: &str, path: &str) -> Result<(Vec<u8>, Json), String> {
+    let bytes = fixture(root, file)?;
+    let first = parquet_lab::report::encodings(&bytes, 0);
+    let column = first
+        .get("columns")
+        .and_then(Json::as_array)
+        .and_then(|cs| cs.iter().find(|c| text_of(c.get("path")) == path))
+        .and_then(|c| c.get("column"))
+        .and_then(Json::as_u64)
+        .ok_or(format!("{file} has no column {path}"))?;
+    let j = parquet_lab::report::encodings(&bytes, column as usize);
+    if j.get("ok") != Some(&Json::Bool(true)) {
+        return Err(format!("{file} {path}: {}", j.to_json()));
+    }
+    Ok((bytes, j))
+}
+
+fn encodings_sizes(root: &Path) -> Result<String, String> {
+    let mut s = String::from(HEADER);
+    s.push_str(
+        "| File | Column | Encoding | Values | Stored | As PLAIN | Stored as a share of PLAIN |\n\
+         |---|---|---|--:|--:|--:|--:|\n",
+    );
+    let mut sizes = Vec::new();
+    for file in ["dictionary.parquet", "encodings.parquet"] {
+        let bytes = fixture(root, file)?;
+        sizes.push(format!("`{file}` is {} bytes", bytes.len()));
+        let first = parquet_lab::report::encodings(&bytes, 0);
+        for c in first
+            .get("columns")
+            .and_then(Json::as_array)
+            .ok_or("no columns")?
+        {
+            let (_, j) = encodings_json(root, file, &text_of(c.get("path")))?;
+            let sz = j.get("sizes").ok_or("no sizes")?;
+            let (enc, plain) = (
+                sz.get("encoded").and_then(Json::as_u64).unwrap_or(0),
+                sz.get("plain").and_then(Json::as_u64).unwrap_or(0),
+            );
+            let encoding: Vec<String> = j
+                .get("pages")
+                .and_then(Json::as_array)
+                .map(|ps| ps.iter().map(|p| text_of(p.get("encoding"))).collect())
+                .unwrap_or_default();
+            s.push_str(&format!(
+                "| `{file}` | `{}` | {} | {} | {enc} bytes | {plain} bytes | {}% |\n",
+                text_of(j.get("path")),
+                encoding.join(", "),
+                text_of(sz.get("count")),
+                if plain == 0 {
+                    0
+                } else {
+                    (enc * 100 + plain / 2) / plain
+                },
+            ));
+        }
+    }
+    s.push_str(&format!(
+        "\n*Computed by the reader from the fixtures: {}. Stored is the encoded values, plus the dictionary page's body where there is one; levels and page headers are in neither column.*\n",
+        sizes.join(", ")
+    ));
+    Ok(s)
+}
+
+fn dictionary_country(root: &Path) -> Result<String, String> {
+    let (bytes, j) = encodings_json(root, "dictionary.parquet", "country")?;
+    let mut s = String::from(HEADER);
+    s.push_str("The dictionary page:\n\n| Index | Value | Bytes |\n|--:|---|---|\n");
+    let dict = j.get("dictionary").ok_or("no dictionary")?;
+    for e in dict
+        .get("entries")
+        .and_then(Json::as_array)
+        .ok_or("no entries")?
+    {
+        let sp = e.get("span").and_then(Json::as_array).ok_or("no span")?;
+        let (a, b) = (
+            sp[0].as_u64().unwrap_or(0) as usize,
+            sp[1].as_u64().unwrap_or(0) as usize,
+        );
+        s.push_str(&format!(
+            "| {} | `{}` | `{}` |\n",
+            text_of(e.get("index")),
+            text_of(e.get("value")),
+            parquet_lab::encoding::hex(&bytes[a..b])
+        ));
+    }
+    s.push_str(
+        "\nThe data page's values:\n\n| Step | Bytes | What the decoder read |\n|---|---|---|\n",
+    );
+    for p in j.get("pages").and_then(Json::as_array).ok_or("no pages")? {
+        for st in p.get("steps").and_then(Json::as_array).ok_or("no steps")? {
+            let sp = st.get("span").and_then(Json::as_array).ok_or("no span")?;
+            let (a, b) = (
+                sp[0].as_u64().unwrap_or(0) as usize,
+                sp[1].as_u64().unwrap_or(0) as usize,
+            );
+            s.push_str(&format!(
+                "| {} | `{}` | {} |\n",
+                text_of(st.get("label")),
+                parquet_lab::encoding::hex(&bytes[a..b]),
+                text_of(st.get("detail"))
+            ));
+        }
+    }
+    let values: Vec<String> = j
+        .get("values")
+        .and_then(Json::as_array)
+        .map(|v| v.iter().map(|x| text_of(x.get("value"))).collect())
+        .unwrap_or_default();
+    s.push_str(&format!("\nDecoded, in order: {}.\n", values.join(", ")));
+    s.push_str(&conditions("dictionary.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn steps_table(bytes: &[u8], j: &Json, limit: usize) -> Result<String, String> {
+    let mut s = String::from("| Step | Bytes | What the decoder read |\n|---|---|---|\n");
+    for p in j.get("pages").and_then(Json::as_array).ok_or("no pages")? {
+        for st in p
+            .get("steps")
+            .and_then(Json::as_array)
+            .ok_or("no steps")?
+            .iter()
+            .take(limit)
+        {
+            let sp = st.get("span").and_then(Json::as_array).ok_or("no span")?;
+            let (a, b) = (
+                sp[0].as_u64().unwrap_or(0) as usize,
+                sp[1].as_u64().unwrap_or(0) as usize,
+            );
+            let hex = if b - a > 12 {
+                format!(
+                    "{} … ({} bytes)",
+                    parquet_lab::encoding::hex(&bytes[a..a + 12]),
+                    b - a
+                )
+            } else if a == b {
+                "(none)".to_string()
+            } else {
+                parquet_lab::encoding::hex(&bytes[a..b])
+            };
+            s.push_str(&format!(
+                "| {} | `{hex}` | {} |\n",
+                text_of(st.get("label")),
+                text_of(st.get("detail"))
+            ));
+        }
+    }
+    Ok(s)
+}
+
+fn delta_ordered_at(root: &Path) -> Result<String, String> {
+    let (bytes, j) = encodings_json(root, "encodings.parquet", "ordered_at")?;
+    let mut s = String::from(HEADER);
+    s.push_str(&steps_table(&bytes, &j, 8)?);
+    let values: Vec<String> = j
+        .get("values")
+        .and_then(Json::as_array)
+        .map(|v| v.iter().take(5).map(|x| text_of(x.get("value"))).collect())
+        .unwrap_or_default();
+    s.push_str(&format!("\nThe first values: {}, …\n", values.join(", ")));
+    s.push_str(&conditions("encodings.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn delta_urls(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, "encodings.parquet")?;
+    let md = open_bytes(&bytes)?;
+    let rootn = parquet_lab::schema::build(&md.schema).map_err(|e| e.to_string())?;
+    let leaves = parquet_lab::schema::leaves(&rootn);
+    let leaf = leaves
+        .iter()
+        .find(|l| l.dotted_path() == "url")
+        .ok_or("no url column")?;
+    let data =
+        parquet_lab::column::read_column(&bytes, &md.row_groups[0].columns[leaf.column], leaf)
+            .map_err(|e| e.to_string())?;
+    let page = data.pages.first().ok_or("no page")?;
+    let body = &bytes[page.values.start as usize..page.values.end as usize];
+    let deltas =
+        parquet_lab::delta::binary_packed(body, page.values.start).map_err(|e| e.to_string())?;
+    let (prefixes, end) = (deltas.values, deltas.end);
+    let suffixes =
+        parquet_lab::delta::length_byte_array(&body[(end - page.values.start) as usize..], end)
+            .map_err(|e| e.to_string())?;
+    let mut s = String::from(HEADER);
+    s.push_str(
+        "| # | Shared with the previous value | Stored suffix | Value |\n|--:|--:|---|---|\n",
+    );
+    for (i, (((p, _), suf), t)) in prefixes
+        .iter()
+        .zip(&suffixes.values)
+        .zip(&data.triples)
+        .take(12)
+        .enumerate()
+    {
+        let show = |v: &parquet_lab::plain::PlainValue| text_of(Some(&v.to_json()));
+        s.push_str(&format!(
+            "| {i} | {p} | `{}` | `{}` |\n",
+            show(&suf.value),
+            t.value.as_ref().map(show).unwrap_or_default()
+        ));
+    }
+    s.push_str(&conditions("encodings.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn split_weights(root: &Path) -> Result<String, String> {
+    let (bytes, j) = encodings_json(root, "encodings.parquet", "weight_kg")?;
+    let page = j
+        .get("pages")
+        .and_then(Json::as_array)
+        .and_then(|p| p.first())
+        .ok_or("no page")?;
+    let mut s = String::from(HEADER);
+    s.push_str("| Stream | Holds | First twelve bytes | Distinct bytes in the stream |\n|---|---|---|--:|\n");
+    for st in page
+        .get("steps")
+        .and_then(Json::as_array)
+        .ok_or("no steps")?
+    {
+        let sp = st.get("span").and_then(Json::as_array).ok_or("no span")?;
+        let (a, b) = (
+            sp[0].as_u64().unwrap_or(0) as usize,
+            sp[1].as_u64().unwrap_or(0) as usize,
+        );
+        let mut distinct: Vec<u8> = bytes[a..b].to_vec();
+        distinct.sort_unstable();
+        distinct.dedup();
+        s.push_str(&format!(
+            "| {} | {} | `{}` | {} |\n",
+            text_of(st.get("label")),
+            text_of(st.get("detail")),
+            parquet_lab::encoding::hex(&bytes[a..(a + 12).min(b)]),
+            distinct.len()
+        ));
+    }
+    s.push_str(&conditions("encodings.parquet", &bytes, None));
     Ok(s)
 }

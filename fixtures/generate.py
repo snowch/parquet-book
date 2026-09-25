@@ -208,6 +208,59 @@ FIXTURES = (
             schema=NESTED,
         ),
     ),
+    Fixture(
+        name="dictionary",
+        why=(
+            "Twelve orders written with dictionary encoding, the writer's default. Each column "
+            "chunk starts with a dictionary page of its distinct values, and its data page "
+            "holds small indices into it, packed with the RLE / bit-packing hybrid."
+        ),
+        table=pa.table(
+            {
+                "order_id": list(range(1, 13)),
+                "country": ["UK", "SE", "UK", "PL", "UK", "US", "SE", "UK", "UK", "PL", "UK", "SE"],
+                "amount_cents": [1999, 500, 4210, 1250, 875, 3000, 640, 2275, 1999, 500, 1250, 875],
+            },
+            schema=SALES,
+        ),
+        options={"use_dictionary": True},
+    ),
+    Fixture(
+        name="encodings",
+        why=(
+            "Forty orders with one column per encoding a writer uses instead of a dictionary: "
+            "DELTA_BINARY_PACKED for increasing integers, DELTA_LENGTH_BYTE_ARRAY and "
+            "DELTA_BYTE_ARRAY for strings, and BYTE_STREAM_SPLIT for floats. Each column's "
+            "values were chosen to suit its encoding."
+        ),
+        table=pa.table(
+            {
+                "order_id": pa.array(range(1001, 1041), pa.int64()),
+                "ordered_at": pa.array([1767432600 + 60 * i + (i % 3) for i in range(40)], pa.int64()),
+                "sku": pa.array([f"SKU-{(i * 7) % 13:03d}" for i in range(40)], pa.string()),
+                "url": pa.array([f"https://shop.example/p/{100 + i}" for i in range(40)], pa.string()),
+                "weight_kg": pa.array([round(0.25 + 0.05 * i, 2) for i in range(40)], pa.float32()),
+            },
+            schema=pa.schema(
+                [
+                    pa.field("order_id", pa.int64(), nullable=False),
+                    pa.field("ordered_at", pa.int64(), nullable=False),
+                    pa.field("sku", pa.string(), nullable=False),
+                    pa.field("url", pa.string(), nullable=False),
+                    pa.field("weight_kg", pa.float32(), nullable=False),
+                ]
+            ),
+        ),
+        options={
+            "column_encoding": {
+                "order_id": "DELTA_BINARY_PACKED",
+                "ordered_at": "DELTA_BINARY_PACKED",
+                "sku": "DELTA_LENGTH_BYTE_ARRAY",
+                "url": "DELTA_BYTE_ARRAY",
+                "weight_kg": "BYTE_STREAM_SPLIT",
+            }
+        },
+    ),
 )
 
 

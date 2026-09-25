@@ -1,0 +1,486 @@
+{
+  "name": "encodings",
+  "file": "encodings.parquet",
+  "why": "Forty orders with one column per encoding a writer uses instead of a dictionary: DELTA_BINARY_PACKED for increasing integers, DELTA_LENGTH_BYTE_ARRAY and DELTA_BYTE_ARRAY for strings, and BYTE_STREAM_SPLIT for floats. Each column's values were chosen to suit its encoding.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false,
+      "column_encoding": {
+        "order_id": "DELTA_BINARY_PACKED",
+        "ordered_at": "DELTA_BINARY_PACKED",
+        "sku": "DELTA_LENGTH_BYTE_ARRAY",
+        "url": "DELTA_BYTE_ARRAY",
+        "weight_kg": "BYTE_STREAM_SPLIT"
+      }
+    }
+  },
+  "file_size": 1558,
+  "sha256": "6a7aec2d72cd1b7c5fa849e466b524ee7c1a6135349fb9898595f94f3f2e4420",
+  "footer_length": 604,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 40,
+  "num_columns": 5,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "ordered_at",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "sku",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "weight_kg",
+      "type": "float",
+      "nullable": false
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "ordered_at",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "sku",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "url",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "weight_kg",
+      "physical_type": "FLOAT",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1001,
+      "ordered_at": 1767432600,
+      "sku": "SKU-000",
+      "url": "https://shop.example/p/100",
+      "weight_kg": 0.25
+    },
+    {
+      "order_id": 1002,
+      "ordered_at": 1767432661,
+      "sku": "SKU-007",
+      "url": "https://shop.example/p/101",
+      "weight_kg": 0.30000001192092896
+    },
+    {
+      "order_id": 1003,
+      "ordered_at": 1767432722,
+      "sku": "SKU-001",
+      "url": "https://shop.example/p/102",
+      "weight_kg": 0.3499999940395355
+    },
+    {
+      "order_id": 1004,
+      "ordered_at": 1767432780,
+      "sku": "SKU-008",
+      "url": "https://shop.example/p/103",
+      "weight_kg": 0.4000000059604645
+    },
+    {
+      "order_id": 1005,
+      "ordered_at": 1767432841,
+      "sku": "SKU-002",
+      "url": "https://shop.example/p/104",
+      "weight_kg": 0.44999998807907104
+    },
+    {
+      "order_id": 1006,
+      "ordered_at": 1767432902,
+      "sku": "SKU-009",
+      "url": "https://shop.example/p/105",
+      "weight_kg": 0.5
+    },
+    {
+      "order_id": 1007,
+      "ordered_at": 1767432960,
+      "sku": "SKU-003",
+      "url": "https://shop.example/p/106",
+      "weight_kg": 0.550000011920929
+    },
+    {
+      "order_id": 1008,
+      "ordered_at": 1767433021,
+      "sku": "SKU-010",
+      "url": "https://shop.example/p/107",
+      "weight_kg": 0.6000000238418579
+    },
+    {
+      "order_id": 1009,
+      "ordered_at": 1767433082,
+      "sku": "SKU-004",
+      "url": "https://shop.example/p/108",
+      "weight_kg": 0.6499999761581421
+    },
+    {
+      "order_id": 1010,
+      "ordered_at": 1767433140,
+      "sku": "SKU-011",
+      "url": "https://shop.example/p/109",
+      "weight_kg": 0.699999988079071
+    },
+    {
+      "order_id": 1011,
+      "ordered_at": 1767433201,
+      "sku": "SKU-005",
+      "url": "https://shop.example/p/110",
+      "weight_kg": 0.75
+    },
+    {
+      "order_id": 1012,
+      "ordered_at": 1767433262,
+      "sku": "SKU-012",
+      "url": "https://shop.example/p/111",
+      "weight_kg": 0.800000011920929
+    },
+    {
+      "order_id": 1013,
+      "ordered_at": 1767433320,
+      "sku": "SKU-006",
+      "url": "https://shop.example/p/112",
+      "weight_kg": 0.8500000238418579
+    },
+    {
+      "order_id": 1014,
+      "ordered_at": 1767433381,
+      "sku": "SKU-000",
+      "url": "https://shop.example/p/113",
+      "weight_kg": 0.8999999761581421
+    },
+    {
+      "order_id": 1015,
+      "ordered_at": 1767433442,
+      "sku": "SKU-007",
+      "url": "https://shop.example/p/114",
+      "weight_kg": 0.949999988079071
+    },
+    {
+      "order_id": 1016,
+      "ordered_at": 1767433500,
+      "sku": "SKU-001",
+      "url": "https://shop.example/p/115",
+      "weight_kg": 1.0
+    },
+    {
+      "order_id": 1017,
+      "ordered_at": 1767433561,
+      "sku": "SKU-008",
+      "url": "https://shop.example/p/116",
+      "weight_kg": 1.0499999523162842
+    },
+    {
+      "order_id": 1018,
+      "ordered_at": 1767433622,
+      "sku": "SKU-002",
+      "url": "https://shop.example/p/117",
+      "weight_kg": 1.100000023841858
+    },
+    {
+      "order_id": 1019,
+      "ordered_at": 1767433680,
+      "sku": "SKU-009",
+      "url": "https://shop.example/p/118",
+      "weight_kg": 1.149999976158142
+    },
+    {
+      "order_id": 1020,
+      "ordered_at": 1767433741,
+      "sku": "SKU-003",
+      "url": "https://shop.example/p/119",
+      "weight_kg": 1.2000000476837158
+    },
+    {
+      "order_id": 1021,
+      "ordered_at": 1767433802,
+      "sku": "SKU-010",
+      "url": "https://shop.example/p/120",
+      "weight_kg": 1.25
+    },
+    {
+      "order_id": 1022,
+      "ordered_at": 1767433860,
+      "sku": "SKU-004",
+      "url": "https://shop.example/p/121",
+      "weight_kg": 1.2999999523162842
+    },
+    {
+      "order_id": 1023,
+      "ordered_at": 1767433921,
+      "sku": "SKU-011",
+      "url": "https://shop.example/p/122",
+      "weight_kg": 1.350000023841858
+    },
+    {
+      "order_id": 1024,
+      "ordered_at": 1767433982,
+      "sku": "SKU-005",
+      "url": "https://shop.example/p/123",
+      "weight_kg": 1.399999976158142
+    },
+    {
+      "order_id": 1025,
+      "ordered_at": 1767434040,
+      "sku": "SKU-012",
+      "url": "https://shop.example/p/124",
+      "weight_kg": 1.4500000476837158
+    },
+    {
+      "order_id": 1026,
+      "ordered_at": 1767434101,
+      "sku": "SKU-006",
+      "url": "https://shop.example/p/125",
+      "weight_kg": 1.5
+    },
+    {
+      "order_id": 1027,
+      "ordered_at": 1767434162,
+      "sku": "SKU-000",
+      "url": "https://shop.example/p/126",
+      "weight_kg": 1.5499999523162842
+    },
+    {
+      "order_id": 1028,
+      "ordered_at": 1767434220,
+      "sku": "SKU-007",
+      "url": "https://shop.example/p/127",
+      "weight_kg": 1.600000023841858
+    },
+    {
+      "order_id": 1029,
+      "ordered_at": 1767434281,
+      "sku": "SKU-001",
+      "url": "https://shop.example/p/128",
+      "weight_kg": 1.649999976158142
+    },
+    {
+      "order_id": 1030,
+      "ordered_at": 1767434342,
+      "sku": "SKU-008",
+      "url": "https://shop.example/p/129",
+      "weight_kg": 1.7000000476837158
+    },
+    {
+      "order_id": 1031,
+      "ordered_at": 1767434400,
+      "sku": "SKU-002",
+      "url": "https://shop.example/p/130",
+      "weight_kg": 1.75
+    },
+    {
+      "order_id": 1032,
+      "ordered_at": 1767434461,
+      "sku": "SKU-009",
+      "url": "https://shop.example/p/131",
+      "weight_kg": 1.7999999523162842
+    },
+    {
+      "order_id": 1033,
+      "ordered_at": 1767434522,
+      "sku": "SKU-003",
+      "url": "https://shop.example/p/132",
+      "weight_kg": 1.850000023841858
+    },
+    {
+      "order_id": 1034,
+      "ordered_at": 1767434580,
+      "sku": "SKU-010",
+      "url": "https://shop.example/p/133",
+      "weight_kg": 1.899999976158142
+    },
+    {
+      "order_id": 1035,
+      "ordered_at": 1767434641,
+      "sku": "SKU-004",
+      "url": "https://shop.example/p/134",
+      "weight_kg": 1.9500000476837158
+    },
+    {
+      "order_id": 1036,
+      "ordered_at": 1767434702,
+      "sku": "SKU-011",
+      "url": "https://shop.example/p/135",
+      "weight_kg": 2.0
+    },
+    {
+      "order_id": 1037,
+      "ordered_at": 1767434760,
+      "sku": "SKU-005",
+      "url": "https://shop.example/p/136",
+      "weight_kg": 2.049999952316284
+    },
+    {
+      "order_id": 1038,
+      "ordered_at": 1767434821,
+      "sku": "SKU-012",
+      "url": "https://shop.example/p/137",
+      "weight_kg": 2.0999999046325684
+    },
+    {
+      "order_id": 1039,
+      "ordered_at": 1767434882,
+      "sku": "SKU-006",
+      "url": "https://shop.example/p/138",
+      "weight_kg": 2.1500000953674316
+    },
+    {
+      "order_id": 1040,
+      "ordered_at": 1767434940,
+      "sku": "SKU-000",
+      "url": "https://shop.example/p/139",
+      "weight_kg": 2.200000047683716
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 40,
+      "total_byte_size": 942,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "DELTA_BINARY_PACKED",
+            "RLE"
+          ],
+          "num_values": 40,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 74,
+          "total_uncompressed_size": 74,
+          "statistics": {
+            "min": 1001,
+            "max": 1040,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "ordered_at",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "DELTA_BINARY_PACKED",
+            "RLE"
+          ],
+          "num_values": 40,
+          "data_page_offset": 78,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 93,
+          "total_uncompressed_size": 93,
+          "statistics": {
+            "min": 1767432600,
+            "max": 1767434940,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "sku",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "DELTA_LENGTH_BYTE_ARRAY",
+            "RLE"
+          ],
+          "num_values": 40,
+          "data_page_offset": 171,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 333,
+          "total_uncompressed_size": 333,
+          "statistics": {
+            "min": "SKU-000",
+            "max": "SKU-012",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "url",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "DELTA_BYTE_ARRAY",
+            "RLE"
+          ],
+          "num_values": 40,
+          "data_page_offset": 504,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 233,
+          "total_uncompressed_size": 233,
+          "statistics": {
+            "min": "https://shop.example/p/100",
+            "max": "https://shop.example/p/139",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "weight_kg",
+          "physical_type": "FLOAT",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "BYTE_STREAM_SPLIT",
+            "RLE"
+          ],
+          "num_values": 40,
+          "data_page_offset": 737,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 209,
+          "total_uncompressed_size": 209,
+          "statistics": {
+            "min": 0.25,
+            "max": 2.200000047683716,
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

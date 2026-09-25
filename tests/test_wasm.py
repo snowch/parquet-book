@@ -78,6 +78,8 @@ def cases():
         for column in range(12):
             calls.append({"call": "levels", "file": f, "column": column})
             native.append(("levels", f, str(column)))
+            calls.append({"call": "encodings", "file": f, "column": column})
+            native.append(("encodings", f, str(column)))
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))

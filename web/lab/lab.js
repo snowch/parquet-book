@@ -11,9 +11,11 @@ import { mountFooter, mountAnatomy } from "./footer.js";
 import { mountLayouts } from "./layouts.js";
 import { mountSchema } from "./schema.js";
 import { mountLevels } from "./levels.js";
+import { mountEncodings } from "./encodings.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
+  encodings: mountEncodings,
 };
 
 class Fixtures {

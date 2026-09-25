@@ -965,3 +965,160 @@ pub fn levels(file: &[u8], column: usize) -> Json {
         ("records", Json::Arr(records)),
     ])
 }
+
+/// What `values` would take as PLAIN: the size an encoding is saving against.
+fn plain_size(
+    physical: crate::metadata::PhysicalType,
+    type_length: Option<i64>,
+    values: &[&crate::plain::PlainValue],
+) -> u64 {
+    use crate::plain::PlainValue;
+    match physical.0 {
+        0 => (values.len() as u64).div_ceil(8),
+        1 | 4 => 4 * values.len() as u64,
+        2 | 5 => 8 * values.len() as u64,
+        3 => 12 * values.len() as u64,
+        7 => type_length.unwrap_or(0).max(0) as u64 * values.len() as u64,
+        _ => values
+            .iter()
+            .map(|v| match v {
+                PlainValue::Bytes(b) => 4 + b.len() as u64,
+                _ => 0,
+            })
+            .sum(),
+    }
+}
+
+/// Ch05's experiment: how one column's values are encoded, step by step, and what the encoding
+/// saves against PLAIN.
+pub fn encodings(file: &[u8], column: usize) -> Json {
+    use crate::column::read_column;
+    use crate::logical::value_json;
+    use crate::schema::{build, leaves};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let Some(leaf) = all.get(column) else {
+        return fail(format!("the file has no column {column}"));
+    };
+    let columns = Json::Arr(
+        all.iter()
+            .enumerate()
+            .map(|(i, l)| {
+                let chunk = md.row_groups.first().and_then(|rg| rg.columns.get(i));
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                    (
+                        "encodings",
+                        chunk
+                            .map(|c| Json::from(c.encodings.clone()))
+                            .unwrap_or(Json::Null),
+                    ),
+                ])
+            })
+            .collect(),
+    );
+    let step_json = |s: &crate::decode::Step| {
+        obj([
+            ("label", s.label.clone().into()),
+            ("span", s.span.into()),
+            ("detail", s.detail.clone().into()),
+        ])
+    };
+    let show = |v: &crate::plain::PlainValue| {
+        value_json(leaf.physical_type, leaf.logical_type.as_ref(), v)
+    };
+    let mut pages = Vec::new();
+    let mut values = Vec::new();
+    let mut dictionary = Json::Null;
+    let (mut encoded, mut plain_values) = (0u64, Vec::new());
+    let mut data_all = Vec::new();
+    for rg in &md.row_groups {
+        match read_column(file, &rg.columns[leaf.column], leaf) {
+            Ok(d) => data_all.push(d),
+            Err(e) => return fail(e.to_string()).with("columns", columns),
+        }
+    }
+    for data in &data_all {
+        if let Some(d) = &data.dictionary {
+            encoded += d.page.body_span.len();
+            dictionary = obj([
+                ("page", d.page.span().into()),
+                ("header", d.page.header_span.into()),
+                ("body", d.page.body_span.into()),
+                (
+                    "entries",
+                    Json::Arr(
+                        d.entries
+                            .iter()
+                            .enumerate()
+                            .map(|(i, (v, s))| {
+                                obj([
+                                    ("index", i.into()),
+                                    ("value", show(v)),
+                                    ("span", (*s).into()),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+            ]);
+        }
+        for p in &data.pages {
+            encoded += p.values.len();
+            pages.push(obj([
+                ("span", p.page.span().into()),
+                ("encoding", p.encoding.clone().into()),
+                ("values", p.values.into()),
+                ("steps", Json::Arr(p.steps.iter().map(step_json).collect())),
+            ]));
+        }
+        for t in &data.triples {
+            if let Some(v) = &t.value {
+                plain_values.push(v);
+                values.push(obj([
+                    ("value", show(v)),
+                    ("span", t.value_span.into()),
+                    (
+                        "extra",
+                        Json::Arr(t.extra_spans.iter().map(|s| Json::from(*s)).collect()),
+                    ),
+                ]));
+            }
+        }
+    }
+    obj([
+        ("ok", true.into()),
+        ("columns", columns),
+        ("column", column.into()),
+        ("path", leaf.dotted_path().into()),
+        ("physical_type", leaf.physical_type.name().into()),
+        (
+            "logical_type",
+            leaf.logical_type.as_ref().map(|l| l.to_string()).into(),
+        ),
+        ("dictionary", dictionary),
+        ("pages", Json::Arr(pages)),
+        ("values", Json::Arr(values)),
+        (
+            "sizes",
+            obj([
+                ("encoded", encoded.into()),
+                (
+                    "plain",
+                    plain_size(leaf.physical_type, leaf.type_length, &plain_values).into(),
+                ),
+                ("count", plain_values.len().into()),
+            ]),
+        ),
+    ])
+}

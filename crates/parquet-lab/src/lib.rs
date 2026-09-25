@@ -17,6 +17,8 @@
 //! | [`pages`] | walking a column chunk's page headers | ch06 |
 //! | [`rle`] | the RLE / bit-packing hybrid, for levels and indices | ch04, ch05 |
 //! | [`plain`] | PLAIN values, with the bytes of each | ch04, ch05 |
+//! | [`decode`] | any encoding's values, with the steps and bytes of each | ch05 |
+//! | [`delta`] | DELTA_BINARY_PACKED, the byte-array deltas, BYTE_STREAM_SPLIT | ch05 |
 //! | [`column`] | a column chunk read into (repetition, definition, value) triples | ch04 |
 //! | [`nested`] | what the levels mean, and records rebuilt from them | ch04 |
 //! | [`encoding`] | turning encoded bytes back into values | ch05 |
@@ -36,6 +38,8 @@
 
 pub mod bytes;
 pub mod column;
+pub mod decode;
+pub mod delta;
 pub mod encoding;
 pub mod format;
 pub mod json;

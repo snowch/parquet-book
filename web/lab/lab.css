@@ -147,6 +147,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .schema-grid .p-flat { border-right: 1px solid var(--edge); }
 @media (max-width: 90rem) {
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
+  .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
+  .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -193,6 +195,26 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .levels-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
 .levels-picked { outline: 2px solid var(--accent); }
 
+/* Ch05: encodings. */
+.enc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+            grid-template-areas: "summary steps" "dict steps" "values values"; border-bottom: 1px solid var(--edge); }
+.enc-grid .p-summary { grid-area: summary; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.enc-grid .p-dict { grid-area: dict; border-right: 1px solid var(--edge); }
+.enc-grid .p-steps-enc { grid-area: steps; }
+.enc-grid .p-values { grid-area: values; border-top: 1px solid var(--edge); }
+.stepper { display: flex; gap: .4rem; align-items: center; margin-bottom: .4rem; }
+.stepper .where { color: var(--faint); font-size: 12.5px; }
+.enc-steps { margin: 0; padding-left: 1.4rem; font-size: 12.5px; max-height: 18rem; overflow: auto; }
+.enc-steps li { margin-bottom: .3rem; }
+.enc-steps li.current { background: var(--wash); border-radius: 4px; }
+.enc-steps .detail { color: var(--muted); overflow-wrap: anywhere; }
+.value-list { display: flex; flex-wrap: wrap; gap: .25rem .4rem; margin: 0; padding: 0; list-style: none; }
+.enc-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.bars { font-size: 12.5px; }
+.bar-row { display: grid; grid-template-columns: 5.5rem 1fr 6rem; gap: .5rem; align-items: center; margin: .25rem 0; }
+.bar-row .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }
+.bar-row .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -217,6 +239,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 
 @media (max-width: 52rem) {
   .schema-grid { grid-template-columns: minmax(0, 1fr); }
+  .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
+  .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

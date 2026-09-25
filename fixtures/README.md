@@ -146,3 +146,70 @@ store_schema=False
 data_page_version='1.0'
 write_page_index=False
 ```
+
+## `dictionary.parquet`
+
+Twelve orders written with dictionary encoding, the writer's default. Each column chunk starts with a dictionary page of its distinct values, and its data page holds small indices into it, packed with the RLE / bit-packing hybrid.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 838 bytes |
+| Rows | 12 |
+| Row groups | 1 |
+| Footer length | 415 bytes |
+| SHA-256 | `087accb5d17576e2…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=True
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `encodings.parquet`
+
+Forty orders with one column per encoding a writer uses instead of a dictionary: DELTA_BINARY_PACKED for increasing integers, DELTA_LENGTH_BYTE_ARRAY and DELTA_BYTE_ARRAY for strings, and BYTE_STREAM_SPLIT for floats. Each column's values were chosen to suit its encoding.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 1558 bytes |
+| Rows | 40 |
+| Row groups | 1 |
+| Footer length | 604 bytes |
+| SHA-256 | `6a7aec2d72cd1b7c…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | DELTA_BINARY_PACKED, RLE | UNCOMPRESSED |
+| `ordered_at` | INT64 | None | 0 | 0 | DELTA_BINARY_PACKED, RLE | UNCOMPRESSED |
+| `sku` | BYTE_ARRAY | String | 0 | 0 | DELTA_LENGTH_BYTE_ARRAY, RLE | UNCOMPRESSED |
+| `url` | BYTE_ARRAY | String | 0 | 0 | DELTA_BYTE_ARRAY, RLE | UNCOMPRESSED |
+| `weight_kg` | FLOAT | None | 0 | 0 | BYTE_STREAM_SPLIT, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+column_encoding={'order_id': 'DELTA_BINARY_PACKED', 'ordered_at': 'DELTA_BINARY_PACKED', 'sku': 'DELTA_LENGTH_BYTE_ARRAY', 'url': 'DELTA_BYTE_ARRAY', 'weight_kg': 'BYTE_STREAM_SPLIT'}
+```

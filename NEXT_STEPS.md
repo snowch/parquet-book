@@ -30,20 +30,24 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   pyarrow's rows for every column of every fixture.
 - Fixture: `nested.parquet`. Experiment: the levels panel. Problems 4.1, 4.2 with tests; 4.3 open.
 
-## Next: ch05, encodings
+## Done: ch05, encodings
 
-1. Fixture: `dictionary.parquet` (low-cardinality strings, dictionary on) and an encodings fixture
-   with `DELTA_BINARY_PACKED`, `DELTA_LENGTH_BYTE_ARRAY`, `DELTA_BYTE_ARRAY` and
-   `BYTE_STREAM_SPLIT` set per column.
-2. Reader: dictionary pages and RLE_DICTIONARY indices (reusing `rle.rs`), the delta decoders,
-   BYTE_STREAM_SPLIT; `column.rs` accepts them.
-3. Experiment: an encoding stepper that decodes one run or miniblock at a time from its bytes.
+- Reader: dictionary pages and RLE_DICTIONARY indices, DELTA_BINARY_PACKED, DELTA_LENGTH_BYTE_ARRAY,
+  DELTA_BYTE_ARRAY and BYTE_STREAM_SPLIT (`delta.rs`), behind one dispatcher that records every
+  decode step with its bytes (`decode.rs`).
+- Fixtures: `dictionary.parquet`, `encodings.parquet`. Experiment: the encodings stepper.
+- Problems 5.1 to 5.3 with tests; 5.4 about the reader's own columns.
+
+## Next: ch06, pages
+
+1. Fixture: `pages.parquet` with several pages per column chunk (a small `data_page_size`), and a
+   data page v2 variant with nulls.
+2. Reader: data page v2 (levels outside the compressed section, `num_rows`, `num_nulls`), RLE for
+   booleans, records that span v1 pages; page CRCs when present.
+3. Experiment: a page walker listing every page's offset, sizes, encoding and statistics.
 
 ## Then
 
-- **ch05**: `dictionary.parquet`; decoders for PLAIN, RLE/bit-packing, dictionary, delta; a
-  stepper panel that decodes one run at a time from the page body bytes.
-- **ch06**: data page v1 and v2 bodies, split into levels and values.
 - **ch07**: decompression. Snappy and ZSTD decoders are large; decide whether to write teaching
   decoders (Snappy is small enough) and gate ZSTD behind a comparison with a production crate,
   kept out of the zero-dependency reader. Record the decision in PLAN.md §4.

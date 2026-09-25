@@ -4,6 +4,7 @@
 //! pqlab inspect FILE                 the structure of a file, as an indented tree
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
+//! pqlab encodings FILE COLUMN       how one column's values are encoded, step by step
 //! pqlab levels FILE COLUMN          one column's levels, values and rebuilt records
 //! pqlab schema FILE                  the schema: flat, rebuilt, and read through logical types
 //! pqlab interpret FILE OFFSET        every reading of the bytes at OFFSET, as JSON
@@ -35,6 +36,7 @@ const USAGE: &str = "usage:
   pqlab structure FILE
   pqlab schema FILE
   pqlab levels FILE COLUMN
+  pqlab encodings FILE COLUMN
   pqlab interpret FILE OFFSET
   pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
   pqlab figures [--out DIR] [--check]";
@@ -75,6 +77,17 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "encodings" => {
+            let column: usize = args
+                .get(2)
+                .ok_or("encodings needs a COLUMN number")?
+                .parse()
+                .map_err(|_| "COLUMN must be a whole number")?;
+            println!(
+                "{}",
+                report::encodings(&read(file()?)?, column).to_json_pretty()
+            );
+        }
         "levels" => {
             let column: usize = args
                 .get(2)

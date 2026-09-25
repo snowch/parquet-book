@@ -18,12 +18,16 @@
 //! [values, PLAIN]                   one per slot whose d is the maximum
 //! ```
 //!
-//! What this reader does not do yet, and says so rather than guessing: decompress pages (ch07),
-//! decode dictionary pages and indices (ch05), and read data page version 2 (ch06).
+//! The values may be encoded in any way [`crate::decode`] knows (ch05). A dictionary page, when
+//! there is one, comes first, and the data pages then hold indices into it.
+//!
+//! What this reader does not do yet, and says so rather than guessing: decompress pages (ch07)
+//! and read data page version 2 (ch06).
 
 use std::fmt;
 
 use crate::bytes::{ByteReader, Span};
+use crate::decode::{self, Dictionary, Step};
 use crate::metadata::ColumnChunk;
 use crate::pages::{walk_pages, Page};
 use crate::plain::{self, PlainValue};
@@ -37,6 +41,8 @@ pub struct Triple {
     pub def: u32,
     pub value: Option<PlainValue>,
     pub value_span: Option<Span>,
+    /// Other bytes the value needed: its dictionary index run, its length, its prefix length.
+    pub extra_spans: Vec<Span>,
     /// Which page it came from.
     pub page: usize,
 }
@@ -49,10 +55,21 @@ pub struct DataPage {
     pub rep_levels: Option<(Span, Vec<Run>)>,
     pub def_levels: Option<(Span, Vec<Run>)>,
     pub values: Span,
+    pub encoding: String,
+    /// How the values were decoded, step by step.
+    pub steps: Vec<Step>,
+}
+
+/// A column chunk's dictionary page, decoded.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DictionaryPage {
+    pub page: Page,
+    pub entries: Dictionary,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ColumnData {
+    pub dictionary: Option<DictionaryPage>,
     pub pages: Vec<DataPage>,
     pub triples: Vec<Triple>,
 }
@@ -106,27 +123,33 @@ pub fn read_column(
     };
     let pages = walk_pages(bytes, range.start).map_err(|e| ColumnError(e.to_string()))?;
     let mut out = ColumnData {
+        dictionary: None,
         pages: Vec::new(),
         triples: Vec::new(),
     };
     for (index, page) in pages.into_iter().enumerate() {
+        let body_start = page.body_span.start as usize - range.start as usize;
+        let body = &bytes[body_start..body_start + page.body_span.len() as usize];
         match page.page_type.as_str() {
             "DATA_PAGE" => {}
             "DICTIONARY_PAGE" => {
-                return err("this column is dictionary-encoded; ch05 decodes dictionaries")
+                // The dictionary: every distinct value, PLAIN-encoded, once.
+                let count = page.num_values.unwrap_or(0).max(0) as usize;
+                let entries = plain::decode(
+                    leaf.physical_type,
+                    leaf.type_length,
+                    body,
+                    page.body_span.start,
+                    count,
+                )
+                .map_err(|e| ColumnError(format!("dictionary: {e}")))?;
+                out.dictionary = Some(DictionaryPage { page, entries });
+                continue;
             }
             "DATA_PAGE_V2" => return err("this column uses data page version 2; ch06 reads it"),
             other => return err(format!("unexpected page type {other}")),
         }
-        if page.encoding.as_deref() != Some("PLAIN") {
-            return err(format!(
-                "values encoded with {}; ch05 decodes encodings other than PLAIN",
-                page.encoding.as_deref().unwrap_or("an unknown encoding")
-            ));
-        }
         let count = page.num_values.unwrap_or(0).max(0) as usize;
-        let body_start = page.body_span.start as usize - range.start as usize;
-        let body = &bytes[body_start..body_start + page.body_span.len() as usize];
         let mut r = ByteReader::new(body, page.body_span.start);
         let rep_levels = if leaf.max_repetition_level > 0 {
             Some(level_stream(&mut r, leaf.max_repetition_level, count)?)
@@ -152,29 +175,33 @@ pub fn read_column(
             .count();
         let values_start = r.offset();
         let rest = &body[(values_start - page.body_span.start) as usize..];
-        let values = plain::decode(
+        let encoding = page.encoding.clone().unwrap_or_default();
+        let decoded = decode::values(
+            &encoding,
             leaf.physical_type,
             leaf.type_length,
             rest,
             values_start,
             present,
+            out.dictionary.as_ref().map(|d| &d.entries),
         )
         .map_err(|e| ColumnError(format!("values: {e}")))?;
-        let mut next = values.into_iter();
+        let mut next = decoded.values.into_iter();
         for i in 0..count {
-            let (value, value_span) = if defs[i] == leaf.max_definition_level {
+            let (value, value_span, extra_spans) = if defs[i] == leaf.max_definition_level {
                 match next.next() {
-                    Some((v, s)) => (Some(v), Some(s)),
+                    Some(v) => (Some(v.value), Some(v.span), v.extra),
                     None => return err("fewer values than definition levels say are present"),
                 }
             } else {
-                (None, None)
+                (None, None, vec![])
             };
             out.triples.push(Triple {
                 rep: reps[i],
                 def: defs[i],
                 value,
                 value_span,
+                extra_spans,
                 page: index,
             });
         }
@@ -182,17 +209,10 @@ pub fn read_column(
             page,
             rep_levels,
             def_levels,
-            values: Span::new(values_start, page_end(&out.triples, values_start)),
+            values: Span::new(values_start, decoded.end.max(values_start)),
+            encoding,
+            steps: decoded.steps,
         });
     }
     Ok(out)
-}
-
-fn page_end(triples: &[Triple], start: u64) -> u64 {
-    triples
-        .iter()
-        .rev()
-        .find_map(|t| t.value_span.map(|s| s.end))
-        .unwrap_or(start)
-        .max(start)
 }

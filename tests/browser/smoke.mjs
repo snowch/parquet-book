@@ -175,6 +175,27 @@ const litHdr = await levelsLab.locator(".hex .b.hl").evaluateAll((els) => els.ma
 check(litHdr[0] === hdr[0] && litHdr.length === hdr[1] - hdr[0], `a run header highlights its byte [${hdr[0]}, ${hdr[1]})`);
 if (shots) await levelsLab.screenshot({ path: path.join(shots, "levels-lab.png") });
 
+// ch05: encodings. The decoded values and the stepper are the reader's.
+await page.goto(base + "encodings.html");
+const encLab = page.locator('.lab[data-experiment="encodings"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]')?.dataset.state === "ok");
+const nativeEnc = native(["encodings", "fixtures/encodings.parquet", "0"]);
+check(await encLab.getAttribute("data-values") === JSON.stringify(nativeEnc.values.map((v) => v.value)),
+  `order_id decodes to the reader's ${nativeEnc.values.length} values`);
+await encLab.locator('button[data-step="1"]').click();
+await encLab.locator('button[data-step="1"]').click();
+const step1 = nativeEnc.pages[0].steps[1].span;
+const litStep = await encLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
+check(litStep[0] === step1[0] && litStep.length === step1[1] - step1[0], `the second step highlights its bytes [${step1[0]}, ${step1[1]})`);
+await encLab.locator(".lab-head select").selectOption("dictionary.parquet");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]').dataset.encoding === "RLE_DICTIONARY");
+await encLab.locator('button[data-column="1"]').click();
+const nativeDict = native(["encodings", "fixtures/dictionary.parquet", "1"]);
+await page.waitForFunction((v) => document.querySelector('.lab[data-experiment="encodings"]').dataset.values === v,
+  JSON.stringify(nativeDict.values.map((v) => v.value)));
+check(true, "dictionary.parquet's country decodes through its dictionary to the reader's values");
+if (shots) await encLab.screenshot({ path: path.join(shots, "encodings-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

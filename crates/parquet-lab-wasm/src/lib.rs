@@ -223,3 +223,12 @@ pub extern "C" fn pl_levels(id: u32, column: u32) -> usize {
         None => no_such_file(id),
     }
 }
+
+/// Ch05's experiment: one column's encoding, step by step. See `report::encodings`.
+#[no_mangle]
+pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
+    match with_file(id, |f| report::encodings(&f.bytes, column as usize)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}

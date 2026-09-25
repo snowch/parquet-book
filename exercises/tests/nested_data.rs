@@ -159,6 +159,7 @@ fn reader_answer(
             def: d,
             value: (d == 3).then(|| PlainValue::Bytes(next.next().unwrap().as_bytes().to_vec())),
             value_span: None,
+            extra_spans: vec![],
             page: 0,
         })
         .collect();

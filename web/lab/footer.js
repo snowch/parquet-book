@@ -62,6 +62,9 @@ export class FileViews {
     this.original = bytes.slice();
     this.id = this.lab.load(name, bytes);
     this.edited = false;
+    // A selection belongs to the file it was made in.
+    this.hex.selection = null;
+    this.inspector.el.innerHTML = '<p class="hint">Select a byte in the byte view. Shift-click to select a range.</p>';
     this.refresh();
   }
 
