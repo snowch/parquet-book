@@ -285,6 +285,22 @@ await page.waitForFunction(() => document.querySelector('.lab[data-experiment="s
 check(true, "an absent customer number is ruled out in every row group by its Bloom filter");
 if (shots) await skipLab.screenshot({ path: path.join(shots, "skipping-lab.png") });
 
+// ch10: the read path. Requests and times are the reader's and the simulated store's.
+await page.goto(base + "how-readers-read.html");
+const scanLab = page.locator('.lab[data-experiment="scan"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="scan"]')?.dataset.state === "ok");
+const scan1 = native(["scan", "fixtures/pruning-sorted.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8"]);
+check(await scanLab.getAttribute("data-requests") === String(scan1.totals.requests) &&
+  await scanLab.getAttribute("data-elapsed") === String(scan1.totals.elapsed_us),
+  `order_id = 431 takes the reader's ${scan1.totals.requests} requests and ${scan1.totals.elapsed_us / 1000} ms`);
+check(await scanLab.getAttribute("data-matching") === "1", "and returns one row");
+await scanLab.locator('select[name="connections"]').selectOption("4");
+const scan4 = native(["scan", "fixtures/pruning-sorted.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8", "--connections", "4"]);
+await page.waitForFunction((t) => document.querySelector('.lab[data-experiment="scan"]').dataset.elapsed === String(t), scan4.totals.elapsed_us);
+check(true, `four connections: ${scan4.totals.elapsed_us / 1000} ms`);
+check(await scanLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
+if (shots) await scanLab.screenshot({ path: path.join(shots, "scan-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

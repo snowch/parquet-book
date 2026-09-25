@@ -74,6 +74,22 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  /**
+   * Run a query through the simulated object store. `where` is null or {column, op, value};
+   * `s` is the strategy: {footer: "head"|"suffix", prefetch, connections, gap (null: never merge), statistics, bloom,
+   * pageIndex, wholeChunks, latencyUs, bandwidth}.
+   */
+  scan(id, columns, where, s) {
+    const OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];
+    const text = encoder.encode(where ? where.value ?? "" : "");
+    const ptr = this.#copyIn(text);
+    const mask = (columns || []).reduce((m, c) => m | (1 << c), 0);
+    const flags = (s.statistics ? 1 : 0) | (s.bloom ? 2 : 0) | (s.pageIndex ? 4 : 0) | (s.wholeChunks ? 8 : 0);
+    return this.#result(this.exports.pl_scan(id, mask, where ? where.column : 0xffffffff,
+      where ? OPS.indexOf(where.op) : 0, ptr, text.length, s.footer === "suffix" ? 1 : 0, s.prefetch,
+      s.connections, s.gap === null || s.gap === undefined ? 0xffffffff : s.gap, flags, s.latencyUs, s.bandwidth));
+  }
+
   /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
   skipping(id, column, op, value, mechanisms = 7) {
     const OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];

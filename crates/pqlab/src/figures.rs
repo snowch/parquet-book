@@ -147,6 +147,18 @@ const FIGURES: &[Figure] = &[
         render: bloom_rate,
     },
     Figure {
+        file: "scan-strategies.md",
+        render: scan_strategies,
+    },
+    Figure {
+        file: "scan-full.md",
+        render: scan_full,
+    },
+    Figure {
+        file: "scan-networks.md",
+        render: scan_networks,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -1698,5 +1710,260 @@ fn bloom_rate(root: &Path) -> Result<String, String> {
         thousands(passed),
         thousands(tested),
         100.0 * passed as f64 / tested.max(1) as f64
+    ))
+}
+
+use parquet_lab::prune::{Mechanisms, Op};
+use parquet_lab::scan::{Query, Strategy};
+
+fn strategy(
+    size: SizeSource,
+    prefetch: u64,
+    connections: usize,
+    gap: Option<u64>,
+    whole: bool,
+    m: Mechanisms,
+) -> Strategy {
+    Strategy {
+        footer: FooterOptions { size, prefetch },
+        connections,
+        coalesce_gap: gap,
+        whole_chunks: whole,
+        mechanisms: m,
+    }
+}
+
+fn ms_of(us: u64) -> String {
+    let v = us as f64 / 1000.0;
+    if v >= 10.0 {
+        format!("{v:.0} ms")
+    } else {
+        format!("{v:.1} ms")
+    }
+}
+
+/// Run a scan and return (requests, bytes fetched, time).
+fn scan_cost(
+    bytes: &[u8],
+    q: &Query,
+    s: Strategy,
+    m: NetworkModel,
+) -> Result<(usize, u64, u64, usize), String> {
+    let r = parquet_lab::scan::scan(bytes, "data.parquet", q, s, m)?;
+    Ok((
+        r.requests.len(),
+        r.bytes_fetched,
+        r.elapsed_us,
+        r.matches.len(),
+    ))
+}
+
+fn stats_and_index() -> Mechanisms {
+    Mechanisms {
+        statistics: true,
+        bloom: false,
+        page_index: true,
+    }
+}
+
+fn scan_strategies(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, SORTED)?;
+    let columns = parquet_lab::report::flat_columns(&bytes)?;
+    let q = Query {
+        columns,
+        condition: Some((0, Op::Eq, "431".into())),
+    };
+    let stats = Mechanisms {
+        statistics: true,
+        bloom: false,
+        page_index: false,
+    };
+    let cases: [(&str, Strategy); 7] = [
+        (
+            "HEAD, trailer, footer; every column chunk",
+            strategy(SizeSource::Head, 8, 1, None, true, Mechanisms::NONE),
+        ),
+        (
+            "… skipping row groups by statistics",
+            strategy(SizeSource::Head, 8, 1, None, true, stats),
+        ),
+        (
+            "… and pages by the page index",
+            strategy(SizeSource::Head, 8, 1, None, false, stats_and_index()),
+        ),
+        (
+            "… with an 8 KiB suffix read for the footer",
+            strategy(
+                SizeSource::SuffixRange,
+                8192,
+                1,
+                None,
+                false,
+                stats_and_index(),
+            ),
+        ),
+        (
+            "… merging ranges within 4 KiB",
+            strategy(
+                SizeSource::SuffixRange,
+                8192,
+                1,
+                Some(4096),
+                false,
+                stats_and_index(),
+            ),
+        ),
+        (
+            "… on four connections, without merging",
+            strategy(
+                SizeSource::SuffixRange,
+                8192,
+                4,
+                None,
+                false,
+                stats_and_index(),
+            ),
+        ),
+        (
+            "One suffix read of 64 KiB: the whole file",
+            strategy(
+                SizeSource::SuffixRange,
+                65536,
+                1,
+                None,
+                false,
+                stats_and_index(),
+            ),
+        ),
+    ];
+    let model = NetworkModel::default();
+    let mut rows = vec![
+        "| Strategy | Requests | Bytes fetched | Time |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
+    ];
+    for (label, s) in cases {
+        let (n, b, t, _) = scan_cost(&bytes, &q, s, model)?;
+        rows.push(format!(
+            "| {label} | {n} | {} | {} |",
+            thousands(b),
+            ms_of(t)
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*`SELECT * WHERE order_id = 431`, run by the reader against `fixtures/{SORTED}` ({} \
+         bytes) in the simulated object store: {} per request, {} once data flows. Every strategy \
+         returns the same one row.*\n",
+        rows.join("\n"),
+        thousands(bytes.len() as u64),
+        ms(model.latency_us),
+        rate(model.bandwidth_bytes_per_sec)
+    ))
+}
+
+fn scan_full(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, SORTED)?;
+    let md = open_bytes(&bytes)?;
+    let columns = parquet_lab::report::flat_columns(&bytes)?;
+    let q = Query {
+        columns,
+        condition: None,
+    };
+    let model = NetworkModel::default();
+    let head = |c, gap| strategy(SizeSource::Head, 8, c, gap, true, Mechanisms::NONE);
+    let cases = [
+        ("one request per column chunk", head(1, None)),
+        (
+            "one request per column chunk, four connections",
+            head(4, None),
+        ),
+        (
+            "one request per column chunk, sixteen connections",
+            head(16, None),
+        ),
+        (
+            "chunks that touch merged into one request",
+            head(1, Some(0)),
+        ),
+    ];
+    let mut rows = vec![
+        "| `SELECT *`, no condition | Requests | Bytes fetched | Time |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
+    ];
+    for (label, s) in cases {
+        let (n, b, t, _) = scan_cost(&bytes, &q, s, model)?;
+        rows.push(format!(
+            "| {label} | {n} | {} | {} |",
+            thousands(b),
+            ms_of(t)
+        ));
+    }
+    let chunks: usize = md.row_groups.iter().map(|g| g.columns.len()).sum();
+    Ok(format!(
+        "{}\n\n*Computed by the reader against `fixtures/{SORTED}`, which has {chunks} column chunks, \
+         with the footer found by `HEAD` and an exact tail read first. {} per request, {} once \
+         data flows.*\n",
+        rows.join("\n"),
+        ms(model.latency_us),
+        rate(model.bandwidth_bytes_per_sec)
+    ))
+}
+
+fn scan_networks(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, SORTED)?;
+    let columns = parquet_lab::report::flat_columns(&bytes)?;
+    let q = Query {
+        columns,
+        condition: Some((0, Op::Eq, "431".into())),
+    };
+    let pages = strategy(
+        SizeSource::SuffixRange,
+        8192,
+        1,
+        None,
+        false,
+        stats_and_index(),
+    );
+    let whole = strategy(
+        SizeSource::SuffixRange,
+        65536,
+        1,
+        None,
+        false,
+        stats_and_index(),
+    );
+    let nets = [
+        ("same data centre", 1_000u64, 1_000_000_000u64),
+        ("object store", 20_000, 100_000_000),
+        ("slow link", 1_000, 1_000_000),
+        ("far and slow", 100_000, 1_000_000),
+    ];
+    let mut rows = vec![
+        "| Network | Latency | Bandwidth | Pages the plan needs | The whole file |".to_string(),
+        "|---|--:|--:|--:|--:|".to_string(),
+    ];
+    for (label, latency_us, bw) in nets {
+        let m = NetworkModel {
+            latency_us,
+            bandwidth_bytes_per_sec: bw,
+        };
+        let (n1, _, t1, _) = scan_cost(&bytes, &q, pages, m)?;
+        let (_, _, t2, _) = scan_cost(&bytes, &q, whole, m)?;
+        let mark = |a: u64, b: u64| if a <= b { "**" } else { "" };
+        rows.push(format!(
+            "| {label} | {} | {} | {}{} in {n1} requests{} | {}{}{} |",
+            ms(latency_us),
+            rate(bw),
+            mark(t1, t2),
+            ms_of(t1),
+            mark(t1, t2),
+            mark(t2, t1),
+            ms_of(t2),
+            mark(t2, t1)
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*`SELECT * WHERE order_id = 431` against `fixtures/{SORTED}`, by the reader, under four \
+         simulated networks. The faster strategy on each is in bold.*\n",
+        rows.join("\n")
     ))
 }

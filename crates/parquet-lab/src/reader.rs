@@ -114,6 +114,7 @@ pub fn read_footer<S: ObjectStore>(
     let tail = match options.size {
         SizeSource::Head => {
             let size = store.head(key, "learn the file size, to know where the end is")?;
+            store.next_phase();
             store.get(key, tail_range(size, want), "read the trailer")?
         }
         SizeSource::Known(size) => store.get(key, tail_range(size, want), "read the trailer")?,
@@ -140,6 +141,7 @@ pub fn read_footer<S: ObjectStore>(
         tail.bytes[from..from + footer.len() as usize].to_vec()
     } else {
         let missing = Span::new(footer.start, tail.span.start);
+        store.next_phase();
         let head = store.get(
             key,
             GetRange::Bounded(missing),

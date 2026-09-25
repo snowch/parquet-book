@@ -16,12 +16,14 @@ import { mountPages } from "./pages.js";
 import { mountCompression } from "./compression.js";
 import { mountStatistics } from "./statistics.js";
 import { mountSkipping } from "./skipping.js";
+import { mountScan } from "./scan.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
   encodings: mountEncodings, pages: mountPages, compression: mountCompression,
   statistics: mountStatistics,
   skipping: mountSkipping,
+  scan: mountScan,
 };
 
 class Fixtures {

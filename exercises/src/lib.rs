@@ -17,6 +17,7 @@
 pub mod anatomy_of_a_parquet_file;
 pub mod compression;
 pub mod encodings;
+pub mod how_readers_read;
 pub mod metadata_and_statistics;
 pub mod nested_data;
 pub mod pages;

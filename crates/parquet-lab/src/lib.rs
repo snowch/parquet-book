@@ -62,6 +62,7 @@ pub mod prune;
 pub mod reader;
 pub mod report;
 pub mod rle;
+pub mod scan;
 pub mod schema;
 pub mod stats;
 pub mod thrift;

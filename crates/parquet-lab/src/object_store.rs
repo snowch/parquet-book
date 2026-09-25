@@ -85,6 +85,10 @@ pub struct GetResult {
 pub trait ObjectStore {
     fn head(&mut self, key: &str, why: &str) -> Result<u64, StoreError>;
     fn get(&mut self, key: &str, range: GetRange, why: &str) -> Result<GetResult, StoreError>;
+
+    /// Say that the next request depends on the answers to earlier ones, so it cannot start
+    /// until they have finished. A store that does not model time ignores it.
+    fn next_phase(&mut self) {}
 }
 
 /// Objects held in memory: the book's fixtures, embedded in the page or read from disk.
@@ -204,34 +208,53 @@ pub struct Request {
     pub bytes_returned: u64,
     pub start_us: u64,
     pub end_us: u64,
+    /// Which connection carried it, from 0.
+    pub connection: usize,
+    /// Which phase it belonged to, from 0.
+    pub phase: usize,
 }
 
 /// Wraps a store, and records and prices every request that passes through it.
 ///
-/// Requests are issued one after another, so each starts when the previous one ended. A
-/// reader that issues requests concurrently is a later chapter's subject (ch10), and when it
-/// arrives it will change this clock, not the requests.
+/// The store has `connections` connections, one by default. A request goes on whichever
+/// connection is free first, and starts when that connection is free and the current phase has
+/// begun. With one connection every request starts when the previous one ended. With several,
+/// requests in the same phase overlap in time (ch10).
+///
+/// A **phase** is a set of requests that do not depend on each other. A request that needs the
+/// answer to an earlier one, such as a data read that needs the footer, belongs to a later
+/// phase: [`TracingStore::next_phase`] makes every later request wait for all earlier ones.
 #[derive(Debug)]
 pub struct TracingStore<S> {
     inner: S,
     pub model: NetworkModel,
     pub requests: Vec<Request>,
-    clock_us: u64,
+    /// When each connection is next free.
+    free_at: Vec<u64>,
+    /// No request starts before this: the end of the previous phase.
+    phase_start: u64,
+    phase: usize,
 }
 
 impl<S: ObjectStore> TracingStore<S> {
     pub fn new(inner: S, model: NetworkModel) -> TracingStore<S> {
+        TracingStore::with_connections(inner, model, 1)
+    }
+
+    pub fn with_connections(inner: S, model: NetworkModel, connections: usize) -> TracingStore<S> {
         TracingStore {
             inner,
             model,
             requests: Vec::new(),
-            clock_us: 0,
+            free_at: vec![0; connections.max(1)],
+            phase_start: 0,
+            phase: 0,
         }
     }
 
-    /// Total simulated time for every request so far.
+    /// Total simulated time: when the last request finished.
     pub fn elapsed_us(&self) -> u64 {
-        self.clock_us
+        self.requests.iter().map(|r| r.end_us).max().unwrap_or(0)
     }
 
     pub fn bytes_returned(&self) -> u64 {
@@ -248,8 +271,17 @@ impl<S: ObjectStore> TracingStore<S> {
         returned: Option<Span>,
     ) {
         let bytes = returned.map(|s| s.len()).unwrap_or(0);
-        let start_us = self.clock_us;
-        self.clock_us += self.model.cost_us(bytes);
+        // The connection that is free first; ties go to the lowest number.
+        let (connection, free) = self
+            .free_at
+            .iter()
+            .copied()
+            .enumerate()
+            .min_by_key(|&(i, t)| (t, i))
+            .unwrap_or((0, 0));
+        let start_us = free.max(self.phase_start);
+        let end_us = start_us + self.model.cost_us(bytes);
+        self.free_at[connection] = end_us;
         self.requests.push(Request {
             seq: self.requests.len() + 1,
             method,
@@ -260,7 +292,9 @@ impl<S: ObjectStore> TracingStore<S> {
             returned,
             bytes_returned: bytes,
             start_us,
-            end_us: self.clock_us,
+            end_us,
+            connection,
+            phase: self.phase,
         });
     }
 }
@@ -273,6 +307,12 @@ fn status_of(e: &StoreError) -> u16 {
 }
 
 impl<S: ObjectStore> ObjectStore for TracingStore<S> {
+    /// Start a new phase: later requests wait until every request so far has finished.
+    fn next_phase(&mut self) {
+        self.phase_start = self.elapsed_us();
+        self.phase += 1;
+    }
+
     fn head(&mut self, key: &str, why: &str) -> Result<u64, StoreError> {
         let result = self.inner.head(key, why);
         let status = result.as_ref().map(|_| 200).unwrap_or_else(status_of);
@@ -370,6 +410,28 @@ mod tests {
         assert_eq!(t.requests[1].end_us, 2008);
         assert_eq!(t.elapsed_us(), 3008);
         assert_eq!(t.bytes_returned(), 8);
+    }
+
+    #[test]
+    fn requests_overlap_on_several_connections_and_wait_for_the_phase() {
+        let model = NetworkModel {
+            latency_us: 1000,
+            bandwidth_bytes_per_sec: 0,
+        };
+        let mut t = TracingStore::with_connections(store(), model, 2);
+        t.get("data.parquet", GetRange::Suffix(8), "footer")
+            .unwrap();
+        t.next_phase();
+        for _ in 0..3 {
+            t.get("data.parquet", GetRange::Bounded(Span::new(0, 4)), "data")
+                .unwrap();
+        }
+        let starts: Vec<u64> = t.requests.iter().map(|r| r.start_us).collect();
+        // Two data requests start together once the footer is back; the third waits for a
+        // connection.
+        assert_eq!(starts, [0, 1000, 1000, 2000]);
+        assert_eq!(t.elapsed_us(), 3000);
+        assert_eq!(t.requests[3].phase, 1);
     }
 
     #[test]

@@ -203,9 +203,9 @@ _CHAPTERS = (
         "How readers read",
         "reading_less",
         "Why does a reader issue exactly the requests it does?",
-        "The complete read path over the object store: projection, pruning, coalescing, prefetching, caching.",
-        (),
-        (),
+        "The complete read path over the object store: footer, indexes and data in phases, with coalescing and concurrency.",
+        ("scan",),
+        ("pruning-sorted.parquet", "pruning-shuffled.parquet", "tiny.parquet"),
     ),
     (
         "writing_parquet_well",
@@ -281,4 +281,5 @@ EXPERIMENTS = (
     "compression",
     "statistics",
     "skipping",
+    "scan",
 )

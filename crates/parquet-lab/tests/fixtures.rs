@@ -896,3 +896,122 @@ fn skipping_never_loses_a_matching_row() {
         "the plans skipped almost nothing: {skipped_something}"
     );
 }
+
+#[test]
+fn every_strategy_returns_the_rows_a_full_read_finds() {
+    use parquet_lab::object_store::NetworkModel;
+    use parquet_lab::prune::{Mechanisms, Op, Predicate};
+    use parquet_lab::reader::{FooterOptions, SizeSource};
+    use parquet_lab::scan::{scan, Query, Strategy};
+    let strategies = [
+        Strategy {
+            footer: FooterOptions::default(),
+            connections: 1,
+            coalesce_gap: None,
+            whole_chunks: true,
+            mechanisms: Mechanisms::NONE,
+        },
+        Strategy {
+            footer: FooterOptions {
+                size: SizeSource::SuffixRange,
+                prefetch: 8192,
+            },
+            connections: 1,
+            coalesce_gap: Some(0),
+            whole_chunks: false,
+            mechanisms: Mechanisms::ALL,
+        },
+        Strategy {
+            footer: FooterOptions::default(),
+            connections: 4,
+            coalesce_gap: Some(1024),
+            whole_chunks: false,
+            mechanisms: Mechanisms::ALL,
+        },
+        Strategy {
+            footer: FooterOptions {
+                size: SizeSource::SuffixRange,
+                prefetch: 1 << 20,
+            },
+            connections: 2,
+            coalesce_gap: None,
+            whole_chunks: false,
+            mechanisms: Mechanisms::ALL,
+        },
+    ];
+    let mut scans = 0;
+    for (name, bytes, _) in fixtures() {
+        if !(name.starts_with("pruning")
+            || name == "statistics.parquet"
+            || name == "tiny.parquet"
+            || name == "pages-v2-snappy.parquet")
+        {
+            continue;
+        }
+        let md = report::open_bytes(&bytes).unwrap();
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        let leaves: Vec<_> = parquet_lab::schema::leaves(&root)
+            .into_iter()
+            .filter(|l| l.max_repetition_level == 0)
+            .collect();
+        let columns: Vec<usize> = leaves.iter().map(|l| l.column).collect();
+        let mut conditions: Vec<Option<(usize, Op, String)>> = vec![None];
+        for leaf in &leaves {
+            for (op, v) in [
+                (Op::Eq, "431"),
+                (Op::Gt, "100"),
+                (Op::Lt, "9800"),
+                (Op::IsNull, ""),
+                (Op::Eq, "SE"),
+                (Op::Eq, "424242"),
+            ] {
+                conditions.push(Some((leaf.column, op, v.to_string())));
+            }
+        }
+        for condition in conditions {
+            // The answer, from a plain read of every row.
+            let expected: Option<Vec<u64>> = match &condition {
+                None => Some((0..md.num_rows as u64).collect()),
+                Some((c, op, v)) => {
+                    let leaf = leaves.iter().find(|l| l.column == *c).unwrap();
+                    let conv = md.schema[leaf.element].converted_type.clone();
+                    Predicate::new(leaf, conv.as_deref(), *op, v).ok().map(|p| {
+                        let mut out = Vec::new();
+                        let mut row = 0u64;
+                        for rg in &md.row_groups {
+                            let d = parquet_lab::column::read_column(&bytes, &rg.columns[*c], leaf)
+                                .unwrap();
+                            for t in &d.triples {
+                                let raw = t
+                                    .value
+                                    .as_ref()
+                                    .map(|x| x.to_plain_bytes(leaf.physical_type));
+                                if p.row_matches(raw.as_deref()) {
+                                    out.push(row);
+                                }
+                                row += 1;
+                            }
+                        }
+                        out
+                    })
+                }
+            };
+            let Some(expected) = expected else { continue };
+            for s in strategies {
+                let q = Query {
+                    columns: columns.clone(),
+                    condition: condition.clone(),
+                };
+                let r = scan(&bytes, "data.parquet", &q, s, NetworkModel::default())
+                    .unwrap_or_else(|e| panic!("{name} {condition:?} {s:?}: {e}"));
+                assert_eq!(r.matches, expected, "{name} {condition:?} {s:?}");
+                assert!(
+                    r.bytes_fetched <= bytes.len() as u64 * 2,
+                    "{name}: fetched far more than the file"
+                );
+                scans += 1;
+            }
+        }
+    }
+    assert!(scans > 200, "only {scans} scans");
+}

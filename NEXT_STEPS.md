@@ -76,13 +76,25 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: the skipping panel. Problems 9.1 (can this be skipped?) and 9.2 (probe a filter);
   9.3 open.
 
-## Next: ch10, how readers read
+## Done: ch10, how readers read
 
-1. `TracingStore` gains a clock per connection, so concurrent requests overlap in time.
-2. Reader: turn a plan into requests (one per page, coalesced within a gap, or whole chunks), and
-   measure requests, bytes and simulated time under the network model.
-3. Experiment: the same query under each strategy, with the request timeline.
-4. The cost of large footers: a fixture with many columns and row groups.
+- Reader: `scan.rs` (a query run in phases: footer, indexes, data; ranges coalesced within a gap
+  or never; only fetched bytes decoded). `TracingStore` has connections and phases, and
+  `ObjectStore::next_phase` marks dependent requests. `column::read_column_pages` reads chosen
+  pages where the OffsetIndex puts them. Indexes are fetched only for row groups the statistics
+  keep.
+- Tests: over two hundred fixture, condition and strategy combinations, a scan's rows equal a
+  plain read's; removing a fetch makes the test fail.
+- Experiment: the read-path panel with a request timeline. Problems 10.1 (merge ranges) and 10.2
+  (time the requests); 10.3 open.
+
+## Next: ch11, writing Parquet well
+
+1. Fixtures written from one table with different writer settings: row group size, page size,
+   dictionary on and off, sorted and unsorted, statistics truncation if pyarrow exposes it.
+2. Measure each with the reader: file size, footer size, what ch09's conditions skip, and ch10's
+   request counts.
+3. Experiment: pick settings, see the consequences, all from committed files.
 
 ## Then
 

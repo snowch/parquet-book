@@ -5,6 +5,9 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N]
+//!            [--connections N] [--gap BYTES] [--chunks] [--use ...] [--latency-us N] [--bandwidth N]
+//!                                    a query through the simulated object store
 //! pqlab skipping FILE COLUMN OP [VALUE] [--use statistics,bloom,page-index]
 //!                                    what a condition lets the reader skip
 //! pqlab statistics FILE ROW_GROUP COLUMN
@@ -56,6 +59,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N] [--connections N] [--gap BYTES] [--chunks] [--use statistics,bloom,page-index] [--latency-us N] [--bandwidth N]
   pqlab skipping FILE COLUMN OP [VALUE] [--use statistics,bloom,page-index]
   pqlab statistics FILE ROW_GROUP COLUMN
   pqlab compression FILE COLUMN [PAGE]
@@ -99,6 +103,88 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "scan" => {
+            use parquet_lab::prune::{Mechanisms, Op};
+            use parquet_lab::scan::{Query, Strategy};
+            let bytes = read(file()?)?;
+            let mut columns = report::flat_columns(&bytes)?;
+            let mut condition = None;
+            let mut strategy = Strategy {
+                footer: FooterOptions::default(),
+                connections: 1,
+                coalesce_gap: None,
+                whole_chunks: false,
+                mechanisms: Mechanisms::ALL,
+            };
+            let mut model = NetworkModel::default();
+            let mut i = 2;
+            let number = |v: Option<&String>, what: &str| -> Result<u64, String> {
+                v.ok_or(format!("{what} needs a number"))?
+                    .parse()
+                    .map_err(|_| format!("{what} needs a whole number"))
+            };
+            while let Some(a) = args.get(i) {
+                match a.as_str() {
+                    "--where" => {
+                        let c = number(args.get(i + 1), "--where")? as usize;
+                        let op = Op::parse(args.get(i + 2).ok_or("--where needs an OP")?)?;
+                        let takes_value = !matches!(op, Op::IsNull | Op::IsNotNull);
+                        let v = if takes_value {
+                            args.get(i + 3).ok_or("--where needs a VALUE")?.clone()
+                        } else {
+                            String::new()
+                        };
+                        condition = Some((c, op, v));
+                        i += if takes_value { 4 } else { 3 };
+                        continue;
+                    }
+                    "--columns" => {
+                        columns = args
+                            .get(i + 1)
+                            .ok_or("--columns needs a list")?
+                            .split(',')
+                            .map(|c| c.parse().map_err(|_| format!("bad column {c}")))
+                            .collect::<Result<_, String>>()?;
+                    }
+                    "--size" => {
+                        strategy.footer.size = match args.get(i + 1).map(String::as_str) {
+                            Some("head") => SizeSource::Head,
+                            Some("suffix") => SizeSource::SuffixRange,
+                            _ => return Err("--size is head or suffix".into()),
+                        };
+                    }
+                    "--prefetch" => strategy.footer.prefetch = number(args.get(i + 1), a)?,
+                    "--connections" => strategy.connections = number(args.get(i + 1), a)? as usize,
+                    "--gap" => strategy.coalesce_gap = Some(number(args.get(i + 1), a)?),
+                    "--latency-us" => model.latency_us = number(args.get(i + 1), a)?,
+                    "--bandwidth" => model.bandwidth_bytes_per_sec = number(args.get(i + 1), a)?,
+                    "--chunks" => {
+                        strategy.whole_chunks = true;
+                        i += 1;
+                        continue;
+                    }
+                    "--use" => {
+                        let list = args.get(i + 1).ok_or("--use needs a list")?;
+                        strategy.mechanisms = Mechanisms::NONE;
+                        for m in list.split(',').filter(|m| !m.is_empty()) {
+                            match m {
+                                "statistics" => strategy.mechanisms.statistics = true,
+                                "bloom" => strategy.mechanisms.bloom = true,
+                                "page-index" => strategy.mechanisms.page_index = true,
+                                other => return Err(format!("unknown mechanism {other}")),
+                            }
+                        }
+                    }
+                    other => return Err(format!("unknown option {other}")),
+                }
+                i += 2;
+            }
+            let q = Query { columns, condition };
+            out!(
+                "{}",
+                report::scan(&bytes, &q, strategy, model).to_json_pretty()
+            );
+        }
         "skipping" => {
             let column: usize = args
                 .get(2)

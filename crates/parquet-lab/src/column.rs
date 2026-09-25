@@ -130,6 +130,43 @@ pub fn read_column(
         ));
     };
     let pages = walk_pages(bytes, range.start).map_err(|e| ColumnError(e.to_string()))?;
+    decode_pages(file, chunk, leaf, pages)
+}
+
+/// Read only some pages of a column chunk: its dictionary page, if it has one, and the data
+/// pages starting at `offsets`, each read where the page index says it is (ch10). The bytes
+/// between them are never looked at, so a reader need not have fetched them.
+pub fn read_column_pages(
+    file: &[u8],
+    chunk: &ColumnChunk,
+    leaf: &Leaf,
+    offsets: &[u64],
+) -> Result<ColumnData, ColumnError> {
+    let range = chunk.byte_range();
+    let one = |at: u64| -> Result<Page, ColumnError> {
+        let bytes = file
+            .get(at as usize..range.end as usize)
+            .ok_or_else(|| ColumnError(format!("no page at offset {at} in chunk {range}")))?;
+        crate::pages::read_page(&mut ByteReader::new(bytes, at))
+            .map_err(|e| ColumnError(format!("page at offset {at}: {e}")))
+    };
+    let mut pages = Vec::new();
+    if chunk.dictionary_page_offset.is_some_and(|d| d > 0) {
+        pages.push(one(range.start)?);
+    }
+    for &at in offsets {
+        pages.push(one(at)?);
+    }
+    decode_pages(file, chunk, leaf, pages)
+}
+
+/// Decode pages already located: a dictionary page first, if there is one, then data pages.
+fn decode_pages(
+    file: &[u8],
+    chunk: &ColumnChunk,
+    leaf: &Leaf,
+    pages: Vec<Page>,
+) -> Result<ColumnData, ColumnError> {
     let mut out = ColumnData {
         dictionary: None,
         pages: Vec::new(),
@@ -137,8 +174,13 @@ pub fn read_column(
     };
     let codec = chunk.codec.as_str();
     for (index, page) in pages.into_iter().enumerate() {
-        let body_start = page.body_span.start as usize - range.start as usize;
-        let body = &bytes[body_start..body_start + page.body_span.len() as usize];
+        let Some(body) = file.get(page.body_span.start as usize..page.body_span.end as usize)
+        else {
+            return err(format!(
+                "page body {} is past the end of the file",
+                page.body_span
+            ));
+        };
         match page.page_type.as_str() {
             "DATA_PAGE" | "DATA_PAGE_V2" => {}
             "DICTIONARY_PAGE" => {

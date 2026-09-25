@@ -92,6 +92,40 @@ def cases():
             for column in range(0, 12, 2):
                 calls.append({"call": "statistics", "file": f, "row_group": row_group, "column": column})
                 native.append(("statistics", f, str(row_group), str(column)))
+        if "pruning" in f or f.endswith("tiny.parquet"):
+            for where, strat, extra in (
+                (
+                    None,
+                    {"footer": "head", "prefetch": 8, "connections": 1, "gap": None},
+                    ["--size", "head", "--prefetch", "8", "--chunks"],
+                ),
+                (
+                    {"column": 0, "op": "=", "value": "431"},
+                    {"footer": "suffix", "prefetch": 8192, "connections": 4, "gap": 1024},
+                    ["--size", "suffix", "--prefetch", "8192", "--connections", "4", "--gap", "1024"],
+                ),
+                (
+                    {"column": 2, "op": "is null", "value": ""},
+                    {"footer": "head", "prefetch": 8, "connections": 2, "gap": None},
+                    ["--size", "head", "--prefetch", "8", "--connections", "2"],
+                ),
+            ):
+                s = {
+                    **strat,
+                    "statistics": True,
+                    "bloom": True,
+                    "pageIndex": True,
+                    "wholeChunks": "--chunks" in extra,
+                    "latencyUs": 20000,
+                    "bandwidth": 100000000,
+                }
+                calls.append({"call": "scan", "file": f, "columns": [], "where": where, "strategy": s})
+                args = ["scan", f] + extra
+                if where:
+                    args += ["--where", str(where["column"]), where["op"]] + (
+                        [where["value"]] if where["value"] else []
+                    )
+                native.append(tuple(args))
         if "pruning" in f or f.endswith("statistics.parquet"):
             for column, op, value, mechanisms in (
                 (0, "=", "431", 7),

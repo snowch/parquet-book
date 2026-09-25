@@ -10,6 +10,9 @@ Terms the book uses, with the chapter that introduces each.
 **Bloom filter.** A bitset per column chunk that can prove a value was never written to it. It has
 false positives and no false negatives. [ch09](#skipping-data)
 
+**Coalescing.** Merging nearby byte ranges into one request, reading the gap between them to save a
+request. [ch10](#how-readers-read)
+
 **Codec.** The general-purpose compressor applied to every page of a column chunk after encoding,
 named in the chunk's metadata: SNAPPY, GZIP, LZ4_RAW, ZSTD, BROTLI, or UNCOMPRESSED.
 [ch07](#compression)
@@ -43,6 +46,9 @@ position and description of every column chunk. [ch02](#anatomy-of-a-parquet-fil
 
 **Footer length.** The four-byte little-endian integer immediately before the closing magic.
 [ch02](#anatomy-of-a-parquet-file)
+
+**Latency.** The time from sending a request to the first byte of its response, paid once per
+request whatever its size. [ch02](#anatomy-of-a-parquet-file), [ch10](#how-readers-read)
 
 **Little-endian.** Storing a multi-byte integer with its least significant byte first.
 [ch02](#anatomy-of-a-parquet-file)

@@ -233,6 +233,89 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch10's experiment: a query run through the simulated object store. `columns` is a bit set
+/// of leaf columns to return (0 for all). `where_column` is `u32::MAX` for no condition; then
+/// `op` indexes `report::OPS` and `text` (a `pl_alloc` buffer this call frees) is the value.
+/// `gap` is `u32::MAX` never to merge ranges. `footer` is 0 for HEAD then a range, 1 for a suffix range. `flags`: 1 statistics, 2 Bloom
+/// filters, 4 the page index, 8 whole column chunks.
+///
+/// # Safety
+/// `text_ptr` and `text_len` must come from one call to `pl_alloc`.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn pl_scan(
+    id: u32,
+    columns: u32,
+    where_column: u32,
+    op: u32,
+    text_ptr: *mut u8,
+    text_len: usize,
+    footer: u32,
+    prefetch: u32,
+    connections: u32,
+    gap: u32,
+    flags: u32,
+    latency_us: u32,
+    bandwidth: u32,
+) -> usize {
+    use parquet_lab::prune::{Mechanisms, Op};
+    use parquet_lab::scan::{Query, Strategy};
+    let text = Box::from_raw(std::ptr::slice_from_raw_parts_mut(text_ptr, text_len));
+    let text = String::from_utf8_lossy(&text).into_owned();
+    let condition = if where_column == u32::MAX {
+        None
+    } else {
+        let op = report::OPS.get(op as usize).copied().unwrap_or("?");
+        match Op::parse(op) {
+            Ok(op) => Some((where_column as usize, op, text)),
+            Err(e) => return emit(obj([("ok", false.into()), ("error", e.into())])),
+        }
+    };
+    let strategy = Strategy {
+        footer: FooterOptions {
+            size: if footer == 1 {
+                SizeSource::SuffixRange
+            } else {
+                SizeSource::Head
+            },
+            prefetch: u64::from(prefetch),
+        },
+        connections: connections.max(1) as usize,
+        coalesce_gap: (gap != u32::MAX).then_some(u64::from(gap)),
+        whole_chunks: flags & 8 != 0,
+        mechanisms: Mechanisms {
+            statistics: flags & 1 != 0,
+            bloom: flags & 2 != 0,
+            page_index: flags & 4 != 0,
+        },
+    };
+    let model = NetworkModel {
+        latency_us: u64::from(latency_us),
+        bandwidth_bytes_per_sec: u64::from(bandwidth),
+    };
+    match with_file(id, |f| {
+        let cols: Vec<usize> = match report::flat_columns(&f.bytes) {
+            Ok(all) => all
+                .into_iter()
+                .filter(|c| columns == 0 || (*c < 32 && columns & (1 << c) != 0))
+                .collect(),
+            Err(e) => return obj([("ok", false.into()), ("error", e.into())]),
+        };
+        report::scan(
+            &f.bytes,
+            &Query {
+                columns: cols,
+                condition,
+            },
+            strategy,
+            model,
+        )
+    }) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch09's experiment: what a condition lets the reader skip. `op` indexes
 /// `report::OPS`; `text` is the condition's value, in a buffer from `pl_alloc` that this call
 /// takes and frees; `mechanisms` is the bit set `report::skipping` describes.

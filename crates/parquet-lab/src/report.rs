@@ -108,6 +108,8 @@ pub fn requests_json(requests: &[Request]) -> Json {
                     ("bytes", r.bytes_returned.into()),
                     ("start_us", r.start_us.into()),
                     ("end_us", r.end_us.into()),
+                    ("connection", r.connection.into()),
+                    ("phase", r.phase.into()),
                 ])
             })
             .collect(),
@@ -2060,5 +2062,96 @@ pub fn skipping(file: &[u8], column: usize, op: &str, value: &str, mechanisms: u
             ]),
         ),
         ("row_groups", groups),
+    ])
+}
+
+/// The leaf columns that do not repeat: the ones `scan` can return.
+pub fn flat_columns(file: &[u8]) -> Result<Vec<usize>, String> {
+    let md = open_bytes(file)?;
+    let root = crate::schema::build(&md.schema).map_err(|e| e.to_string())?;
+    Ok(crate::schema::leaves(&root)
+        .iter()
+        .filter(|l| l.max_repetition_level == 0)
+        .map(|l| l.column)
+        .collect())
+}
+
+/// Ch10's experiment: a query run against the file in the simulated object store, with every
+/// request, when it ran and on which connection, and the rows it returned.
+pub fn scan(
+    file: &[u8],
+    query: &crate::scan::Query,
+    strategy: crate::scan::Strategy,
+    model: NetworkModel,
+) -> Json {
+    use crate::scan::scan as run;
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let columns = match open_bytes(file).and_then(|md| {
+        let root = crate::schema::build(&md.schema).map_err(|e| e.to_string())?;
+        Ok(crate::schema::leaves(&root)
+            .iter()
+            .filter(|l| l.max_repetition_level == 0)
+            .map(|l| {
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                ])
+            })
+            .collect::<Vec<_>>())
+    }) {
+        Ok(c) => Json::Arr(c),
+        Err(e) => return fail(e),
+    };
+    let r = match run(file, "data.parquet", query, strategy, model) {
+        Ok(r) => r,
+        Err(e) => {
+            let mut j = fail(e);
+            if let Json::Obj(ref mut f) = j {
+                f.push(("columns".into(), columns));
+            }
+            return j;
+        }
+    };
+    obj([
+        ("ok", true.into()),
+        ("columns", columns),
+        ("file_size", file.len().into()),
+        (
+            "strategy",
+            obj([
+                ("footer", options_json(strategy.footer, model)),
+                ("connections", strategy.connections.into()),
+                ("coalesce_gap", strategy.coalesce_gap.into()),
+                ("whole_chunks", strategy.whole_chunks.into()),
+                ("statistics", strategy.mechanisms.statistics.into()),
+                ("bloom", strategy.mechanisms.bloom.into()),
+                ("page_index", strategy.mechanisms.page_index.into()),
+            ]),
+        ),
+        (
+            "totals",
+            obj([
+                ("requests", r.requests.len().into()),
+                ("elapsed_us", r.elapsed_us.into()),
+                ("bytes_fetched", r.bytes_fetched.into()),
+                ("bytes_planned", r.bytes_planned.into()),
+                ("rows_decoded", r.rows_decoded.into()),
+                ("rows_matching", r.matches.len().into()),
+            ]),
+        ),
+        ("requests", requests_json(&r.requests)),
+        (
+            "result",
+            obj([
+                (
+                    "columns",
+                    Json::Arr(r.column_names.iter().map(|c| c.clone().into()).collect()),
+                ),
+                (
+                    "rows",
+                    Json::Arr(r.rows.into_iter().map(Json::Arr).collect()),
+                ),
+            ]),
+        ),
     ])
 }

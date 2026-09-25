@@ -153,6 +153,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .stats-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "all" "fields" "order"; }
   .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
+  .scan-grid .p-scan-sum { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -296,6 +298,29 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .skip-groups .reads { margin: .2rem 0 0; padding-left: 1.1rem; }
 .skip-grid button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
 
+/* Ch10: the read path. */
+.scan-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); font-size: 13px; }
+.scan-form .row { display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center; margin: .25rem 0; }
+.scan-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+             grid-template-areas: "sum time" "reqs reqs" "rows rows"; border-bottom: 1px solid var(--edge); }
+.scan-grid .p-scan-sum { grid-area: sum; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.scan-grid .p-scan-time { grid-area: time; border-bottom: 1px solid var(--edge); }
+.scan-grid .p-scan-reqs { grid-area: reqs; border-bottom: 1px solid var(--edge); }
+.scan-grid .p-scan-rows { grid-area: rows; }
+.scan-costs { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .8rem; margin: 0; }
+.scan-costs dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.scan-costs dd { margin: 0; font: 600 18px/1.3 var(--chrome); font-variant-numeric: tabular-nums; }
+.scan-costs dd small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.timeline .lane { display: flex; align-items: center; gap: .4rem; margin: .25rem 0; }
+.timeline .lane-name { width: 1.2rem; font: 11px var(--mono); color: var(--faint); text-align: right; }
+.timeline .lane-track { position: relative; flex: 1; height: 1.4rem; background: var(--panel); border: 1px solid var(--edge); border-radius: 3px; }
+.timeline .req { position: absolute; top: 2px; bottom: 2px; padding: 0; min-width: 0; overflow: hidden;
+                 font: 10px var(--mono); border-radius: 2px; border: 1px solid var(--edge); color: var(--on-accent); }
+.timeline .req.foot { background: var(--muted); }
+.timeline .req.idx { background: var(--warn); }
+.timeline .req.data { background: var(--accent); }
+.scan-grid button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -326,6 +351,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .stats-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "all" "fields" "order"; }
   .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
+  .scan-grid .p-scan-sum { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

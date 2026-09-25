@@ -12,8 +12,8 @@ What it flags, in prose only (not code blocks, not directives, not inline code, 
 
 - a number followed by a unit this book measures in: bytes, KB, KiB, MB, ms, requests, rows,
   row groups, pages, columns, values;
-- any other integer of two or more digits, except a year, a chapter label, or an RFC or section
-  number in a citation.
+- any other integer of two or more digits, except a year, a chapter label, a problem number, or
+  an RFC or section number in a citation.
 
 Small counts written as words ("four bytes", "eight orders") pass. They are either format
 constants the specification fixes, or counts of things on the page, and neither goes stale. A
@@ -40,6 +40,8 @@ ALLOWED_BARE = re.compile(r"^(?:19|20)\d\d$")  # a year
 INLINE_CODE = re.compile(r"`[^`]*`")
 LINK_TARGET = re.compile(r"\]\([^)]*\)")
 CITATION = re.compile(r"\b(?:RFC|section|ch|Appendix|Part)\s*\d+", re.IGNORECASE)
+#: A problem's number, "10.1", in its bold heading or after the word "problem".
+PROBLEM = re.compile(r"(?:\*\*|\bproblems?\s+)\d+\.\d+", re.IGNORECASE)
 
 
 def prose_lines(text: str):
@@ -80,6 +82,7 @@ def problems(path: Path) -> list[str]:
     for n, line in prose_lines(path.read_text()):
         text = INLINE_CODE.sub("", LINK_TARGET.sub("]", line))
         text = CITATION.sub("", text)
+        text = PROBLEM.sub("", text)
         text = re.sub(r"^\s*(?:\d+\.|[-*])\s+", "", text)  # list markers
         text = re.sub(r"^#+\s", "", text)
         covered = []
