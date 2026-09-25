@@ -40,6 +40,32 @@
       "nullable": false
     }
   ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount_cents",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
   "rows": [
     {
       "order_id": 1,

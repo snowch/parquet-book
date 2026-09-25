@@ -204,3 +204,13 @@ pub extern "C" fn pl_layouts(
     let row = usize::try_from(row).ok();
     emit(report::layouts(column_mask, row, model))
 }
+
+/// Ch03's experiment: the flat schema, the rebuilt tree, and each column's statistics read
+/// through its logical type. See `report::schema`.
+#[no_mangle]
+pub extern "C" fn pl_schema(id: u32) -> usize {
+    match with_file(id, |f| report::schema(&f.bytes)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}

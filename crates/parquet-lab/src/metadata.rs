@@ -11,6 +11,7 @@
 use std::fmt;
 
 use crate::bytes::{ByteReader, Span};
+use crate::logical::{self, LogicalType};
 use crate::parquet_thrift::{enum_value_name, EnumName};
 use crate::thrift::{read_struct, Node, Struct, ThriftError, Value};
 
@@ -74,14 +75,24 @@ impl PhysicalType {
 }
 
 /// One node of the flattened schema: a leaf column or a group (ch03).
+///
+/// The footer stores the schema tree as a list in depth-first order. A group says how many
+/// children follow it; a leaf has none. [`crate::schema`] rebuilds the tree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SchemaElement {
     pub name: String,
     pub physical_type: Option<PhysicalType>,
+    /// For `FIXED_LEN_BYTE_ARRAY`: how many bytes each value takes.
+    pub type_length: Option<i64>,
     pub repetition: Option<String>,
     pub num_children: Option<i64>,
+    /// The older annotation, kept by writers for readers that predate logical types.
     pub converted_type: Option<String>,
-    pub logical_type: Option<String>,
+    pub logical_type: Option<LogicalType>,
+    pub scale: Option<i64>,
+    pub precision: Option<i64>,
+    /// An identifier that survives renames; table formats use it (ch14).
+    pub field_id: Option<i64>,
     pub span: Span,
 }
 
@@ -89,6 +100,9 @@ pub struct SchemaElement {
 pub struct Statistics {
     pub min_value: Option<Vec<u8>>,
     pub max_value: Option<Vec<u8>>,
+    /// Where the minimum's value bytes are, after their length prefix.
+    pub min_span: Option<Span>,
+    pub max_span: Option<Span>,
     pub null_count: Option<i64>,
     pub span: Span,
 }
@@ -209,18 +223,14 @@ fn schema_element(node: &Node) -> Result<SchemaElement, MetadataError> {
     Ok(SchemaElement {
         name: req_str(s, "SchemaElement", 4, "name", node.span)?,
         physical_type: opt_int(s, 1).map(PhysicalType),
+        type_length: opt_int(s, 2),
         repetition: opt_int(s, 3).map(|v| enum_name(EnumName::FieldRepetitionType, v)),
         num_children: opt_int(s, 5),
         converted_type: opt_int(s, 6).map(|v| enum_name(EnumName::ConvertedType, v)),
-        logical_type: s.field(10).and_then(|f| match &f.node.value {
-            // A LogicalType is a union: exactly one field is set, and its name is the type.
-            Value::Struct(u) => u.fields.first().map(|inner| {
-                crate::parquet_thrift::field_def("LogicalType", inner.id)
-                    .map(|d| d.name.to_string())
-                    .unwrap_or_else(|| format!("field {}", inner.id))
-            }),
-            _ => None,
-        }),
+        scale: opt_int(s, 7),
+        precision: opt_int(s, 8),
+        field_id: opt_int(s, 9),
+        logical_type: s.field(10).and_then(|f| logical::decode(&f.node)),
         span: node.span,
     })
 }
@@ -294,9 +304,20 @@ pub(crate) fn statistics(node: &Node) -> Result<Statistics, MetadataError> {
         // what order the writer used; this one reports them only when the new ones are absent.
         min_value: opt_bytes(s, 6).or_else(|| opt_bytes(s, 2)),
         max_value: opt_bytes(s, 5).or_else(|| opt_bytes(s, 1)),
+        min_span: value_span(s, 6).or_else(|| value_span(s, 2)),
+        max_span: value_span(s, 5).or_else(|| value_span(s, 1)),
         null_count: opt_int(s, 3),
         span: node.span,
     })
+}
+
+/// The span of a binary field's bytes, without the varint length in front of them.
+fn value_span(s: &Struct, id: i16) -> Option<Span> {
+    let node = &s.field(id)?.node;
+    match &node.value {
+        Value::Binary(b) => Some(Span::new(node.span.end - b.len() as u64, node.span.end)),
+        _ => None,
+    }
 }
 
 fn key_value(node: &Node) -> Result<KeyValue, MetadataError> {

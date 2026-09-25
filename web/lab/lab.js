@@ -9,8 +9,11 @@
 import { Lab } from "./wasm.js";
 import { mountFooter, mountAnatomy } from "./footer.js";
 import { mountLayouts } from "./layouts.js";
+import { mountSchema } from "./schema.js";
 
-const EXPERIMENTS = { footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts };
+const EXPERIMENTS = {
+  footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema,
+};
 
 class Fixtures {
   constructor(names) {

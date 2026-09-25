@@ -34,7 +34,7 @@ function panel(parent, title, cls) {
 
 // Shared by both experiments: a file loaded into the module, its bytes, its structure, and the
 // three coordinated views over them.
-class FileViews {
+export class FileViews {
   constructor(root, lab, { withTrace }) {
     this.lab = lab;
     this.grid = document.createElement("div");
@@ -199,7 +199,7 @@ export function mountFooter(root, lab, files, initial, config) {
   choose();
 }
 
-function fileChooser(head, files, initial, open) {
+export function fileChooser(head, files, initial, open) {
   const names = files.names();
   head.innerHTML = `<span class="lab-title">Parquet laboratory</span>` +
     (names.length > 1

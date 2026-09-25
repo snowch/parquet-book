@@ -140,6 +140,23 @@ if (shots) {
   await page.screenshot({ path: path.join(shots, "chapter-dark.png") });
 }
 
+// ch03: the schema. The leaf count and the date reading are the reader's.
+await page.goto(base + "the-type-system.html");
+const schemaLab = page.locator('.lab[data-experiment="schema"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="schema"]')?.dataset.state === "ok");
+const nativeSchema = native(["schema", "fixtures/types.parquet"]);
+check(await schemaLab.getAttribute("data-leaves") === String(nativeSchema.leaves.length),
+  `schema panel shows the reader's ${nativeSchema.leaves.length} leaf columns`);
+const dateRow = schemaLab.locator(".values-table tr", { hasText: "order_date" });
+const expectedDate = nativeSchema.leaves.find((l) => l.path === "order_date").statistics.min.logical;
+check((await dateRow.innerText()).includes(expectedDate), `order_date's minimum reads as ${expectedDate}`);
+await dateRow.locator("td:nth-child(4) button.span").click();
+const minSpan = nativeSchema.leaves.find((l) => l.path === "order_date").statistics.min.span;
+const litDate = await schemaLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
+check(litDate[0] === minSpan[0] && litDate.length === minSpan[1] - minSpan[0],
+  `clicking the minimum highlights its bytes [${minSpan[0]}, ${minSpan[1]})`);
+if (shots) await schemaLab.screenshot({ path: path.join(shots, "schema-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -73,6 +73,8 @@ def cases():
                     )
         calls.append({"call": "structure", "file": f})
         native.append(("structure", f))
+        calls.append({"call": "schema", "file": f})
+        native.append(("schema", f))
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))

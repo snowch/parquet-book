@@ -160,7 +160,10 @@ fn metadata_summary(m: &FileMetaData) -> Json {
                             ("name", e.name.clone().into()),
                             ("physical_type", e.physical_type.map(|t| t.name()).into()),
                             ("repetition", e.repetition.clone().into()),
-                            ("logical_type", e.logical_type.clone().into()),
+                            (
+                                "logical_type",
+                                e.logical_type.as_ref().map(|l| l.to_string()).into(),
+                            ),
                         ])
                     })
                     .collect(),
@@ -690,5 +693,129 @@ pub fn layouts(column_mask: u32, row: Option<usize>, model: NetworkModel) -> Jso
             "columns_layout",
             layout_json(Layout::Columns, "sales.columns"),
         ),
+    ])
+}
+
+/// Ch03's experiment: the schema as the footer stores it, as the reader rebuilds it, and what
+/// each column's statistics mean once its logical type is applied.
+pub fn schema(file: &[u8]) -> Json {
+    use crate::logical;
+    use crate::schema::{build, leaves, to_text};
+
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return obj([("ok", false.into()), ("error", e.into())]),
+    };
+    let root = match build(&md.schema) {
+        Ok(root) => root,
+        Err(e) => return obj([("ok", false.into()), ("error", e.to_string().into())]),
+    };
+    let elements = Json::Arr(
+        md.schema
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                obj([
+                    ("index", i.into()),
+                    ("name", e.name.clone().into()),
+                    ("span", e.span.into()),
+                    ("num_children", e.num_children.into()),
+                    ("repetition", e.repetition.clone().into()),
+                    ("physical_type", e.physical_type.map(|t| t.name()).into()),
+                    ("type_length", e.type_length.into()),
+                    (
+                        "logical_type",
+                        e.logical_type.as_ref().map(|l| l.to_string()).into(),
+                    ),
+                    ("converted_type", e.converted_type.clone().into()),
+                ])
+            })
+            .collect(),
+    );
+    let reading = |c: &ColumnChunk,
+                   lt: &Option<logical::LogicalType>,
+                   bytes: &Option<Vec<u8>>,
+                   span: Option<Span>| {
+        match (bytes, span) {
+            (Some(b), Some(s)) => obj([
+                ("span", s.into()),
+                ("hex", hex(b).into()),
+                ("physical", plain_scalar(c.physical_type, b).into()),
+                (
+                    "logical",
+                    lt.as_ref()
+                        .and_then(|l| logical::interpret(c.physical_type, l, b))
+                        .into(),
+                ),
+            ]),
+            _ => Json::Null,
+        }
+    };
+    let first_group = md.row_groups.first();
+    let leaves_json = Json::Arr(
+        leaves(&root)
+            .iter()
+            .map(|leaf| {
+                let chunk = first_group.and_then(|rg| rg.columns.get(leaf.column));
+                let stats = chunk.and_then(|c| {
+                    c.statistics.as_ref().map(|s| {
+                        obj([
+                            ("span", s.span.into()),
+                            (
+                                "min",
+                                reading(c, &leaf.logical_type, &s.min_value, s.min_span),
+                            ),
+                            (
+                                "max",
+                                reading(c, &leaf.logical_type, &s.max_value, s.max_span),
+                            ),
+                            ("null_count", s.null_count.into()),
+                        ])
+                    })
+                });
+                obj([
+                    ("column", leaf.column.into()),
+                    ("path", leaf.dotted_path().into()),
+                    ("element", leaf.element.into()),
+                    (
+                        "repetitions",
+                        Json::Arr(
+                            leaf.repetitions
+                                .iter()
+                                .map(|r| Json::from(r.word()))
+                                .collect(),
+                        ),
+                    ),
+                    ("max_definition_level", leaf.max_definition_level.into()),
+                    ("max_repetition_level", leaf.max_repetition_level.into()),
+                    ("physical_type", leaf.physical_type.name().into()),
+                    (
+                        "logical_type",
+                        leaf.logical_type.as_ref().map(|l| l.to_string()).into(),
+                    ),
+                    ("chunk", chunk.map(|c| Json::from(c.byte_range())).into()),
+                    ("statistics", stats.unwrap_or(Json::Null)),
+                ])
+            })
+            .collect(),
+    );
+    fn tree(node: &crate::schema::SchemaNode) -> Json {
+        obj([
+            ("name", node.name.clone().into()),
+            ("element", node.element.into()),
+            ("span", node.span.into()),
+            ("repetition", node.repetition.word().into()),
+            (
+                "children",
+                Json::Arr(node.children.iter().map(tree).collect()),
+            ),
+        ])
+    }
+    obj([
+        ("ok", true.into()),
+        ("elements", elements),
+        ("tree", tree(&root)),
+        ("text", to_text(&root).into()),
+        ("leaves", leaves_json),
     ])
 }

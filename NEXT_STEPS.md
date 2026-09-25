@@ -14,21 +14,25 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Checks: fixture reproducibility, figure staleness, numbers in prose, WASM/native parity, built
   links, headless-browser test of the experiments.
 
-## Next: ch03, the type system
+## Done: ch03, the type system
 
-1. Reader: build the schema tree from the flattened `SchemaElement` list (`num_children`),
-   with max definition and repetition levels per leaf. Expose logical types fully (decimal scale
-   and precision, timestamp unit and UTC flag).
-2. Fixture: `types.parquet`, one column per physical type and the common logical types, a handful
-   of rows. Nullable and required columns side by side.
-3. Experiment: a schema panel over the footer: select a leaf, see its `SchemaElement`s' bytes, its
-   physical and logical type, and its path.
-4. Problems: rebuild the tree from the flat list; compute max levels.
+- Reader: full logical types (`logical.rs`) applied to values, the schema tree rebuilt from the
+  flat list with maximum levels (`schema.rs`), statistics value spans.
+- Fixture: `types.parquet`; every manifest now records pyarrow's reading of each leaf.
+- Experiment: the schema panel (flat list, rebuilt tree, statistics read through logical types).
+- Problems 3.1 to 3.3 with tests; 3.4 about the reader's own schema.
+
+## Next: ch04, nested data
+
+1. Fixture: `nested.parquet` with a list of structs containing a list (the sales `items` example),
+   nullable at every level, a handful of records including an empty list and a null list.
+2. Reader: the RLE/bit-packing hybrid decoder for levels (written here, reused by ch05), data page
+   v1 bodies split into repetition levels, definition levels and values.
+3. Record assembly: levels and values back into records, checked against pyarrow's rows.
+4. Experiment: a levels panel stepping through (r, d, value) triples with the bytes of each.
 
 ## Then
 
-- **ch04**: `nested.parquet`; decode levels by hand, then with the RLE hybrid from ch05 (write the
-  level decoder in ch04 and reuse it).
 - **ch05**: `dictionary.parquet`; decoders for PLAIN, RLE/bit-packing, dictionary, delta; a
   stepper panel that decodes one run at a time from the page body bytes.
 - **ch06**: data page v1 and v2 bodies, split into levels and values.

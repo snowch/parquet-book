@@ -87,15 +87,33 @@ fn the_footer_decodes_to_what_pyarrow_wrote() {
             manifest.get("created_by").and_then(Json::as_str),
             "{name}"
         );
-        let schema: Vec<&str> = manifest
-            .get("schema")
-            .and_then(Json::as_array)
-            .unwrap()
-            .iter()
-            .map(|c| c.get("name").and_then(Json::as_str).unwrap())
-            .collect();
-        let leaves: Vec<&str> = md.leaves().iter().map(|e| e.name.as_str()).collect();
-        assert_eq!(leaves, schema, "{name}: leaf columns");
+        let root = parquet_lab::schema::build(&md.schema).unwrap();
+        let leaves = parquet_lab::schema::leaves(&root);
+        let expected = manifest.get("leaves").and_then(Json::as_array).unwrap();
+        assert_eq!(leaves.len(), expected.len(), "{name}: one leaf per column");
+        for (leaf, e) in leaves.iter().zip(expected) {
+            let path = e.get("path").and_then(Json::as_str).unwrap();
+            assert_eq!(leaf.dotted_path(), path, "{name}");
+            assert_eq!(
+                u64::from(leaf.max_definition_level),
+                e.get("max_definition_level")
+                    .and_then(Json::as_u64)
+                    .unwrap(),
+                "{name} {path}: max definition level"
+            );
+            assert_eq!(
+                u64::from(leaf.max_repetition_level),
+                e.get("max_repetition_level")
+                    .and_then(Json::as_u64)
+                    .unwrap(),
+                "{name} {path}: max repetition level"
+            );
+            assert_eq!(
+                leaf.physical_type.name(),
+                e.get("physical_type").and_then(Json::as_str).unwrap(),
+                "{name} {path}"
+            );
+        }
     }
 }
 
@@ -274,4 +292,53 @@ fn damage_is_reported_not_papered_over() {
         .contains("footer"));
     // Requests made before the damage was found are still in the trace.
     assert_eq!(j.get("requests").and_then(Json::as_array).unwrap().len(), 2);
+}
+
+#[test]
+fn logical_types_read_statistics_the_way_pyarrow_does() {
+    // pyarrow reports statistics already converted through the logical type. The reader applies
+    // the logical type itself, to the raw bytes, and must arrive at the same values. Only the
+    // spelling differs: pyarrow prints a UTC timestamp with a space and "+00:00", and strings
+    // without quotes.
+    let normalise = |s: &str| {
+        s.trim_matches('"')
+            .replacen(' ', "T", 1)
+            .replace("+00:00", "Z")
+    };
+    let mut compared = 0;
+    for (name, bytes, manifest) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        let leaves = parquet_lab::schema::leaves(&parquet_lab::schema::build(&md.schema).unwrap());
+        let groups = manifest.get("row_groups").and_then(Json::as_array).unwrap();
+        for (rg, expected) in md.row_groups.iter().zip(groups) {
+            let cols = expected.get("columns").and_then(Json::as_array).unwrap();
+            for ((c, e), leaf) in rg.columns.iter().zip(cols).zip(&leaves) {
+                let (Some(logical), Some(stats)) = (&leaf.logical_type, &c.statistics) else {
+                    continue;
+                };
+                let theirs = e.get("statistics").unwrap();
+                for (mine, key) in [(&stats.min_value, "min"), (&stats.max_value, "max")] {
+                    let (Some(raw), Some(want)) = (mine, theirs.get(key).and_then(Json::as_str))
+                    else {
+                        continue;
+                    };
+                    let got = parquet_lab::logical::interpret(c.physical_type, logical, raw)
+                        .unwrap_or_else(|| {
+                            panic!("{name} {}: no reading of {raw:?}", c.dotted_path())
+                        });
+                    assert_eq!(
+                        normalise(&got),
+                        normalise(want),
+                        "{name} {} {key}",
+                        c.dotted_path()
+                    );
+                    compared += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        compared >= 10,
+        "only {compared} values compared; the types fixture should give more"
+    );
 }

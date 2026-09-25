@@ -50,23 +50,9 @@ impl Cell {
         match self {
             Cell::Int(v) => v.to_string(),
             Cell::Text(s) => s.clone(),
-            Cell::Date(d) => civil_from_days(i64::from(*d)),
+            Cell::Date(d) => crate::logical::date_from_days(i64::from(*d)),
         }
     }
-}
-
-/// The date for a count of days since 1970-01-01, by Howard Hinnant's `civil_from_days`.
-fn civil_from_days(z: i64) -> String {
-    let z = z + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    format!("{y:04}-{m:02}-{d:02}")
 }
 
 #[derive(Clone, Debug)]
@@ -228,12 +214,5 @@ mod tests {
             ranges(&encode(&t, Layout::Columns), &q).len(),
             t.columns.len()
         );
-    }
-
-    #[test]
-    fn day_numbers_are_dates() {
-        assert_eq!(civil_from_days(0), "1970-01-01");
-        assert_eq!(civil_from_days(20456), "2026-01-03");
-        assert_eq!(civil_from_days(-1), "1969-12-31");
     }
 }

@@ -21,6 +21,7 @@ const out = calls.map((c) => {
   switch (c.call) {
     case "footer": return lab.footerLab(id(c.file), c.options);
     case "structure": return lab.structure(id(c.file));
+    case "schema": return lab.schema(id(c.file));
     case "interpret": return lab.interpret(id(c.file), c.offset);
     case "layouts": return lab.layouts(c.options);
     default: throw new Error(`unknown call ${c.call}`);

@@ -131,9 +131,9 @@ _CHAPTERS = (
         "The type system",
         "the_file",
         "How do a handful of storage types carry strings, dates, decimals and timestamps?",
-        "The schema, decoded from the footer: physical types, logical types and repetition.",
-        (),
-        (),
+        "The schema tree rebuilt from the footer, with maximum levels, and logical types applied to values.",
+        ("schema",),
+        ("types.parquet",),
     ),
     (
         "nested_data",
@@ -261,4 +261,4 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
-EXPERIMENTS = ("layouts", "footer", "anatomy")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema")

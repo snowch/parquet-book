@@ -26,6 +26,8 @@ check refuses to run under any other version rather than reporting a false diffe
 from __future__ import annotations
 
 import argparse
+import datetime
+import decimal
 import hashlib
 import io
 import json
@@ -72,6 +74,28 @@ BASE_OPTIONS = {
     "write_page_index": False,
 }
 
+#: One column for each physical type the book discusses, and the common logical types on top of
+#: them. Two columns are nullable and one is a group, so the schema has all three repetitions'
+#: effects on levels and a path with a dot in it.
+TYPES = pa.schema(
+    [
+        pa.field("is_paid", pa.bool_(), nullable=False),
+        pa.field("quantity", pa.int8(), nullable=False),
+        pa.field("store_id", pa.uint16(), nullable=False),
+        pa.field("order_id", pa.int64(), nullable=False),
+        pa.field("weight_kg", pa.float32(), nullable=False),
+        pa.field("amount", pa.decimal128(9, 2), nullable=False),
+        pa.field("country", pa.string(), nullable=True),
+        pa.field("order_date", pa.date32(), nullable=False),
+        pa.field("paid_at", pa.timestamp("us", tz="UTC"), nullable=False),
+        pa.field(
+            "shipping",
+            pa.struct([pa.field("city", pa.string()), pa.field("postcode", pa.string())]),
+            nullable=True,
+        ),
+    ]
+)
+
 FIXTURES = (
     Fixture(
         name="tiny",
@@ -106,6 +130,42 @@ FIXTURES = (
         ),
         options={"row_group_size": 2},
     ),
+    Fixture(
+        name="types",
+        why=(
+            "Three orders with a column for each physical type and the common logical types: "
+            "a signed and an unsigned small integer, a decimal, a date, a UTC timestamp, a "
+            "nullable string and an optional group. The same bytes mean different values "
+            "depending on the logical type the schema gives them, which is ch03's subject."
+        ),
+        table=pa.table(
+            {
+                "is_paid": [True, False, True],
+                "quantity": [1, 3, 2],
+                "store_id": [7, 65000, 12],
+                "order_id": [1, 2, 3],
+                "weight_kg": [0.5, 1.25, 2.0],
+                "amount": [decimal.Decimal("19.99"), decimal.Decimal("5.00"), decimal.Decimal("42.10")],
+                "country": ["UK", None, "PL"],
+                "order_date": [
+                    datetime.date(2026, 1, 3),
+                    datetime.date(2026, 1, 4),
+                    datetime.date(2026, 1, 5),
+                ],
+                "paid_at": [
+                    datetime.datetime(2026, 1, 3, 9, 30, tzinfo=datetime.UTC),
+                    datetime.datetime(2026, 1, 4, 17, 5, tzinfo=datetime.UTC),
+                    datetime.datetime(2026, 1, 5, 0, 0, tzinfo=datetime.UTC),
+                ],
+                "shipping": [
+                    {"city": "Leeds", "postcode": "LS1"},
+                    None,
+                    {"city": "Kraków", "postcode": None},
+                ],
+            },
+            schema=TYPES,
+        ),
+    ),
 )
 
 
@@ -116,9 +176,14 @@ def write(fixture: Fixture) -> bytes:
 
 
 def _stat(value):
+    """A value pyarrow returned, as JSON can hold it: text for anything that is not a number."""
     if isinstance(value, bytes):
         return value.decode("utf-8", "replace")
-    return value
+    if isinstance(value, dict):
+        return {k: _stat(v) for k, v in value.items()}
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    return str(value)
 
 
 def manifest(fixture: Fixture, data: bytes) -> dict:
@@ -174,7 +239,19 @@ def manifest(fixture: Fixture, data: bytes) -> dict:
         "schema": [
             {"name": f.name, "type": str(f.type), "nullable": f.nullable} for f in fixture.table.schema
         ],
-        "rows": fixture.table.to_pylist(),
+        # pyarrow's own reading of the Parquet schema: one entry per leaf column.
+        "leaves": [
+            {
+                "path": md.schema.column(i).path,
+                "physical_type": md.schema.column(i).physical_type,
+                "logical_type": str(md.schema.column(i).logical_type),
+                "converted_type": md.schema.column(i).converted_type,
+                "max_definition_level": md.schema.column(i).max_definition_level,
+                "max_repetition_level": md.schema.column(i).max_repetition_level,
+            }
+            for i in range(md.num_columns)
+        ],
+        "rows": [{k: _stat(v) for k, v in row.items()} for row in fixture.table.to_pylist()],
         "row_groups": row_groups,
     }
 
@@ -204,15 +281,16 @@ def readme(manifests: list[dict]) -> str:
             f"| Footer length | {m['footer_length']} bytes |",
             f"| SHA-256 | `{m['sha256'][:16]}…` |",
             "",
-            "Schema:",
+            "Leaf columns, as pyarrow reads the Parquet schema:",
             "",
-            "| Column | Arrow type | Nullable | Parquet physical type | Encodings | Codec |",
-            "|---|---|---|---|---|---|",
+            "| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |",
+            "|---|---|---|--:|--:|---|---|",
         ]
         first = m["row_groups"][0]["columns"]
-        for s, c in zip(m["schema"], first, strict=True):
+        for leaf, c in zip(m["leaves"], first, strict=True):
             out.append(
-                f"| `{s['name']}` | {s['type']} | {s['nullable']} | {c['physical_type']} | "
+                f"| `{leaf['path']}` | {leaf['physical_type']} | {leaf['logical_type']} | "
+                f"{leaf['max_definition_level']} | {leaf['max_repetition_level']} | "
                 f"{', '.join(c['encodings'])} | {c['compression']} |"
             )
         out += ["", "Writer options:", "", "```python"]

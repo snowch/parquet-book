@@ -70,6 +70,10 @@ export class Lab {
     return this.#result(this.exports.pl_structure(id));
   }
 
+  schema(id) {
+    return this.#result(this.exports.pl_schema(id));
+  }
+
   layouts({ columns = [], row = -1, latencyUs = 20000, bandwidth = 100e6 } = {}) {
     const mask = columns.reduce((m, c) => m | (1 << c), 0);
     return this.#result(this.exports.pl_layouts(mask, row, latencyUs, bandwidth));

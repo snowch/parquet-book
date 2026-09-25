@@ -46,8 +46,8 @@ make problems                                           # the chapter exercises 
 
 ## Status
 
-The first vertical slice is complete: ch01 (row and column layouts) and ch02 (footer discovery
-through a simulated object store) are written, with working experiments and graded problems.
+ch01 (row and column layouts), ch02 (footer discovery through a simulated object store) and
+ch03 (the type system) are written, with working experiments and graded problems.
 The other chapters are planned in `tools/outline.py` and appear in the book as outlines. See
 `PLAN.md` for the plan and `NEXT_STEPS.md` for what comes next.
 

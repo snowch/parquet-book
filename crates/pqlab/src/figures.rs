@@ -45,6 +45,18 @@ const FIGURES: &[Figure] = &[
         file: "footer-strategies.md",
         render: footer_strategies,
     },
+    Figure {
+        file: "types-schema-flat.md",
+        render: types_schema_flat,
+    },
+    Figure {
+        file: "types-schema-text.md",
+        render: types_schema_text,
+    },
+    Figure {
+        file: "types-values.md",
+        render: types_values,
+    },
 ];
 
 pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
@@ -390,5 +402,102 @@ fn layouts_costs(_root: &Path) -> Result<String, String> {
         ms(model.latency_us),
         rate(model.bandwidth_bytes_per_sec)
     ));
+    Ok(s)
+}
+
+fn types_schema(root: &Path) -> Result<(Vec<u8>, Json), String> {
+    let bytes = fixture(root, "types.parquet")?;
+    let j = parquet_lab::report::schema(&bytes);
+    if j.get("ok") != Some(&Json::Bool(true)) {
+        return Err(format!("types.parquet: {}", j.to_json()));
+    }
+    Ok((bytes, j))
+}
+
+fn text_of(j: Option<&Json>) -> String {
+    match j {
+        Some(Json::Str(s)) => s.clone(),
+        Some(Json::Null) | None => String::new(),
+        Some(other) => other.to_json(),
+    }
+}
+
+fn types_schema_flat(root: &Path) -> Result<String, String> {
+    let (bytes, j) = types_schema(root)?;
+    let mut s = String::from(HEADER);
+    s.push_str("| # | Name | Children | Repetition | Physical type | Logical type |\n|--:|---|--:|---|---|---|\n");
+    for e in j
+        .get("elements")
+        .and_then(Json::as_array)
+        .ok_or("no elements")?
+    {
+        let physical = text_of(e.get("physical_type"));
+        let physical = match e.get("type_length").and_then(Json::as_i64) {
+            Some(n) if !physical.is_empty() => format!("{physical}({n})"),
+            _ => physical,
+        };
+        s.push_str(&format!(
+            "| {} | `{}` | {} | {} | {} | {} |\n",
+            text_of(e.get("index")),
+            text_of(e.get("name")),
+            text_of(e.get("num_children")),
+            text_of(e.get("repetition")).to_lowercase(),
+            if physical.is_empty() {
+                "(group)".into()
+            } else {
+                physical
+            },
+            text_of(e.get("logical_type")),
+        ));
+    }
+    s.push_str(&conditions("types.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn types_schema_text(root: &Path) -> Result<String, String> {
+    let (bytes, j) = types_schema(root)?;
+    let mut s = String::from(HEADER);
+    s.push_str("```text\n");
+    s.push_str(&text_of(j.get("text")));
+    s.push_str("```\n");
+    s.push_str(&conditions("types.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn types_values(root: &Path) -> Result<String, String> {
+    let (bytes, j) = types_schema(root)?;
+    let mut s = String::from(HEADER);
+    s.push_str(
+        "| Column | Physical type | Logical type | Minimum, as stored | Read as the physical type | Read through the logical type |\n\
+         |---|---|---|---|---|---|\n",
+    );
+    for l in j
+        .get("leaves")
+        .and_then(Json::as_array)
+        .ok_or("no leaves")?
+    {
+        let min = l.get("statistics").and_then(|st| st.get("min"));
+        let cell = |k: &str| {
+            let v = text_of(min.and_then(|m| m.get(k)));
+            if v.is_empty() {
+                "·".to_string()
+            } else {
+                format!("`{}`", v.replace('`', ""))
+            }
+        };
+        s.push_str(&format!(
+            "| `{}` | {} | {} | {} | {} | {} |\n",
+            text_of(l.get("path")),
+            text_of(l.get("physical_type")),
+            match text_of(l.get("logical_type")) {
+                t if t.is_empty() => "·".to_string(),
+                t => t,
+            },
+            cell("hex"),
+            cell("physical"),
+            cell("logical"),
+        ));
+    }
+    s.push_str(&conditions("types.parquet", &bytes, None));
     Ok(s)
 }

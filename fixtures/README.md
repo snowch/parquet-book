@@ -21,13 +21,13 @@ The smallest useful file: four rows of a sales table, one row group, no compress
 | Footer length | 380 bytes |
 | SHA-256 | `67873fc1899b25ef…` |
 
-Schema:
+Leaf columns, as pyarrow reads the Parquet schema:
 
-| Column | Arrow type | Nullable | Parquet physical type | Encodings | Codec |
-|---|---|---|---|---|---|
-| `order_id` | int64 | False | INT64 | PLAIN, RLE | UNCOMPRESSED |
-| `country` | string | False | BYTE_ARRAY | PLAIN, RLE | UNCOMPRESSED |
-| `amount_cents` | int64 | False | INT64 | PLAIN, RLE | UNCOMPRESSED |
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
 
 Writer options:
 
@@ -53,13 +53,13 @@ The same sales schema split into row groups of two rows. The footer now describe
 | Footer length | 902 bytes |
 | SHA-256 | `31f67ae2363b4dd9…` |
 
-Schema:
+Leaf columns, as pyarrow reads the Parquet schema:
 
-| Column | Arrow type | Nullable | Parquet physical type | Encodings | Codec |
-|---|---|---|---|---|---|
-| `order_id` | int64 | False | INT64 | PLAIN, RLE | UNCOMPRESSED |
-| `country` | string | False | BYTE_ARRAY | PLAIN, RLE | UNCOMPRESSED |
-| `amount_cents` | int64 | False | INT64 | PLAIN, RLE | UNCOMPRESSED |
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
 
 Writer options:
 
@@ -71,4 +71,44 @@ store_schema=False
 data_page_version='1.0'
 write_page_index=False
 row_group_size=2
+```
+
+## `types.parquet`
+
+Three orders with a column for each physical type and the common logical types: a signed and an unsigned small integer, a decimal, a date, a UTC timestamp, a nullable string and an optional group. The same bytes mean different values depending on the logical type the schema gives them, which is ch03's subject.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 1824 bytes |
+| Rows | 3 |
+| Row groups | 1 |
+| Footer length | 1157 bytes |
+| SHA-256 | `05a5b091422fda61…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `is_paid` | BOOLEAN | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `quantity` | INT32 | Int(bitWidth=8, isSigned=true) | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `store_id` | INT32 | Int(bitWidth=16, isSigned=false) | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `weight_kg` | FLOAT | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount` | FIXED_LEN_BYTE_ARRAY | Decimal(precision=9, scale=2) | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `order_date` | INT32 | Date | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `paid_at` | INT64 | Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false) | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `shipping.city` | BYTE_ARRAY | String | 2 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `shipping.postcode` | BYTE_ARRAY | String | 2 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
 ```

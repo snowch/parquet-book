@@ -1,0 +1,428 @@
+{
+  "name": "types",
+  "file": "types.parquet",
+  "why": "Three orders with a column for each physical type and the common logical types: a signed and an unsigned small integer, a decimal, a date, a UTC timestamp, a nullable string and an optional group. The same bytes mean different values depending on the logical type the schema gives them, which is ch03's subject.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false
+    }
+  },
+  "file_size": 1824,
+  "sha256": "05a5b091422fda6146241af4e02272b9e62772bd0479fb60360c1dbb86a8215c",
+  "footer_length": 1157,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 3,
+  "num_columns": 11,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "is_paid",
+      "type": "bool",
+      "nullable": false
+    },
+    {
+      "name": "quantity",
+      "type": "int8",
+      "nullable": false
+    },
+    {
+      "name": "store_id",
+      "type": "uint16",
+      "nullable": false
+    },
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "weight_kg",
+      "type": "float",
+      "nullable": false
+    },
+    {
+      "name": "amount",
+      "type": "decimal128(9, 2)",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "order_date",
+      "type": "date32[day]",
+      "nullable": false
+    },
+    {
+      "name": "paid_at",
+      "type": "timestamp[us, tz=UTC]",
+      "nullable": false
+    },
+    {
+      "name": "shipping",
+      "type": "struct<city: string, postcode: string>",
+      "nullable": true
+    }
+  ],
+  "leaves": [
+    {
+      "path": "is_paid",
+      "physical_type": "BOOLEAN",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "quantity",
+      "physical_type": "INT32",
+      "logical_type": "Int(bitWidth=8, isSigned=true)",
+      "converted_type": "INT_8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "store_id",
+      "physical_type": "INT32",
+      "logical_type": "Int(bitWidth=16, isSigned=false)",
+      "converted_type": "UINT_16",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "weight_kg",
+      "physical_type": "FLOAT",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount",
+      "physical_type": "FIXED_LEN_BYTE_ARRAY",
+      "logical_type": "Decimal(precision=9, scale=2)",
+      "converted_type": "DECIMAL",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "order_date",
+      "physical_type": "INT32",
+      "logical_type": "Date",
+      "converted_type": "DATE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "paid_at",
+      "physical_type": "INT64",
+      "logical_type": "Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false)",
+      "converted_type": "TIMESTAMP_MICROS",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "shipping.city",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 2,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "shipping.postcode",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 2,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {
+      "is_paid": true,
+      "quantity": 1,
+      "store_id": 7,
+      "order_id": 1,
+      "weight_kg": 0.5,
+      "amount": "19.99",
+      "country": "UK",
+      "order_date": "2026-01-03",
+      "paid_at": "2026-01-03 09:30:00+00:00",
+      "shipping": {
+        "city": "Leeds",
+        "postcode": "LS1"
+      }
+    },
+    {
+      "is_paid": false,
+      "quantity": 3,
+      "store_id": 65000,
+      "order_id": 2,
+      "weight_kg": 1.25,
+      "amount": "5.00",
+      "country": null,
+      "order_date": "2026-01-04",
+      "paid_at": "2026-01-04 17:05:00+00:00",
+      "shipping": null
+    },
+    {
+      "is_paid": true,
+      "quantity": 2,
+      "store_id": 12,
+      "order_id": 3,
+      "weight_kg": 2.0,
+      "amount": "42.10",
+      "country": "PL",
+      "order_date": "2026-01-05",
+      "paid_at": "2026-01-05 00:00:00+00:00",
+      "shipping": {
+        "city": "Krak\u00f3w",
+        "postcode": null
+      }
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 3,
+      "total_byte_size": 655,
+      "columns": [
+        {
+          "path": "is_paid",
+          "physical_type": "BOOLEAN",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 36,
+          "total_uncompressed_size": 36,
+          "statistics": {
+            "min": false,
+            "max": true,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "quantity",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 40,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 59,
+          "total_uncompressed_size": 59,
+          "statistics": {
+            "min": 1,
+            "max": 3,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "store_id",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 99,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 47,
+          "total_uncompressed_size": 47,
+          "statistics": {
+            "min": 7,
+            "max": 65000,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 146,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 87,
+          "total_uncompressed_size": 87,
+          "statistics": {
+            "min": 1,
+            "max": 3,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "weight_kg",
+          "physical_type": "FLOAT",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 233,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 59,
+          "total_uncompressed_size": 59,
+          "statistics": {
+            "min": 0.5,
+            "max": 2.0,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount",
+          "physical_type": "FIXED_LEN_BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 292,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 59,
+          "total_uncompressed_size": 59,
+          "statistics": {
+            "min": "5.00",
+            "max": "42.10",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 351,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 49,
+          "total_uncompressed_size": 49,
+          "statistics": {
+            "min": "PL",
+            "max": "UK",
+            "null_count": 1
+          }
+        },
+        {
+          "path": "order_date",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 400,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 59,
+          "total_uncompressed_size": 59,
+          "statistics": {
+            "min": "2026-01-03",
+            "max": "2026-01-05",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "paid_at",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 459,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 87,
+          "total_uncompressed_size": 87,
+          "statistics": {
+            "min": "2026-01-03 09:30:00+00:00",
+            "max": "2026-01-05 00:00:00+00:00",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "shipping.city",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 546,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 66,
+          "total_uncompressed_size": 66,
+          "statistics": {
+            "min": "Krak\u00f3w",
+            "max": "Leeds",
+            "null_count": 1
+          }
+        },
+        {
+          "path": "shipping.postcode",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 3,
+          "data_page_offset": 612,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 47,
+          "total_uncompressed_size": 47,
+          "statistics": {
+            "min": "LS1",
+            "max": "LS1",
+            "null_count": 2
+          }
+        }
+      ]
+    }
+  ]
+}

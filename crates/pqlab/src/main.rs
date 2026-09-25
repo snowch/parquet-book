@@ -4,6 +4,7 @@
 //! pqlab inspect FILE                 the structure of a file, as an indented tree
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
+//! pqlab schema FILE                  the schema: flat, rebuilt, and read through logical types
 //! pqlab interpret FILE OFFSET        every reading of the bytes at OFFSET, as JSON
 //! pqlab layouts --columns 2,3 [--row N]
 //!                                    ch01's row and column layouts, queried, as JSON
@@ -31,6 +32,7 @@ const USAGE: &str = "usage:
   pqlab inspect FILE
   pqlab footer FILE [--size head|known|suffix] [--prefetch BYTES] [--latency-us N] [--bandwidth BYTES_PER_SEC] [--json]
   pqlab structure FILE
+  pqlab schema FILE
   pqlab interpret FILE OFFSET
   pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
   pqlab figures [--out DIR] [--check]";
@@ -71,6 +73,9 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "schema" => {
+            println!("{}", report::schema(&read(file()?)?).to_json_pretty());
+        }
         "structure" => {
             println!("{}", report::structure(&read(file()?)?).to_json_pretty());
         }
