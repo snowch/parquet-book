@@ -1,0 +1,735 @@
+{
+  "name": "statistics",
+  "file": "statistics.parquet",
+  "why": "Twelve orders in three row groups, with a column for each way a reader can misread statistics: unsigned integers above 2^31, negative small integers, strings with non-ASCII bytes, floats with NaN and signed zeros, negative decimals, a column that is null throughout one row group, and a column written without statistics. The row groups declare that they are sorted by order_id.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": [
+        "order_id",
+        "customer_id",
+        "delta",
+        "city",
+        "temp_c",
+        "amount",
+        "coupon"
+      ],
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false,
+      "row_group_size": 4,
+      "sorting_columns": [
+        {
+          "column_index": 0,
+          "descending": false,
+          "nulls_first": false
+        }
+      ]
+    }
+  },
+  "file_size": 3911,
+  "sha256": "5954be0a5dbc9bf1620067ed9ccd85b916f6d0e1cc0926bda29d0eb45db0af0e",
+  "footer_length": 2139,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 12,
+  "num_columns": 8,
+  "num_row_groups": 3,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": true
+    },
+    {
+      "name": "customer_id",
+      "type": "uint32",
+      "nullable": true
+    },
+    {
+      "name": "delta",
+      "type": "int8",
+      "nullable": true
+    },
+    {
+      "name": "city",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "temp_c",
+      "type": "double",
+      "nullable": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal128(9, 2)",
+      "nullable": true
+    },
+    {
+      "name": "coupon",
+      "type": "string",
+      "nullable": true
+    },
+    {
+      "name": "note",
+      "type": "string",
+      "nullable": true
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "customer_id",
+      "physical_type": "INT32",
+      "logical_type": "Int(bitWidth=32, isSigned=false)",
+      "converted_type": "UINT_32",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "delta",
+      "physical_type": "INT32",
+      "logical_type": "Int(bitWidth=8, isSigned=true)",
+      "converted_type": "INT_8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "city",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "temp_c",
+      "physical_type": "DOUBLE",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount",
+      "physical_type": "FIXED_LEN_BYTE_ARRAY",
+      "logical_type": "Decimal(precision=9, scale=2)",
+      "converted_type": "DECIMAL",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "coupon",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "note",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 1,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "customer_id": 7,
+      "delta": -5,
+      "city": "Leeds",
+      "temp_c": 12.5,
+      "amount": "19.99",
+      "coupon": "SPRING",
+      "note": "gift"
+    },
+    {
+      "order_id": 2,
+      "customer_id": 3000000000,
+      "delta": 3,
+      "city": "\u0141\u00f3d\u017a",
+      "temp_c": "NaN",
+      "amount": "-5.00",
+      "coupon": null,
+      "note": null
+    },
+    {
+      "order_id": 3,
+      "customer_id": 42,
+      "delta": -120,
+      "city": "Z\u00fcrich",
+      "temp_c": -3.0,
+      "amount": "42.10",
+      "coupon": "SPRING",
+      "note": ""
+    },
+    {
+      "order_id": 4,
+      "customer_id": 2147483648,
+      "delta": 7,
+      "city": "Aarhus",
+      "temp_c": 3.0,
+      "amount": "-0.50",
+      "coupon": "WELCOME",
+      "note": "leave at door"
+    },
+    {
+      "order_id": 5,
+      "customer_id": 15,
+      "delta": 0,
+      "city": "Oslo",
+      "temp_c": 0.0,
+      "amount": "7.25",
+      "coupon": null,
+      "note": null
+    },
+    {
+      "order_id": 6,
+      "customer_id": 99,
+      "delta": 9,
+      "city": "\u00c5rhus",
+      "temp_c": -0.0,
+      "amount": "3.00",
+      "coupon": null,
+      "note": "gift"
+    },
+    {
+      "order_id": 7,
+      "customer_id": 4000000000,
+      "delta": -1,
+      "city": "Bergen",
+      "temp_c": 20.0,
+      "amount": "-19.99",
+      "coupon": null,
+      "note": ""
+    },
+    {
+      "order_id": 8,
+      "customer_id": 8,
+      "delta": 100,
+      "city": "\u00c9cija",
+      "temp_c": "NaN",
+      "amount": "0.01",
+      "coupon": null,
+      "note": ""
+    },
+    {
+      "order_id": 9,
+      "customer_id": 1,
+      "delta": 12,
+      "city": "Malm\u00f6",
+      "temp_c": 7.5,
+      "amount": "12.00",
+      "coupon": "SUMMER",
+      "note": null
+    },
+    {
+      "order_id": 10,
+      "customer_id": 2,
+      "delta": -3,
+      "city": "York",
+      "temp_c": 1.0,
+      "amount": "-100.00",
+      "coupon": null,
+      "note": "fragile"
+    },
+    {
+      "order_id": 11,
+      "customer_id": 3,
+      "delta": 4,
+      "city": "\u00c4ngelholm",
+      "temp_c": 2.0,
+      "amount": "8.40",
+      "coupon": "SUMMER",
+      "note": ""
+    },
+    {
+      "order_id": 12,
+      "customer_id": 2500000000,
+      "delta": 5,
+      "city": "Cork",
+      "temp_c": 4.5,
+      "amount": "1.10",
+      "coupon": null,
+      "note": "gift"
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 4,
+      "total_byte_size": 615,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": 1,
+            "max": 4,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "customer_id",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 105,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 57,
+          "total_uncompressed_size": 57,
+          "statistics": {
+            "min": 7,
+            "max": 3000000000,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "delta",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 162,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": -120,
+            "max": 7,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "city",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 231,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 87,
+          "total_uncompressed_size": 87,
+          "statistics": {
+            "min": "Aarhus",
+            "max": "\u0141\u00f3d\u017a",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "temp_c",
+          "physical_type": "DOUBLE",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 318,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": -3.0,
+            "max": 12.5,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount",
+          "physical_type": "FIXED_LEN_BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 419,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": "-5.00",
+            "max": "42.10",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "coupon",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 488,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 77,
+          "total_uncompressed_size": 77,
+          "statistics": {
+            "min": "SPRING",
+            "max": "WELCOME",
+            "null_count": 1
+          }
+        },
+        {
+          "path": "note",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 565,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 54,
+          "total_uncompressed_size": 54,
+          "statistics": null
+        }
+      ]
+    },
+    {
+      "num_rows": 4,
+      "total_byte_size": 548,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 619,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": 5,
+            "max": 8,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "customer_id",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 720,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 57,
+          "total_uncompressed_size": 57,
+          "statistics": {
+            "min": 8,
+            "max": 4000000000,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "delta",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 777,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": -1,
+            "max": 100,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "city",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 846,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 83,
+          "total_uncompressed_size": 83,
+          "statistics": {
+            "min": "Bergen",
+            "max": "\u00c9cija",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "temp_c",
+          "physical_type": "DOUBLE",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 929,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": -0.0,
+            "max": 20.0,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount",
+          "physical_type": "FIXED_LEN_BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1030,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": "-19.99",
+            "max": "7.25",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "coupon",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1099,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 27,
+          "total_uncompressed_size": 27,
+          "statistics": {
+            "min": null,
+            "max": null,
+            "null_count": 4
+          }
+        },
+        {
+          "path": "note",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1126,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 41,
+          "total_uncompressed_size": 41,
+          "statistics": null
+        }
+      ]
+    },
+    {
+      "num_rows": 4,
+      "total_byte_size": 597,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1167,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": 9,
+            "max": 12,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "customer_id",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1268,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 57,
+          "total_uncompressed_size": 57,
+          "statistics": {
+            "min": 1,
+            "max": 2500000000,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "delta",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1325,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": -3,
+            "max": 12,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "city",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1394,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 87,
+          "total_uncompressed_size": 87,
+          "statistics": {
+            "min": "Cork",
+            "max": "\u00c4ngelholm",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "temp_c",
+          "physical_type": "DOUBLE",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1481,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 101,
+          "total_uncompressed_size": 101,
+          "statistics": {
+            "min": 1.0,
+            "max": 7.5,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount",
+          "physical_type": "FIXED_LEN_BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1582,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 69,
+          "total_uncompressed_size": 69,
+          "statistics": {
+            "min": "-100.00",
+            "max": "12.00",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "coupon",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1651,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 65,
+          "total_uncompressed_size": 65,
+          "statistics": {
+            "min": "SUMMER",
+            "max": "SUMMER",
+            "null_count": 2
+          }
+        },
+        {
+          "path": "note",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 1716,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 48,
+          "total_uncompressed_size": 48,
+          "statistics": null
+        }
+      ]
+    }
+  ]
+}

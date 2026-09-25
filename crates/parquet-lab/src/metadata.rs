@@ -98,12 +98,24 @@ pub struct SchemaElement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Statistics {
+    /// `min_value` and `max_value`: the smallest and largest value in the column's own sort
+    /// order (ch08), PLAIN-encoded without a length prefix.
     pub min_value: Option<Vec<u8>>,
     pub max_value: Option<Vec<u8>>,
     /// Where the minimum's value bytes are, after their length prefix.
     pub min_span: Option<Span>,
     pub max_span: Option<Span>,
+    /// `min` and `max`: the deprecated fields, computed with signed comparison whatever the
+    /// type. A reader may use them only where signed comparison is the right order (ch08).
+    pub min: Option<Vec<u8>>,
+    pub max: Option<Vec<u8>>,
+    pub min_deprecated_span: Option<Span>,
+    pub max_deprecated_span: Option<Span>,
     pub null_count: Option<i64>,
+    pub distinct_count: Option<i64>,
+    /// False when a writer shortened a long value: the bound is then not a value in the column.
+    pub is_min_value_exact: Option<bool>,
+    pub is_max_value_exact: Option<bool>,
     pub span: Span,
 }
 
@@ -148,7 +160,17 @@ pub struct RowGroup {
     pub num_rows: i64,
     pub total_byte_size: i64,
     pub columns: Vec<ColumnChunk>,
+    /// The columns the writer says each row group is sorted by, in order (ch08). A claim, not
+    /// something the reader checks.
+    pub sorting_columns: Vec<SortingColumn>,
     pub span: Span,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SortingColumn {
+    pub column: i64,
+    pub descending: bool,
+    pub nulls_first: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -166,6 +188,10 @@ pub struct FileMetaData {
     pub row_groups: Vec<RowGroup>,
     pub key_value_metadata: Vec<KeyValue>,
     pub created_by: Option<String>,
+    /// One entry per leaf column: the order `min_value` and `max_value` use. `TYPE_ORDER` is the
+    /// one this reader knows. `None` when the footer has no `column_orders`, in which case the order of
+    /// those fields is undefined (ch08).
+    pub column_orders: Option<Vec<String>>,
     /// The decoded Thrift tree the fields above were taken from. Kept, because the browser
     /// shows every field, including the ones this struct does not name.
     pub tree: Node,
@@ -214,6 +240,21 @@ pub fn decode_file_metadata(footer: &[u8], base: u64) -> Result<FileMetaData, Me
             None => Vec::new(),
         },
         created_by: opt_str(s, 6),
+        column_orders: opt_list(s, 7).map(|items| {
+            items
+                .iter()
+                .map(|n| match &n.value {
+                    // A union: a struct with exactly one field set. Field 1 is TYPE_ORDER.
+                    Value::Struct(u) if u.field(1).is_some() => "TYPE_ORDER".to_string(),
+                    Value::Struct(u) => u
+                        .fields
+                        .first()
+                        .map(|f| format!("UNKNOWN({})", f.id))
+                        .unwrap_or_else(|| "UNKNOWN".into()),
+                    _ => "UNKNOWN".into(),
+                })
+                .collect()
+        }),
         tree,
     })
 }
@@ -245,6 +286,21 @@ fn row_group(node: &Node) -> Result<RowGroup, MetadataError> {
             .collect::<Result<_, _>>()?,
         total_byte_size: req_int(s, RG, 2, "total_byte_size", node.span)?,
         num_rows: req_int(s, RG, 3, "num_rows", node.span)?,
+        sorting_columns: opt_list(s, 4)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|n| match &n.value {
+                        Value::Struct(c) => Some(SortingColumn {
+                            column: opt_int(c, 1)?,
+                            descending: opt_bool(c, 2).unwrap_or(false),
+                            nulls_first: opt_bool(c, 3).unwrap_or(false),
+                        }),
+                        _ => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default(),
         span: node.span,
     })
 }
@@ -299,14 +355,21 @@ fn column_chunk(node: &Node) -> Result<ColumnChunk, MetadataError> {
 pub(crate) fn statistics(node: &Node) -> Result<Statistics, MetadataError> {
     let s = as_struct(node)?;
     Ok(Statistics {
-        // min_value and max_value (fields 6 and 5) replaced min and max (2 and 1), whose sort
-        // order was never specified. A reader that falls back to the old fields has to know
-        // what order the writer used; this one reports them only when the new ones are absent.
-        min_value: opt_bytes(s, 6).or_else(|| opt_bytes(s, 2)),
-        max_value: opt_bytes(s, 5).or_else(|| opt_bytes(s, 1)),
-        min_span: value_span(s, 6).or_else(|| value_span(s, 2)),
-        max_span: value_span(s, 5).or_else(|| value_span(s, 1)),
+        // min_value and max_value (fields 6 and 5) replaced min and max (2 and 1), whose order
+        // was signed comparison whatever the type. The two pairs are kept apart: which one a
+        // reader may use depends on the column's sort order (see crate::stats).
+        min_value: opt_bytes(s, 6),
+        max_value: opt_bytes(s, 5),
+        min_span: value_span(s, 6),
+        max_span: value_span(s, 5),
+        min: opt_bytes(s, 2),
+        max: opt_bytes(s, 1),
+        min_deprecated_span: value_span(s, 2),
+        max_deprecated_span: value_span(s, 1),
         null_count: opt_int(s, 3),
+        distinct_count: opt_int(s, 4),
+        is_max_value_exact: opt_bool(s, 7),
+        is_min_value_exact: opt_bool(s, 8),
         span: node.span,
     })
 }

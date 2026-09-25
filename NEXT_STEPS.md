@@ -55,18 +55,28 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: the compression panel (sizes per chunk, tokens stepped against the rebuilt page).
 - Problems 7.1 (Snappy) and 7.2 (LZ4) with tests; 7.3 open.
 
-## Next: ch08, metadata and statistics
+## Done: ch08, metadata and statistics
 
-1. Fixture `statistics.parquet`: signed and unsigned integers, strings with non-ASCII bytes,
-   floats with NaN and negative zero, a column without statistics, and deprecated `min`/`max`
-   beside `min_value`/`max_value`.
-2. Reader: sort orders from logical types; which statistics a reader may trust and why.
-3. Experiment: a footer's statistics, per row group, with the comparisons a reader would make.
+- Reader: `stats.rs` (a comparator for every type, the mistaken order for each, and `bounds`,
+  the rules for which statistics a reader may use); `Statistics` keeps the deprecated `min` and
+  `max` apart from `min_value` and `max_value`; `column_orders` and `sorting_columns` decoded.
+- Fixture `statistics.parquet`. The reader's orders reproduce pyarrow's bounds for every column
+  chunk of every fixture. NaN is written to JSON as `"NaN"` instead of `null`.
+- Experiment: the statistics panel. Problems 8.1 (sort orders) and 8.2 (which bounds); 8.3 open.
+
+## Next: ch09, skipping data
+
+1. Fixture `pruning.parquet`: sorted and unsorted copies of the same rows, many row groups,
+   page indexes (`write_page_index=True`), and Bloom filters if pyarrow 25 writes them.
+2. Reader: predicates (`=`, `<`, `>`, `IN`, `IS NULL`) evaluated against bounds with three
+   answers (cannot match, may match, all match); ColumnIndex and OffsetIndex; Bloom filter probes.
+3. Experiment: a predicate builder showing, row group by row group and page by page, what is
+   skipped and why, and the bytes a reader would still fetch.
 
 ## Then
 
-- **ch09 to ch10**: `pruning.parquet`; pruning decisions, page indexes, Bloom filters; request
-  coalescing and concurrency in `TracingStore` (a clock per connection).
+- **ch10**: request coalescing and concurrency in `TracingStore` (a clock per connection); the
+  cost of large footers.
 - **ch11**: writing well, measured: row group and page sizes, sorting, dictionary fallback.
 - **ch12**: a tiny query engine over the reader.
 

@@ -5,6 +5,8 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab statistics FILE ROW_GROUP COLUMN
+//!                                    every chunk's statistics, and one in detail
 //! pqlab compression FILE COLUMN [PAGE]
 //!                                    the codec's effect, and one page decompressed
 //! pqlab encodings FILE COLUMN       how one column's values are encoded, step by step
@@ -25,6 +27,17 @@
 
 mod figures;
 
+/// `println!`, except that a closed pipe ends the program quietly. `pqlab inspect FILE | head`
+/// closes stdout early, and that is not an error.
+macro_rules! out {
+    ($($t:tt)*) => {{
+        use std::io::Write;
+        if writeln!(std::io::stdout(), $($t)*).is_err() {
+            std::process::exit(0);
+        }
+    }};
+}
+
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -41,6 +54,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab statistics FILE ROW_GROUP COLUMN
   pqlab compression FILE COLUMN [PAGE]
   pqlab interpret FILE OFFSET
   pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
@@ -82,6 +96,19 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "statistics" => {
+            let number = |i: usize, what: &str| -> Result<usize, String> {
+                args.get(i)
+                    .ok_or(format!("statistics needs a {what} number"))?
+                    .parse()
+                    .map_err(|_| format!("{what} must be a whole number"))
+            };
+            let (row_group, column) = (number(2, "ROW_GROUP")?, number(3, "COLUMN")?);
+            out!(
+                "{}",
+                report::statistics(&read(file()?)?, row_group, column).to_json_pretty()
+            );
+        }
         "compression" => {
             let column: usize = args
                 .get(2)
@@ -92,7 +119,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 Some(p) => Some(p.parse().map_err(|_| "PAGE must be a whole number")?),
                 None => None,
             };
-            println!(
+            out!(
                 "{}",
                 report::compression(&read(file()?)?, column, page).to_json_pretty()
             );
@@ -103,7 +130,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .ok_or("pages needs a COLUMN number")?
                 .parse()
                 .map_err(|_| "COLUMN must be a whole number")?;
-            println!(
+            out!(
                 "{}",
                 report::pages(&read(file()?)?, column).to_json_pretty()
             );
@@ -114,7 +141,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .ok_or("encodings needs a COLUMN number")?
                 .parse()
                 .map_err(|_| "COLUMN must be a whole number")?;
-            println!(
+            out!(
                 "{}",
                 report::encodings(&read(file()?)?, column).to_json_pretty()
             );
@@ -125,16 +152,16 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .ok_or("levels needs a COLUMN number")?
                 .parse()
                 .map_err(|_| "COLUMN must be a whole number")?;
-            println!(
+            out!(
                 "{}",
                 report::levels(&read(file()?)?, column).to_json_pretty()
             );
         }
         "schema" => {
-            println!("{}", report::schema(&read(file()?)?).to_json_pretty());
+            out!("{}", report::schema(&read(file()?)?).to_json_pretty());
         }
         "structure" => {
-            println!("{}", report::structure(&read(file()?)?).to_json_pretty());
+            out!("{}", report::structure(&read(file()?)?).to_json_pretty());
         }
         "interpret" => {
             let offset: u64 = args
@@ -142,7 +169,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .ok_or("interpret needs an OFFSET")?
                 .parse()
                 .map_err(|_| "OFFSET must be a whole number")?;
-            println!(
+            out!(
                 "{}",
                 report::interpret(&read(file()?)?, offset).to_json_pretty()
             );
@@ -182,7 +209,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                 .unwrap_or_else(|| path.to_string());
             let json = report::footer_lab(&bytes, &key, options, model);
             if args.iter().any(|a| a == "--json") {
-                println!("{}", json.to_json_pretty());
+                out!("{}", json.to_json_pretty());
             } else {
                 print_footer(&json);
             }
@@ -218,7 +245,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
                     defaults.bandwidth_bytes_per_sec,
                 )?,
             };
-            println!("{}", report::layouts(mask, row, model).to_json_pretty());
+            out!("{}", report::layouts(mask, row, model).to_json_pretty());
         }
         "figures" => {
             let out = PathBuf::from(flag(args, "--out").unwrap_or("chapters/_generated"));
@@ -247,7 +274,7 @@ fn span(j: Option<&Json>) -> String {
 
 fn print_tree(node: &Json, depth: usize) {
     let value = text(node.get("value"));
-    println!(
+    out!(
         "{:indent$}{} {}{}",
         "",
         text(node.get("label")),
@@ -269,7 +296,7 @@ fn print_tree(node: &Json, depth: usize) {
 fn print_footer(j: &Json) {
     if let Some(Json::Arr(requests)) = j.get("requests") {
         for r in requests {
-            println!(
+            out!(
                 "{:>2}. {:<4} {:<22} {:>6} B  {:>8.1} ms  {}",
                 text(r.get("seq")),
                 text(r.get("method")),
@@ -285,7 +312,7 @@ fn print_footer(j: &Json) {
     }
     if j.get("ok") == Some(&Json::Bool(true)) {
         let t = j.get("trailer").unwrap();
-        println!(
+        out!(
             "footer length {} → footer {} ({}prefetched)",
             text(t.get("footer_length")),
             span(j.get("footer").and_then(|f| f.get("span"))),
@@ -296,6 +323,6 @@ fn print_footer(j: &Json) {
             }
         );
     } else {
-        println!("error: {}", text(j.get("error")));
+        out!("error: {}", text(j.get("error")));
     }
 }

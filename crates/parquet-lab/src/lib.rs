@@ -13,6 +13,7 @@
 //! | [`parquet_thrift`] | the names `parquet.thrift` gives to field ids | ch03 |
 //! | [`logical`] | logical types, and what they make of a value's bytes | ch03 |
 //! | [`metadata`] | `FileMetaData` as Rust types | ch03, ch08 |
+//! | [`stats`] | sort orders, and which statistics a reader may use | ch08 |
 //! | [`schema`] | the schema tree, leaf paths, and maximum levels | ch03 |
 //! | [`pages`] | walking a column chunk's page headers | ch06 |
 //! | [`rle`] | the RLE / bit-packing hybrid, for levels and indices | ch04, ch05 |
@@ -31,7 +32,8 @@
 //!
 //! The book grows this crate chapter by chapter, and `PLAN.md` lists what each chapter adds.
 //! Today it finds and decodes the footer, walks pages, decompresses SNAPPY, LZ4_RAW and GZIP
-//! pages, and decodes every encoding writers use. It does not decompress ZSTD or BROTLI, evaluate
+//! pages, decodes every encoding writers use, and checks statistics against their types' sort
+//! orders. It does not decompress ZSTD or BROTLI, evaluate
 //! predicates, or decrypt. A file that needs any of those still
 //! opens, and the missing step is reported as missing rather than guessed at.
 //!
@@ -58,4 +60,5 @@ pub mod reader;
 pub mod report;
 pub mod rle;
 pub mod schema;
+pub mod stats;
 pub mod thrift;

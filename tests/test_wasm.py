@@ -88,6 +88,10 @@ def cases():
             native.append(("pages", f, str(column)))
             calls.append({"call": "compression", "file": f, "column": column})
             native.append(("compression", f, str(column)))
+        for row_group in range(3):
+            for column in range(0, 12, 2):
+                calls.append({"call": "statistics", "file": f, "row_group": row_group, "column": column})
+                native.append(("statistics", f, str(row_group), str(column)))
         for page in range(4):
             calls.append({"call": "compression", "file": f, "column": 1, "page": page})
             native.append(("compression", f, "1", str(page)))

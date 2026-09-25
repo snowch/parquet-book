@@ -185,9 +185,9 @@ _CHAPTERS = (
         "Metadata and statistics",
         "reading_less",
         "What does the footer know that lets a reader avoid reading the data?",
-        "Column statistics decoded and compared, with their sort-order pitfalls.",
-        (),
-        (),
+        "Sort orders for every type, and the rules for which statistics a reader may use.",
+        ("statistics",),
+        ("statistics.parquet", "types.parquet"),
     ),
     (
         "skipping_data",
@@ -279,4 +279,5 @@ EXPERIMENTS = (
     "encodings",
     "pages",
     "compression",
+    "statistics",
 )

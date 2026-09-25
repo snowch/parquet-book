@@ -115,6 +115,22 @@ const FIGURES: &[Figure] = &[
         render: page_header_fields,
     },
     Figure {
+        file: "statistics-grid.md",
+        render: statistics_grid,
+    },
+    Figure {
+        file: "statistics-fields.md",
+        render: statistics_fields,
+    },
+    Figure {
+        file: "statistics-mistakes.md",
+        render: statistics_mistakes,
+    },
+    Figure {
+        file: "statistics-cost.md",
+        render: statistics_cost,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -1278,4 +1294,178 @@ fn first_page(
         page.uncompressed_page_size as usize,
     )?;
     Ok(((chunk.codec.clone(), page.body_span.len()), d))
+}
+
+const STATS: &str = "statistics.parquet";
+
+fn arr(j: Option<&Json>) -> Vec<Json> {
+    j.and_then(Json::as_array).cloned().unwrap_or_default()
+}
+
+/// `|` would end a table cell.
+fn cell(s: &str) -> String {
+    s.replace('|', "\\|")
+}
+
+fn statistics_grid(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, STATS)?;
+    let r = parquet_lab::report::statistics(&bytes, 0, 0);
+    let groups = arr(r.get("row_groups"));
+    let mut rows = vec![
+        format!(
+            "| Column | Order | {} |",
+            (0..groups.len())
+                .map(|g| format!("Row group {g}"))
+                .collect::<Vec<_>>()
+                .join(" | ")
+        ),
+        format!("|---|---|{}", "---|".repeat(groups.len())),
+    ];
+    for c in arr(r.get("columns")) {
+        let chunks: Vec<String> = arr(c.get("chunks"))
+            .iter()
+            .map(|k| {
+                if matches!(k.get("usable"), Some(Json::Bool(true))) {
+                    format!(
+                        "{} … {}",
+                        cell(&text_of(k.get("min"))),
+                        cell(&text_of(k.get("max")))
+                    )
+                } else if text_of(k.get("reason")).starts_with("every value is null") {
+                    "all null".to_string()
+                } else {
+                    "none".to_string()
+                }
+            })
+            .collect();
+        rows.push(format!(
+            "| `{}` | {} | {} |",
+            text_of(c.get("path")),
+            text_of(c.get("order")),
+            chunks.join(" | ")
+        ));
+    }
+    Ok(format!(
+        "{}\n{}",
+        rows.join("\n"),
+        conditions(STATS, &bytes, None)
+    ))
+}
+
+fn statistics_fields(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, STATS)?;
+    let md = open_bytes(&bytes)?;
+    let rg = &md.row_groups[0];
+    let tick = |b: bool| if b { "yes" } else { "·" };
+    let mut rows = vec![
+        "| Column | Order | `min_value`, `max_value` | `min`, `max` (deprecated) | `null_count` | exact flags |"
+            .to_string(),
+        "|---|---|---|---|--:|---|".to_string(),
+    ];
+    let r = parquet_lab::report::statistics(&bytes, 0, 0);
+    for (c, j) in rg.columns.iter().zip(arr(r.get("columns"))) {
+        let s = c.statistics.as_ref();
+        rows.push(format!(
+            "| `{}` | {} | {} | {} | {} | {} |",
+            c.dotted_path(),
+            text_of(j.get("order")),
+            tick(s.is_some_and(|s| s.min_value.is_some())),
+            tick(s.is_some_and(|s| s.min.is_some())),
+            s.and_then(|s| s.null_count)
+                .map(|n| n.to_string())
+                .unwrap_or("·".into()),
+            tick(s.is_some_and(|s| s.is_min_value_exact.is_some())),
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Row group 0 of `fixtures/{STATS}`, as its footer records it. `·` means the field is \
+         absent.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn statistics_mistakes(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, STATS)?;
+    let md = open_bytes(&bytes)?;
+    let mut rows = vec![
+        "| Column | Row group | The footer, in the column's order | The mistaken order | What it gives |"
+            .to_string(),
+        "|---|--:|---|---|---|".to_string(),
+    ];
+    let n = parquet_lab::report::statistics(&bytes, 0, 0)
+        .get("columns")
+        .and_then(Json::as_array)
+        .map(|a| a.len())
+        .unwrap_or(0);
+    for column in 0..n {
+        // The first row group where the mistake changes the answer.
+        for g in 0..md.row_groups.len() {
+            let r = parquet_lab::report::statistics(&bytes, g, column);
+            let sel = r.get("selected").cloned().unwrap_or(Json::Null);
+            let values = sel.get("values").cloned().unwrap_or(Json::Null);
+            let (Some(obs), Some(m)) = (values.get("observed"), values.get("mistake")) else {
+                continue;
+            };
+            let Some(res) = m.get("result") else { continue };
+            let pair = |j: &Json| {
+                format!(
+                    "{} … {}",
+                    cell(&text_of(j.get("min"))),
+                    cell(&text_of(j.get("max")))
+                )
+            };
+            if pair(obs) == pair(res) {
+                continue;
+            }
+            rows.push(format!(
+                "| `{}` | {g} | {} | {} | {} |",
+                text_of(sel.get("path")),
+                pair(obs),
+                text_of(m.get("comparator")),
+                pair(res)
+            ));
+            break;
+        }
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the values it decoded from `fixtures/{STATS}`. The \
+         footer's minimum and maximum equal the first column in every row.*\n",
+        rows.join("\n")
+    ))
+}
+
+fn statistics_cost(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| File | File bytes | Footer bytes | Statistics in the footer | Column chunks |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|".to_string(),
+    ];
+    for name in [STATS, "codec-none.parquet"] {
+        let bytes = fixture(root, name)?;
+        let md = open_bytes(&bytes)?;
+        let size = bytes.len() as u64;
+        let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
+        let footer = parse_trailer(last8, size)
+            .map_err(|e| e.to_string())?
+            .footer_length;
+        let chunks: Vec<_> = md.row_groups.iter().flat_map(|rg| &rg.columns).collect();
+        let stats: u64 = chunks
+            .iter()
+            .filter_map(|c| c.statistics.as_ref())
+            .map(|s| s.span.len())
+            .sum();
+        rows.push(format!(
+            "| `{name}` | {} | {} | {} | {} |",
+            thousands(size),
+            thousands(footer as u64),
+            thousands(stats),
+            chunks.len()
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader from the fixtures' footers. Statistics bytes are the \
+         `Statistics` structures in the column chunks' metadata; page headers carry their own \
+         copies, which are not counted.*\n",
+        rows.join("\n")
+    ))
 }

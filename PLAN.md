@@ -36,7 +36,7 @@ needs it, and each is finished, tested and quoted before the chapters that use i
 | 1 | magic, trailer, footer discovery over an object store, Thrift compact decoding, `FileMetaData`, schema, row groups, column chunks, page headers | ch01, ch02, ch03 | done |
 | 2 | PLAIN, dictionary, RLE/bit-packing hybrid, delta encodings, BYTE_STREAM_SPLIT; levels | ch04, ch05 | done |
 | 3 | page walking with values, data page v1 and v2, decompression | ch06, ch07 | done; ZSTD and Brotli sizes only |
-| 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | to do |
+| 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | statistics done; pruning to do |
 | 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | object store and trace done; the rest to do |
 | 6 | encrypted modules, multi-file datasets, manifests | ch13, ch14 | to do |
 

@@ -1,8 +1,8 @@
 //! Encodings: how values become bytes (ch05).
 //!
-//! So far this holds one thing: reading a single PLAIN-encoded value, which is how the footer
-//! stores a column's minimum and maximum. Decoding whole pages of PLAIN, dictionary,
-//! RLE/bit-packed and delta-encoded values arrives with ch05.
+//! This holds the one-value readers: a single PLAIN-encoded value, which is how the footer stores
+//! a column's minimum and maximum, and bytes as hex. Whole pages are decoded by
+//! [`crate::plain`], [`crate::decode`] and [`crate::delta`].
 
 use crate::bytes::read_le_u32;
 use crate::metadata::PhysicalType;

@@ -17,6 +17,9 @@ named in the chunk's metadata: SNAPPY, GZIP, LZ4_RAW, ZSTD, BROTLI, or UNCOMPRES
 **Column layout.** Storing all of a column's values together, then the next column's.
 [ch01](#why-parquet-exists)
 
+**Column order.** The footer's statement, column by column, of which sort order `min_value` and
+`max_value` use. Without it their order is undefined. [ch08](#metadata-and-statistics)
+
 **Data page version 2.** A data page whose header records the level streams' lengths, its rows and
 its nulls, and whose levels are never compressed. [ch06](#pages)
 
@@ -74,6 +77,12 @@ starts; zero starts a new record. [ch04](#nested-data)
 [ch02](#anatomy-of-a-parquet-file)
 
 **Row layout.** Storing each row's values together. [ch01](#why-parquet-exists)
+
+**Sort order.** The order a column's statistics use, fixed by its type: signed, unsigned, by value,
+or byte by byte. [ch08](#metadata-and-statistics)
+
+**Statistics.** A column chunk's or page's minimum, maximum and null count, kept in its metadata so
+a reader can decide not to read it. [ch08](#metadata-and-statistics)
 
 **Suffix range.** A range request for the last `n` bytes of an object, `Range: bytes=-n`. The
 response reports the object's size. [ch02](#anatomy-of-a-parquet-file)

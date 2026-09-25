@@ -233,6 +233,18 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch08's experiment: every column chunk's statistics, and one chunk's in detail. See
+/// `report::statistics`.
+#[no_mangle]
+pub extern "C" fn pl_statistics(id: u32, row_group: u32, column: u32) -> usize {
+    match with_file(id, |f| {
+        report::statistics(&f.bytes, row_group as usize, column as usize)
+    }) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch07's experiment: every column chunk's sizes, and one page decompressed token by token.
 /// `page` is the page's index in the first row group's chunk, or `u32::MAX` for the first data
 /// page. See `report::compression`.

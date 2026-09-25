@@ -499,6 +499,45 @@ data_page_version='1.0'
 write_page_index=False
 ```
 
+## `statistics.parquet`
+
+Twelve orders in three row groups, with a column for each way a reader can misread statistics: unsigned integers above 2^31, negative small integers, strings with non-ASCII bytes, floats with NaN and signed zeros, negative decimals, a column that is null throughout one row group, and a column written without statistics. The row groups declare that they are sorted by order_id.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 3911 bytes |
+| Rows | 12 |
+| Row groups | 3 |
+| Footer length | 2139 bytes |
+| SHA-256 | `5954be0a5dbc9bf1…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `customer_id` | INT32 | Int(bitWidth=32, isSigned=false) | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `delta` | INT32 | Int(bitWidth=8, isSigned=true) | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `city` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `temp_c` | DOUBLE | None | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount` | FIXED_LEN_BYTE_ARRAY | Decimal(precision=9, scale=2) | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `coupon` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `note` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=['order_id', 'customer_id', 'delta', 'city', 'temp_c', 'amount', 'coupon']
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+row_group_size=4
+sorting_columns=[{'column_index': 0, 'descending': False, 'nulls_first': False}]
+```
+
 ## `pages-v2-snappy.parquet`
 
 pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.

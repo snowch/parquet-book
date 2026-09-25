@@ -1467,3 +1467,300 @@ pub fn compression(file: &[u8], column: usize, page: Option<usize>) -> Json {
         ("decompressed", decoded),
     ])
 }
+
+/// A statistics value for display: through the column's logical type when it has one, then as
+/// its physical type, then as hex.
+fn stat_display(leaf: &crate::schema::Leaf, bytes: &[u8]) -> String {
+    leaf.logical_type
+        .as_ref()
+        .and_then(|l| crate::logical::interpret(leaf.physical_type, l, bytes))
+        .or_else(|| plain_scalar(leaf.physical_type, bytes))
+        .unwrap_or_else(|| hex(bytes))
+}
+
+/// A chunk whose every value is null has no minimum or maximum, and that is not a gap in the
+/// statistics: the null count says everything a reader needs.
+fn all_null(reason: String, null_count: Option<i64>, num_values: i64) -> String {
+    match null_count {
+        Some(n) if n == num_values && n > 0 => {
+            "every value is null, so there is no minimum or maximum; the null count alone rules \
+             the chunk out for any comparison with a value"
+                .into()
+        }
+        _ => reason,
+    }
+}
+
+/// Ch08's experiment: every column chunk's statistics, whether the reader may use them and
+/// why, and for one chunk every field, the values in the column's order, and what a mistaken
+/// order would have made of them.
+pub fn statistics(file: &[u8], row_group: usize, column: usize) -> Json {
+    use crate::column::read_column;
+    use crate::schema::{build, leaves};
+    use crate::stats::{bounds, Comparator, Source};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let comparator_of = |l: &crate::schema::Leaf| {
+        Comparator::for_leaf(l, md.schema[l.element].converted_type.as_deref())
+    };
+    let type_order = |l: &crate::schema::Leaf| {
+        md.column_orders
+            .as_ref()
+            .and_then(|o| o.get(l.column))
+            .is_some_and(|o| o == "TYPE_ORDER")
+    };
+    let source_name = |s: Source| match s {
+        Source::MinMaxValue => "min_value and max_value",
+        Source::Deprecated => "min and max (deprecated)",
+    };
+    let columns = Json::Arr(
+        all.iter()
+            .map(|l| {
+                let cmp = comparator_of(l);
+                let chunks = md
+                    .row_groups
+                    .iter()
+                    .enumerate()
+                    .map(|(g, rg)| {
+                        let c = &rg.columns[l.column];
+                        let verdict = match &c.statistics {
+                            Some(s) => bounds(s, cmp, type_order(l)),
+                            None => Err("the column chunk has no statistics".into()),
+                        };
+                        let null_count = c.statistics.as_ref().and_then(|s| s.null_count);
+                        let verdict = verdict.map_err(|e| all_null(e, null_count, c.num_values));
+                        match verdict {
+                            Ok(b) => obj([
+                                ("row_group", g.into()),
+                                ("usable", true.into()),
+                                ("min", stat_display(l, &b.min).into()),
+                                ("max", stat_display(l, &b.max).into()),
+                                ("source", source_name(b.source).into()),
+                                ("null_count", null_count.into()),
+                                ("num_rows", rg.num_rows.into()),
+                            ]),
+                            Err(reason) => obj([
+                                ("row_group", g.into()),
+                                ("usable", false.into()),
+                                ("reason", reason.into()),
+                                ("null_count", null_count.into()),
+                                ("num_rows", rg.num_rows.into()),
+                            ]),
+                        }
+                    })
+                    .collect();
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                    (
+                        "type",
+                        crate::schema::physical_word(l.physical_type, l.type_length).into(),
+                    ),
+                    (
+                        "logical",
+                        md.schema[l.element]
+                            .logical_type
+                            .as_ref()
+                            .map(|t| t.to_string())
+                            .into(),
+                    ),
+                    ("order", cmp.order().name().into()),
+                    ("comparator", cmp.name().into()),
+                    ("chunks", Json::Arr(chunks)),
+                ])
+            })
+            .collect(),
+    );
+    let row_groups = Json::Arr(
+        md.row_groups
+            .iter()
+            .enumerate()
+            .map(|(g, rg)| {
+                obj([
+                    ("index", g.into()),
+                    ("num_rows", rg.num_rows.into()),
+                    ("total_byte_size", rg.total_byte_size.into()),
+                    (
+                        "sorting_columns",
+                        Json::Arr(
+                            rg.sorting_columns
+                                .iter()
+                                .map(|s| {
+                                    obj([
+                                        ("column", s.column.into()),
+                                        (
+                                            "path",
+                                            all.get(s.column.max(0) as usize)
+                                                .map(|l| l.dotted_path())
+                                                .into(),
+                                        ),
+                                        ("descending", s.descending.into()),
+                                        ("nulls_first", s.nulls_first.into()),
+                                    ])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                ])
+            })
+            .collect(),
+    );
+    let (Some(leaf), Some(rg)) = (all.get(column), md.row_groups.get(row_group)) else {
+        return fail(format!("no column {column} in row group {row_group}"));
+    };
+    let chunk = &rg.columns[leaf.column];
+    let cmp = comparator_of(leaf);
+    // Every field of the Statistics struct the footer has, with the bytes that hold its value.
+    let mut fields = Vec::new();
+    if let Some(s) = &chunk.statistics {
+        let mut value = |name: &str, bytes: &Option<Vec<u8>>, span: Option<Span>| {
+            if let (Some(b), Some(sp)) = (bytes, span) {
+                fields.push(obj([
+                    ("name", name.into()),
+                    ("span", sp.into()),
+                    ("hex", hex(b).into()),
+                    ("value", stat_display(leaf, b).into()),
+                ]));
+            }
+        };
+        value("min_value", &s.min_value, s.min_span);
+        value("max_value", &s.max_value, s.max_span);
+        value("min", &s.min, s.min_deprecated_span);
+        value("max", &s.max, s.max_deprecated_span);
+        for (name, v) in [
+            ("null_count", s.null_count.map(|n| n.to_string())),
+            ("distinct_count", s.distinct_count.map(|n| n.to_string())),
+            (
+                "is_min_value_exact",
+                s.is_min_value_exact.map(|b| b.to_string()),
+            ),
+            (
+                "is_max_value_exact",
+                s.is_max_value_exact.map(|b| b.to_string()),
+            ),
+        ] {
+            if let Some(v) = v {
+                fields.push(obj([
+                    ("name", name.into()),
+                    ("span", s.span.into()),
+                    ("hex", Json::Null),
+                    ("value", v.into()),
+                ]));
+            }
+        }
+    }
+    let verdict = match &chunk.statistics {
+        Some(s) => bounds(s, cmp, type_order(leaf))
+            .map_err(|e| all_null(e, s.null_count, chunk.num_values)),
+        None => Err("the column chunk has no statistics".into()),
+    };
+    // The values themselves, decoded, and what each order makes of them.
+    let (values, nulls) = match read_column(file, chunk, leaf) {
+        Ok(d) => (
+            Some(
+                d.triples
+                    .iter()
+                    .filter_map(|t| t.value.as_ref())
+                    .map(|v| v.to_plain_bytes(leaf.physical_type))
+                    .collect::<Vec<_>>(),
+            ),
+            d.triples.iter().filter(|t| t.value.is_none()).count(),
+        ),
+        Err(_) => (None, 0),
+    };
+    let values_json = match &values {
+        Some(vs) => {
+            let mut placed: Vec<&Vec<u8>> =
+                vs.iter().filter(|v| cmp.compare(v, v).is_some()).collect();
+            placed.sort_by(|a, b| cmp.compare(a, b).unwrap_or(std::cmp::Ordering::Equal));
+            let unplaced = vs.len() - placed.len();
+            let pair = |c: Comparator| {
+                c.min_max(vs.iter().map(|v| &v[..]))
+                    .map(|(lo, hi)| {
+                        obj([
+                            ("min", stat_display(leaf, lo).into()),
+                            ("max", stat_display(leaf, hi).into()),
+                        ])
+                    })
+                    .unwrap_or(Json::Null)
+            };
+            obj([
+                (
+                    "sorted",
+                    Json::Arr(
+                        placed
+                            .iter()
+                            .map(|v| stat_display(leaf, v).into())
+                            .collect(),
+                    ),
+                ),
+                ("unplaced", unplaced.into()),
+                ("nulls", nulls.into()),
+                ("observed", pair(cmp)),
+                (
+                    "mistake",
+                    cmp.mistake()
+                        .map(|(wrong, what)| {
+                            obj([
+                                ("comparator", wrong.name().into()),
+                                ("what", what.into()),
+                                ("result", pair(wrong)),
+                            ])
+                        })
+                        .unwrap_or(Json::Null),
+                ),
+            ])
+        }
+        None => Json::Null,
+    };
+    obj([
+        ("ok", true.into()),
+        ("created_by", md.created_by.clone().into()),
+        ("column_orders", md.column_orders.is_some().into()),
+        ("row_groups", row_groups),
+        ("columns", columns),
+        (
+            "selected",
+            obj([
+                ("row_group", row_group.into()),
+                ("column", column.into()),
+                ("path", leaf.dotted_path().into()),
+                ("order", cmp.order().name().into()),
+                ("comparator", cmp.name().into()),
+                (
+                    "statistics_span",
+                    chunk
+                        .statistics
+                        .as_ref()
+                        .map(|s| Json::from(s.span))
+                        .unwrap_or(Json::Null),
+                ),
+                ("fields", Json::Arr(fields)),
+                (
+                    "verdict",
+                    match verdict {
+                        Ok(b) => obj([
+                            ("usable", true.into()),
+                            ("source", source_name(b.source).into()),
+                            ("min", stat_display(leaf, &b.min).into()),
+                            ("max", stat_display(leaf, &b.max).into()),
+                            ("min_exact", b.min_exact.into()),
+                            ("max_exact", b.max_exact.into()),
+                        ]),
+                        Err(reason) => obj([("usable", false.into()), ("reason", reason.into())]),
+                    },
+                ),
+                ("values", values_json),
+            ]),
+        ),
+    ])
+}

@@ -31,6 +31,7 @@ import decimal
 import hashlib
 import io
 import json
+import math
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -168,6 +169,69 @@ def _orders(n: int) -> pa.Table:
         ),
     )
 
+
+#: Twelve orders in three row groups, each column chosen for a way statistics are misread (ch08):
+#: unsigned integers above 2^31, negative small integers, strings with bytes above 0x7f, floats
+#: with NaN and both zeros, negative decimals, a column null throughout one row group, and one
+#: written without statistics.
+STATISTICS_TABLE = pa.table(
+    {
+        "order_id": pa.array(range(1, 13), pa.int64()),
+        "customer_id": pa.array(
+            [7, 3_000_000_000, 42, 2_147_483_648, 15, 99, 4_000_000_000, 8, 1, 2, 3, 2_500_000_000],
+            pa.uint32(),
+        ),
+        "delta": pa.array([-5, 3, -120, 7, 0, 9, -1, 100, 12, -3, 4, 5], pa.int8()),
+        "city": pa.array(
+            [
+                "Leeds",
+                "Łódź",
+                "Zürich",
+                "Aarhus",
+                "Oslo",
+                "Århus",
+                "Bergen",
+                "Écija",
+                "Malmö",
+                "York",
+                "Ängelholm",
+                "Cork",
+            ]
+        ),
+        "temp_c": pa.array(
+            [12.5, float("nan"), -3.0, 3.0, 0.0, -0.0, 20.0, float("nan"), 7.5, 1.0, 2.0, 4.5],
+            pa.float64(),
+        ),
+        "amount": pa.array(
+            [
+                decimal.Decimal(v)
+                for v in (
+                    "19.99",
+                    "-5.00",
+                    "42.10",
+                    "-0.50",
+                    "7.25",
+                    "3.00",
+                    "-19.99",
+                    "0.01",
+                    "12.00",
+                    "-100.00",
+                    "8.40",
+                    "1.10",
+                )
+            ],
+            pa.decimal128(9, 2),
+        ),
+        "coupon": pa.array(
+            ["SPRING", None, "SPRING", "WELCOME", None, None, None, None, "SUMMER", None, "SUMMER", None],
+            pa.string(),
+        ),
+        "note": pa.array(
+            ["gift", None, "", "leave at door", None, "gift", "", "", None, "fragile", "", "gift"],
+            pa.string(),
+        ),
+    }
+)
 
 #: The same orders under every codec the format defines that pyarrow writes (ch07).
 ORDERS = _orders(256)
@@ -364,6 +428,22 @@ FIXTURES = (
         for codec in CODECS
     ),
     Fixture(
+        name="statistics",
+        why=(
+            "Twelve orders in three row groups, with a column for each way a reader can misread "
+            "statistics: unsigned integers above 2^31, negative small integers, strings with "
+            "non-ASCII bytes, floats with NaN and signed zeros, negative decimals, a column that "
+            "is null throughout one row group, and a column written without statistics. The "
+            "row groups declare that they are sorted by order_id."
+        ),
+        table=STATISTICS_TABLE,
+        options={
+            "row_group_size": 4,
+            "write_statistics": ["order_id", "customer_id", "delta", "city", "temp_c", "amount", "coupon"],
+            "sorting_columns": [pq.SortingColumn(0)],
+        },
+    ),
+    Fixture(
         name="pages-v2-snappy",
         why=(
             "pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values "
@@ -408,8 +488,19 @@ def _stat(value):
         return {k: _stat(v) for k, v in value.items()}
     if isinstance(value, list):
         return [_stat(v) for v in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        # JSON has no NaN or infinity; the reader writes the same strings for them.
+        return "NaN" if math.isnan(value) else ("Infinity" if value > 0 else "-Infinity")
     if value is None or isinstance(value, bool | int | float | str):
         return value
+    if isinstance(value, tuple):
+        return [_stat(v) for v in value]
+    if isinstance(value, pq.SortingColumn):
+        return {
+            "column_index": value.column_index,
+            "descending": value.descending,
+            "nulls_first": value.nulls_first,
+        }
     return str(value)
 
 
@@ -453,7 +544,7 @@ def manifest(fixture: Fixture, data: bytes) -> dict:
         "generator": {
             "script": "fixtures/generate.py",
             "writer": f"pyarrow {pa.__version__}",
-            "options": {**BASE_OPTIONS, **fixture.options},
+            "options": _stat({**BASE_OPTIONS, **fixture.options}),
         },
         "file_size": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),

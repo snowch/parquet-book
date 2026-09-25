@@ -4,13 +4,16 @@
 //! fixtures, when it wrote them. None of their numbers came from this crate. So every assertion
 //! here compares two independent implementations reading the same bytes.
 
+use std::cmp::Ordering;
 use std::path::PathBuf;
 
 use parquet_lab::format::{footer_span, parse_trailer, MAGIC};
 use parquet_lab::json::Json;
+use parquet_lab::metadata::Statistics;
 use parquet_lab::object_store::{MemoryStore, Method, NetworkModel, TracingStore};
 use parquet_lab::reader::{read_footer, FooterOptions, SizeSource};
 use parquet_lab::report;
+use parquet_lab::stats::{self, Comparator};
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -508,4 +511,124 @@ fn every_codec_decompresses_to_the_same_pages() {
         }
     }
     assert!(checked >= 21, "only {checked} pages compared");
+}
+
+/// A column chunk's path, row group, the comparator the reader picks for it, its values as PLAIN
+/// bytes, and its statistics.
+type ChunkValues = (String, usize, Comparator, Vec<Vec<u8>>, Option<Statistics>);
+
+fn chunk_values(bytes: &[u8]) -> Vec<ChunkValues> {
+    let md = report::open_bytes(bytes).unwrap();
+    let root = parquet_lab::schema::build(&md.schema).unwrap();
+    let mut out = Vec::new();
+    for leaf in parquet_lab::schema::leaves(&root) {
+        let converted = md.schema[leaf.element].converted_type.clone();
+        let comparator = Comparator::for_leaf(&leaf, converted.as_deref());
+        for (g, rg) in md.row_groups.iter().enumerate() {
+            let chunk = &rg.columns[leaf.column];
+            let Ok(data) = parquet_lab::column::read_column(bytes, chunk, &leaf) else {
+                continue; // a codec the reader does not decode
+            };
+            let values = data
+                .triples
+                .iter()
+                .filter_map(|t| t.value.as_ref())
+                .map(|v| v.to_plain_bytes(leaf.physical_type))
+                .collect();
+            out.push((
+                leaf.dotted_path(),
+                g,
+                comparator,
+                values,
+                chunk.statistics.clone(),
+            ));
+        }
+    }
+    out
+}
+
+#[test]
+fn the_readers_sort_orders_reproduce_pyarrows_statistics() {
+    // pyarrow computed min_value and max_value from the values it wrote. The reader decodes the
+    // same values and finds their minimum and maximum in the order it chose for the column. The
+    // two must agree for every column chunk of every fixture that has statistics.
+    let mut checked = 0;
+    for (name, bytes, _) in fixtures() {
+        let md = report::open_bytes(&bytes).unwrap();
+        assert!(
+            md.column_orders.is_some(),
+            "{name}: pyarrow writes column_orders"
+        );
+        for (path, g, comparator, values, stats) in chunk_values(&bytes) {
+            let Some(s) = stats else { continue };
+            let (Some(min), Some(max)) = (&s.min_value, &s.max_value) else {
+                continue;
+            };
+            let (lo, hi) = comparator
+                .min_max(values.iter().map(|v| &v[..]))
+                .unwrap_or_else(|| panic!("{name} {path}: statistics but no comparable values"));
+            // Equal in the column's order: -0.0 and +0.0 are the same number, and a writer
+            // stores a zero minimum as -0.0 and a zero maximum as +0.0.
+            let same = |a: &[u8], b: &[u8]| comparator.compare(a, b) == Some(Ordering::Equal);
+            assert!(same(lo, min), "{name} {path} row group {g}: minimum");
+            assert!(same(hi, max), "{name} {path} row group {g}: maximum");
+            let b = stats::bounds(&s, comparator, true).unwrap();
+            assert_eq!(b.source, stats::Source::MinMaxValue);
+            checked += 1;
+        }
+    }
+    assert!(checked > 60, "only {checked} column chunks checked");
+}
+
+#[test]
+fn the_statistics_fixture_catches_every_mistaken_order() {
+    let (_, bytes, _) = fixtures()
+        .into_iter()
+        .find(|f| f.0 == "statistics.parquet")
+        .unwrap();
+    let mut caught = Vec::new();
+    for (path, _, comparator, values, stats) in chunk_values(&bytes) {
+        let (Some((wrong, _)), Some(s)) = (comparator.mistake(), stats) else {
+            continue;
+        };
+        let (Some(min), Some(max)) = (&s.min_value, &s.max_value) else {
+            continue;
+        };
+        let got = wrong.min_max(values.iter().map(|v| &v[..]));
+        if got.map(|(lo, hi)| (lo != &min[..], hi != &max[..])) != Some((false, false))
+            && !caught.contains(&path)
+        {
+            caught.push(path);
+        }
+    }
+    caught.sort();
+    assert_eq!(caught, ["amount", "city", "customer_id", "delta", "temp_c"]);
+}
+
+#[test]
+fn deprecated_fields_are_used_only_where_signed_order_is_right() {
+    let (_, bytes, _) = fixtures()
+        .into_iter()
+        .find(|f| f.0 == "statistics.parquet")
+        .unwrap();
+    for (path, _, comparator, _, stats) in chunk_values(&bytes) {
+        let Some(mut s) = stats else { continue };
+        if s.min_value.is_none() {
+            continue;
+        }
+        // Pretend the file is old: only min and max, holding what min_value and max_value hold.
+        s.min = s.min_value.take();
+        s.max = s.max_value.take();
+        let usable = stats::bounds(&s, comparator, true).is_ok();
+        let signed_scalar = matches!(
+            comparator,
+            Comparator::I32 | Comparator::I64 | Comparator::F64
+        );
+        assert_eq!(
+            usable,
+            signed_scalar,
+            "{path}: {:?}",
+            stats::bounds(&s, comparator, true)
+        );
+    }
 }

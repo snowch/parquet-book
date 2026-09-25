@@ -14,10 +14,12 @@ import { mountLevels } from "./levels.js";
 import { mountEncodings } from "./encodings.js";
 import { mountPages } from "./pages.js";
 import { mountCompression } from "./compression.js";
+import { mountStatistics } from "./statistics.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
   encodings: mountEncodings, pages: mountPages, compression: mountCompression,
+  statistics: mountStatistics,
 };
 
 class Fixtures {

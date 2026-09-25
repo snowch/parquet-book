@@ -242,6 +242,26 @@ if (shots) {
   await compLab.screenshot({ path: path.join(shots, "compression-lab.png") });
 }
 
+// ch08: statistics. Verdicts, orders and the mistaken order are the reader's.
+await page.goto(base + "metadata-and-statistics.html");
+const statsLab = page.locator('.lab[data-experiment="statistics"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]')?.dataset.state === "ok");
+await statsLab.locator('button[data-cell="0:1"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]').dataset.selected === "0:1");
+const cust = native(["statistics", "fixtures/statistics.parquet", "0", "1"]).selected;
+check(await statsLab.getAttribute("data-order") === cust.order, `customer_id is compared as ${cust.order}, as the reader says`);
+check((await statsLab.locator(".mistake").innerText()).includes(cust.values.mistake.result.max),
+  `the mistaken order's maximum, ${cust.values.mistake.result.max}, is shown`);
+await statsLab.locator('button[data-cell="1:6"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]').dataset.selected === "1:6");
+check(await statsLab.getAttribute("data-usable") === "false", "an all-null chunk offers no bounds");
+await statsLab.locator(".stats-fields button.span").first().click();
+check(await statsLab.locator(".hex .b.sel").count() > 0, "a statistics field highlights its bytes");
+if (shots) {
+  await statsLab.locator('button[data-cell="0:3"]').click();
+  await statsLab.screenshot({ path: path.join(shots, "statistics-lab.png") });
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

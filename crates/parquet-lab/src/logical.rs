@@ -272,7 +272,7 @@ pub fn be_twos_complement(bytes: &[u8]) -> Option<i128> {
 }
 
 /// A half-precision float's bits as an `f32`.
-fn f16_to_f32(bits: u16) -> f32 {
+pub(crate) fn f16_to_f32(bits: u16) -> f32 {
     let sign = if bits & 0x8000 != 0 { -1.0 } else { 1.0 };
     let exp = i32::from((bits >> 10) & 0x1f);
     let frac = f32::from(bits & 0x3ff);

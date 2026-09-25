@@ -80,7 +80,10 @@ impl Json {
             // exponent. `{}` writes 4.49e21 as twenty-two digits, which a JSON reader may take
             // for an integer. The parity test in tests/test_wasm.py found this too.
             Json::Float(v) if v.is_finite() => out.push_str(&format!("{v:?}")),
-            Json::Float(_) => out.push_str("null"),
+            // JSON has no NaN or infinity. Writing null would hide a value statistics must skip
+            // (ch08), so they are written as the strings JavaScript prints for them.
+            Json::Float(v) if v.is_nan() => write_str(out, "NaN"),
+            Json::Float(v) => write_str(out, if *v > 0.0 { "Infinity" } else { "-Infinity" }),
             Json::Str(s) => write_str(out, s),
             Json::Arr(items) => {
                 out.push('[');
@@ -441,9 +444,10 @@ mod tests {
     }
 
     #[test]
-    fn spans_are_pairs_and_non_finite_floats_are_null() {
+    fn spans_are_pairs_and_non_finite_floats_are_named() {
         assert_eq!(Json::from(Span::new(3, 9)).to_json(), "[3,9]");
-        assert_eq!(Json::from(f64::NAN).to_json(), "null");
+        assert_eq!(Json::from(f64::NAN).to_json(), "\"NaN\"");
+        assert_eq!(Json::from(f64::NEG_INFINITY).to_json(), "\"-Infinity\"");
         assert_eq!(Json::from(4.49e21).to_json(), "4.49e21");
         assert_eq!(Json::from(1.0).to_json(), "1.0");
     }

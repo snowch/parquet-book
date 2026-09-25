@@ -23,6 +23,19 @@ pub enum PlainValue {
 }
 
 impl PlainValue {
+    /// The value's PLAIN bytes for a column of physical type `physical`, without the length
+    /// prefix a byte array has in a page. Statistics store values this way (ch08).
+    pub fn to_plain_bytes(&self, physical: PhysicalType) -> Vec<u8> {
+        match (self, physical.0) {
+            (PlainValue::Bool(b), _) => vec![u8::from(*b)],
+            (PlainValue::Int(v), 1) => (*v as i32).to_le_bytes().to_vec(),
+            (PlainValue::Int(v), _) => v.to_le_bytes().to_vec(),
+            (PlainValue::Float(v), 4) => (*v as f32).to_le_bytes().to_vec(),
+            (PlainValue::Float(v), _) => v.to_le_bytes().to_vec(),
+            (PlainValue::Bytes(b), _) => b.clone(),
+        }
+    }
+
     /// As JSON: text for bytes that are UTF-8, and a hex string for bytes that are not.
     pub fn to_json(&self) -> Json {
         match self {

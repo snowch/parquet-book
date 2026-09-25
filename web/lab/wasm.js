@@ -74,6 +74,10 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  statistics(id, rowGroup, column) {
+    return this.#result(this.exports.pl_statistics(id, rowGroup, column));
+  }
+
   /** `page` omitted or null: the first data page. */
   compression(id, column, page = null) {
     return this.#result(this.exports.pl_compression(id, column, page === null ? 0xffffffff : page));

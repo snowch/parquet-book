@@ -151,6 +151,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .stats-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "all" "fields" "order"; }
+  .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -251,6 +253,23 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .out-row i.out { background: var(--wash); color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
 .out-row i.src { outline: 1px solid var(--warn); outline-offset: -1px; }
 
+/* Ch08: statistics. */
+.stats-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+              grid-template-areas: "all all" "fields order"; border-bottom: 1px solid var(--edge); }
+.stats-grid .p-stats-all { grid-area: all; border-bottom: 1px solid var(--edge); }
+.stats-grid .p-stats-fields { grid-area: fields; border-right: 1px solid var(--edge); }
+.stats-grid .p-stats-order { grid-area: order; }
+.stats-table td button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.stats-table td button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.stats-table .unusable { color: var(--warn); }
+.stats-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.stats-grid .verdict { margin: .6rem 0 0; padding: .4rem .6rem; border-radius: 4px; font-size: 13px; }
+.stats-grid .verdict.ok { background: var(--wash); }
+.stats-grid .verdict.no { border: 1px solid var(--warn); }
+.stats-grid .mistake { border-left: 3px solid var(--warn); padding-left: .6rem; font-size: 13px; }
+.sorted-values li { font: 12px var(--mono); padding: 0 .3rem; border: 1px solid var(--edge); border-radius: 3px; }
+.sorted-values li.lo, .sorted-values li.hi { border-color: var(--accent); background: var(--wash); }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -279,6 +298,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .stats-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "all" "fields" "order"; }
+  .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
