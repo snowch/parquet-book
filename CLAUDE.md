@@ -1,0 +1,175 @@
+# CLAUDE.md
+
+Project instructions for anyone, human or AI, working on this book. They are binding.
+
+## What this is
+
+*Parquet, byte by byte*: an interactive technical book about Apache Parquet in which the reader
+builds a working Parquet reader while reading. Each chapter asks a question, answers it with an
+experiment on the bytes of a real Parquet file, and builds the piece of the reader the experiment
+needed. The finished reader runs in the browser through WebAssembly.
+
+Read **PLAN.md** for the argument and the settled decisions, **AUTHORING_GUIDE.md** before
+writing or editing a page, and **STYLE.md** while editing. **NEXT_STEPS.md** is the working list.
+
+The architecture follows `snowch/sizing-and-tco`: MyST parses, the repository renders, every
+number is generated, code is quoted rather than pasted, and problems are tests. What differs is the
+implementation boundary. There the core is Python; here it is Rust, compiled natively for the tests
+and the command line and to WebAssembly for the browser, so the page runs the code the tests run.
+
+## Architecture
+
+```
+                         THE BOOK (chapters/*.md)
+                                   │
+                ┌──────────────────┴──────────────────┐
+           explanation                           experiment
+      {literalinclude} of Rust              ```lab block in a page
+      {include} of generated tables                    │
+                └──────────────────┬──────────────────┘
+                                   │
+                    crates/parquet-lab  (the reader)
+                                   │
+        ┌──────────────┬───────────┼─────────────┬─────────────────┐
+        │              │           │             │                 │
+   cargo tests    crates/pqlab   crates/        exercises/      fixtures/
+   (vs pyarrow    (CLI, and      parquet-lab-   (reader's       (written by
+    manifests)    `figures`)     wasm (C ABI)   problems)        pyarrow)
+                       │           │
+          chapters/_generated/   web/lab/*.js  ── the browser draws what Rust returned
+```
+
+| Path | What it is |
+|---|---|
+| `crates/parquet-lab/` | The reader. Zero dependencies. One module per layer (see its `lib.rs`). |
+| `crates/parquet-lab-wasm/` | The reader behind a numbers-only C ABI, compiled to `wasm32-unknown-unknown`. |
+| `crates/pqlab/` | The reader on the command line, and `pqlab figures`, which writes every generated fragment. |
+| `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`). |
+| `fixtures/` | Parquet files written by pyarrow, each with a manifest (`.json`) pyarrow wrote about it. |
+| `chapters/`, `parts/`, `appendices/`, `index.md` | The book, in MyST markdown. |
+| `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
+| `tools/` | Python: the outline (`outline.py`), the renderer (`render.py`), the highlighter. |
+| `scripts/` | Build and check entry points. `ci-check.sh` is what CI runs. |
+| `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory. |
+| `tests/` | Python tests of the book, the renderer, WASM/native parity; `tests/browser/` drives Chromium. |
+
+## Build, run, test
+
+```bash
+make install     # rustup wasm target, Python packages, pinned MyST
+make             # wasm + figures + site: _build/html
+make serve       # http://localhost:8000
+make test        # cargo test --workspace, then pytest
+make problems    # the reader's exercises; they fail until solved
+make check       # ./scripts/ci-check.sh: exactly what CI runs
+```
+
+Always run `make check` before pushing. It runs, in order: ruff, `cargo fmt --check`, clippy with
+`-D warnings`, `cargo test`, the fixture check, the figures check, the number check, the WASM
+build, the MyST parse, the site render, the link check, pytest, and the headless browser test.
+
+## How the pieces talk
+
+**MyST parses; this repository renders.** `scripts/parse-book.sh` runs `myst build --site --strict`,
+which writes the parse to `_build/site/content/*.json` and resolves every cross-reference. MyST
+then tries to fetch a site theme; this book never uses it, and the script tolerates that one
+failure only. `scripts/build-site.py` renders the parse through `tools/render.py`, which raises on
+any node type it does not handle.
+
+**The browser calls Rust through a C ABI.** `crates/parquet-lab-wasm/src/lib.rs` exports
+`pl_alloc`, `pl_load`, `pl_footer_lab`, `pl_structure`, `pl_interpret`, `pl_layouts`,
+`pl_set_byte` and `pl_out_ptr`. Arguments are numbers; files cross as a pointer and a length;
+results come back as JSON in a buffer inside the module. `web/lab/wasm.js` is the other half.
+The module imports nothing, so it cannot reach the network, the clock or the page.
+
+**Every result is `parquet_lab::report`'s JSON.** The CLI prints it, the browser draws it, the
+figures render it. `tests/test_wasm.py` makes every browser call twice, through WASM under Node and
+natively through `pqlab`, and requires identical JSON. That test has already caught one real bug:
+64-bit integers above 2^53 being rounded by JavaScript (`json.rs` now writes them as strings).
+
+**Experiments are fenced blocks.** A page embeds one with:
+
+````markdown
+```lab
+experiment: footer
+fixture: tiny.parquet
+fixtures: tiny.parquet, multiple-row-groups.parquet
+```
+````
+
+`tools/render.py` validates the experiment name and the fixtures and emits a mount point;
+`web/lab/lab.js` loads the WASM module and the fixtures, relative to its own URL, and mounts it.
+
+## The invariants
+
+1. **The interactive UI is a view of the implementation, never a scripted animation.** If the page
+   says `GET bytes=249-628`, that range was requested from the object-store abstraction by the
+   reader. If it says a footer length, the reader decoded it from the bytes on screen. The browser
+   test checks this against the native reader.
+2. **No number typed into prose.** Byte counts, offsets, request counts, times and ratios come from
+   `pqlab figures` fragments `{include}`d into the page, or from a live experiment.
+   `scripts/verify-numbers.py` fails the build otherwise. A definition that must be typed takes
+   `% number-ok: <reason>` before its paragraph.
+3. **No code pasted into prose.** Rust is quoted with `{literalinclude}` and `:start-at:` /
+   `:end-before:` text anchors, never `:lines:`. A pasted Rust block fails `tests/test_book.py`. If
+   you rename a function a page quotes, the MyST parse fails with a missing-anchor warning.
+4. **Fixtures are written by a production implementation.** pyarrow, pinned in
+   `requirements.txt`. The reader is tested against files it did not write, and against the
+   manifest pyarrow wrote, never against its own output.
+5. **Problems are tests.** Stubs in `exercises/src/<slug>.rs` with `todo!()`; tests in
+   `exercises/tests/<slug>.rs` marked `#[ignore = "problem …"]`, deriving the expected answer at
+   test time from the reader or the pyarrow manifest; unmarked scaffolding tests beside them
+   proving the problem is answerable. Never commit a solution. Every chapter also has one problem
+   about the reader's own files, which has no test and says what a good answer contains.
+6. **Deterministic.** The object store is simulated, with a fixed `NetworkModel`; nothing reads a
+   clock or a network. The same commit builds the same book, byte for byte.
+
+## Adding things
+
+**A chapter.** Add it to `tools/outline.py` (order, slug, title, part, question, what it builds,
+experiments, fixtures), regenerate `myst.yml`'s toc to match (the test says how it differs), and
+run `make chapter` for the skeleton. Then follow AUTHORING_GUIDE.md: problems first, then the
+reader code, then figures, then prose. A chapter's number is derived from its position; its
+identity is its slug. Never put a number in a slug, label or file name.
+
+**A fixture.** Add a `Fixture` to `fixtures/generate.py` with a `why`, run `make fixtures`, and
+commit the `.parquet`, the `.json` manifest and the regenerated `fixtures/README.md` together.
+Keep it small enough to read byte by byte. The Rust fixture tests pick it up automatically.
+
+**An experiment.** Add a report function in `crates/parquet-lab/src/report.rs` that runs the reader
+and returns JSON; export it from `crates/parquet-lab-wasm`; add a method to `web/lab/wasm.js`, a
+mount function in `web/lab/`, its name to `EXPERIMENTS` in `web/lab/lab.js` and `tools/outline.py`,
+a matching `pqlab` subcommand, and its calls to `tests/test_wasm.py`. JavaScript draws; it never
+computes anything Parquet-shaped.
+
+**A figure.** Add a `Figure` to `crates/pqlab/src/figures.rs` that runs the reader and returns
+markdown ending with its conditions line, run `make figures`, and `{include}` the fragment.
+
+## Coding conventions
+
+- **Rust:** zero dependencies in every crate. Readable before fast: this code is quoted in a book.
+  Every read reports a `Span` of absolute file offsets. Errors are values with offsets, never
+  panics on bad input. `cargo fmt`, clippy clean with `-D warnings`. Module docs say what the
+  module teaches and which chapter uses it.
+- **JavaScript:** plain ES modules, no framework, no build step. It moves bytes and draws JSON.
+- **Python:** tooling only. `python3 -m pytest`, ruff clean.
+- **Comments** say why, in full sentences, as in the reference repository.
+
+## Book-writing conventions
+
+British English, direct, active voice, short sentences, the reader as *you*. No em dashes. No
+"In this chapter". No *simply*, *just*, *obviously*, *basically*: `tests/test_book.py` enforces
+the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE`. STYLE.md is the
+checklist; run both of its passes over a page before finishing it.
+
+Product and implementation names are allowed where the book describes a specific implementation's
+behaviour (pyarrow wrote the fixtures; a reader's prefetch default). They are never used as
+shorthand for the format itself, and the book never recommends a vendor.
+
+## Things that break the build
+
+- Renaming or reformatting a line a `{literalinclude}` anchors on. Search `chapters/` for the text.
+- Changing the reader so a generated number moves, without `make figures`.
+- Upgrading pyarrow without regenerating fixtures (the check refuses to run under another version).
+- A new MyST directive or node type without a branch in `tools/render.py`.
+- A root-relative URL (`/lab/...`) anywhere in a page: the site is served under a base path.

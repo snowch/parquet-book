@@ -1,0 +1,14 @@
+[package]
+name = "parquet-lab-wasm"
+description = "parquet-lab for the browser: the same reader, behind a small C ABI."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+parquet-lab = { path = "../parquet-lab" }

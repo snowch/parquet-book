@@ -1,0 +1,18 @@
+# Build output. Everything here is regenerated from committed sources.
+_build/
+target/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Node
+node_modules/
+test-results/
+
+# Editors
+.DS_Store
+*.swp

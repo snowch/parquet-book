@@ -1,0 +1,26 @@
+# The Rust half of the book. Three crates, one implementation:
+#
+#   parquet-lab       the reader the book builds, chapter by chapter. No dependencies.
+#   parquet-lab-wasm  the same code compiled for the browser, behind a small C ABI.
+#   pqlab             the same code on the command line; also writes the book's figures.
+#   exercises         the reader's problems: stubs, and the tests that grade them.
+#
+# No crate here depends on anything outside this repository, so `cargo build --offline`
+# works on a fresh clone and the browser runs exactly the code the tests run.
+[workspace]
+resolver = "2"
+members = ["crates/parquet-lab", "crates/parquet-lab-wasm", "crates/pqlab", "exercises"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.75"
+
+[profile.release]
+# The browser downloads this. Small beats fast for code that parses a few kilobytes.
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -1,0 +1,266 @@
+{
+  "name": "multiple-row-groups",
+  "file": "multiple-row-groups.parquet",
+  "why": "The same sales schema split into row groups of two rows. The footer now describes several row groups, each with its own column chunks and statistics, so the structure view has more than one branch.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false,
+      "row_group_size": 2
+    }
+  },
+  "file_size": 1517,
+  "sha256": "31f67ae2363b4dd9780163f0f629efa6d4698a4d2027a20adedf0c917d66a618",
+  "footer_length": 902,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 6,
+  "num_columns": 3,
+  "num_row_groups": 3,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "country": "UK",
+      "amount_cents": 1999
+    },
+    {
+      "order_id": 2,
+      "country": "SE",
+      "amount_cents": 500
+    },
+    {
+      "order_id": 3,
+      "country": "UK",
+      "amount_cents": 4210
+    },
+    {
+      "order_id": 4,
+      "country": "PL",
+      "amount_cents": 1250
+    },
+    {
+      "order_id": 5,
+      "country": "SE",
+      "amount_cents": 875
+    },
+    {
+      "order_id": 6,
+      "country": "UK",
+      "amount_cents": 3000
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 2,
+      "total_byte_size": 201,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 1,
+            "max": 2,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 83,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 43,
+          "total_uncompressed_size": 43,
+          "statistics": {
+            "min": "SE",
+            "max": "UK",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 126,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 500,
+            "max": 1999,
+            "null_count": 0
+          }
+        }
+      ]
+    },
+    {
+      "num_rows": 2,
+      "total_byte_size": 201,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 205,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 3,
+            "max": 4,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 284,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 43,
+          "total_uncompressed_size": 43,
+          "statistics": {
+            "min": "PL",
+            "max": "UK",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 327,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 1250,
+            "max": 4210,
+            "null_count": 0
+          }
+        }
+      ]
+    },
+    {
+      "num_rows": 2,
+      "total_byte_size": 201,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 406,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 5,
+            "max": 6,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 485,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 43,
+          "total_uncompressed_size": 43,
+          "statistics": {
+            "min": "SE",
+            "max": "UK",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 2,
+          "data_page_offset": 528,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": 875,
+            "max": 3000,
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

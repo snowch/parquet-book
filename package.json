@@ -1,0 +1,9 @@
+{
+  "name": "parquet-book",
+  "private": true,
+  "type": "module",
+  "description": "Build tooling for the book: MyST parses the pages; scripts/build-site.py renders them.",
+  "devDependencies": {
+    "mystmd": "1.10.1"
+  }
+}

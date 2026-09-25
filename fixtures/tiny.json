@@ -1,0 +1,129 @@
+{
+  "name": "tiny",
+  "file": "tiny.parquet",
+  "why": "The smallest useful file: four rows of a sales table, one row group, no compression, no dictionary, every column required so no levels are stored. Small enough to read completely by eye. The footer laboratory starts here.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false
+    }
+  },
+  "file_size": 637,
+  "sha256": "67873fc1899b25ef20d29055d8d0b402aabb91e1d02c692d0879fc79d7210f9a",
+  "footer_length": 380,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 4,
+  "num_columns": 3,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    }
+  ],
+  "rows": [
+    {
+      "order_id": 1,
+      "country": "UK",
+      "amount_cents": 1999
+    },
+    {
+      "order_id": 2,
+      "country": "SE",
+      "amount_cents": 500
+    },
+    {
+      "order_id": 3,
+      "country": "UK",
+      "amount_cents": 4210
+    },
+    {
+      "order_id": 4,
+      "country": "PL",
+      "amount_cents": 1250
+    }
+  ],
+  "row_groups": [
+    {
+      "num_rows": 4,
+      "total_byte_size": 245,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 95,
+          "total_uncompressed_size": 95,
+          "statistics": {
+            "min": 1,
+            "max": 4,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 99,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 55,
+          "total_uncompressed_size": 55,
+          "statistics": {
+            "min": "PL",
+            "max": "UK",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 4,
+          "data_page_offset": 154,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 95,
+          "total_uncompressed_size": 95,
+          "statistics": {
+            "min": 500,
+            "max": 4210,
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

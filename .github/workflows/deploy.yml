@@ -1,0 +1,72 @@
+name: Deploy the book to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Turns Pages on if it is off. It cannot switch an existing site from "Deploy from a
+          # branch" to "GitHub Actions": that is Settings -> Pages -> Source, by hand.
+          enablement: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - run: python -m pip install -r requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: MyST (pinned)
+        run: npm install -g "mystmd@$(node -p "require('./package.json').devDependencies.mystmd")"
+
+      # The figures are committed and checked by the Quality workflow. Every URL in the site is
+      # relative, so no base path needs to be passed: the same build works at a domain root and
+      # under /parquet-book/.
+      - name: Build the reader, parse the pages, render the site
+        run: |
+          cargo build --release -p parquet-lab-wasm --target wasm32-unknown-unknown
+          ./scripts/parse-book.sh
+          python3 scripts/build-site.py --out _build/html
+          python3 scripts/check-built-links.py _build/html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build/html
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

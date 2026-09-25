@@ -1,0 +1,72 @@
+# The book's table of contents, for MyST to parse and cross-check.
+#
+# MyST parses the pages and resolves every cross-reference (`myst build --strict`, no --html).
+# It does not render the site: scripts/build-site.py does, from the parse. The order here must
+# match tools/outline.py, and tests/test_book.py fails if the two disagree.
+version: 1
+project:
+  id: parquet-book
+  title: Parquet, byte by byte
+  description: >-
+    An executable investigation of Apache Parquet. The reader builds a small Parquet reader in
+    Rust while reading, and every experiment in the book runs that reader in the browser,
+    compiled to WebAssembly.
+  keywords: [parquet, columnar storage, file formats, object storage, rust, webassembly]
+  authors:
+    - name: Chris Snow
+      url: https://snowch.github.io
+  github: https://github.com/snowch/parquet-book
+  license:
+    content: CC-BY-NC-4.0
+    code: Apache-2.0
+  settings:
+    # The book prints no inline maths, and dollar signs in prose should stay dollar signs.
+    parser:
+      dollarmath: false
+  exclude:
+    - README.md
+    - PLAN.md
+    - CLAUDE.md
+    - AUTHORING_GUIDE.md
+    - STYLE.md
+    - NEXT_STEPS.md
+    - fixtures/README.md
+    - target/**
+    - _build/**
+  toc:
+    - file: index.md
+    - file: parts/the_file.md
+      children:
+        - file: chapters/why_parquet_exists.md
+        - file: chapters/anatomy_of_a_parquet_file.md
+        - file: chapters/the_type_system.md
+        - file: chapters/nested_data.md
+    - file: parts/the_values.md
+      children:
+        - file: chapters/encodings.md
+        - file: chapters/pages.md
+        - file: chapters/compression.md
+    - file: parts/reading_less.md
+      children:
+        - file: chapters/metadata_and_statistics.md
+        - file: chapters/skipping_data.md
+        - file: chapters/how_readers_read.md
+    - file: parts/writing_and_querying.md
+      children:
+        - file: chapters/writing_parquet_well.md
+        - file: chapters/a_tiny_query_engine.md
+    - file: parts/beyond_one_file.md
+      children:
+        - file: chapters/modular_encryption.md
+        - file: chapters/lakehouse_and_beyond.md
+    - title: Appendices
+      children:
+        - file: appendices/running_the_lab.md
+        - file: appendices/the_fixtures.md
+        - file: appendices/glossary.md
+
+# MyST needs a site block to write its parse (_build/site/content). It never renders with this
+# theme: scripts/build-site.py renders the site, and scripts/parse-book.sh tolerates the theme
+# download failing where there is no network.
+site:
+  template: book-theme

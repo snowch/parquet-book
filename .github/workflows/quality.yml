@@ -1,0 +1,43 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust, with the WebAssembly target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Python dependencies
+        # pyarrow is pinned: it wrote the fixtures, and `fixtures/generate.py --check` needs the
+        # same version to reproduce their bytes.
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: MyST (pinned) and Playwright
+        run: |
+          npm install -g "mystmd@$(node -p "require('./package.json').devDependencies.mystmd")"
+          npm install -g playwright@1.56.1
+          playwright install --with-deps chromium
+
+      - name: Everything, exactly as `make check` runs it
+        run: ./scripts/ci-check.sh

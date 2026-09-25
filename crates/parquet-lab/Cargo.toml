@@ -1,0 +1,9 @@
+[package]
+name = "parquet-lab"
+description = "A small, readable Parquet reader, built one chapter at a time."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]

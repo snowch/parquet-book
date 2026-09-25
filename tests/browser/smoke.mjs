@@ -1,0 +1,150 @@
+// Drive the built book in a headless browser and check that the experiments are views of the
+// reader, not pictures of one.
+//
+//     node tests/browser/smoke.mjs _build/html [--screenshots DIR]
+//
+// It serves the site from a local HTTP server, opens the chapters, and compares what the page
+// shows with what the Rust reader computes natively (`cargo run -p pqlab -- footer … --json`).
+// The browser and the command line must agree to the byte, because they run the same code.
+
+import { createServer } from "node:http";
+import { readFile, stat, mkdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import path from "node:path";
+
+const root = path.resolve(process.argv[2] || "_build/html");
+const shotsAt = process.argv.indexOf("--screenshots");
+const shots = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
+
+// Playwright from the project, or from the global install if the project has none.
+function loadPlaywright() {
+  const here = createRequire(import.meta.url);
+  try {
+    return here("playwright");
+  } catch {
+    const globalRoot = execFileSync("npm", ["root", "-g"], { encoding: "utf8" }).trim();
+    return createRequire(path.join(globalRoot, "noop.js"))("playwright");
+  }
+}
+const { chromium } = loadPlaywright();
+
+const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css",
+  ".wasm": "application/wasm", ".svg": "image/svg+xml", ".parquet": "application/octet-stream" };
+
+const server = createServer(async (req, res) => {
+  let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  if (p.endsWith("/")) p += "index.html";
+  const file = path.join(root, p);
+  try {
+    if (!file.startsWith(root) || !(await stat(file)).isFile()) throw new Error("no");
+    res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
+    res.end(await readFile(file));
+  } catch {
+    res.writeHead(404);
+    res.end("not found");
+  }
+});
+await new Promise((r) => server.listen(0, "127.0.0.1", r));
+const base = `http://127.0.0.1:${server.address().port}/`;
+
+const native = (args) => JSON.parse(execFileSync("cargo",
+  ["run", "--quiet", "-p", "pqlab", "--", ...args], { encoding: "utf8" }));
+
+let failures = 0;
+const check = (ok, what) => {
+  console.log(`${ok ? "  ok  " : "  FAIL"} ${what}`);
+  if (!ok) failures += 1;
+};
+
+const launch = { headless: true };
+if (process.env.PLAYWRIGHT_BROWSERS_PATH === undefined) {
+  // Nothing to do: Playwright finds its own browsers.
+}
+const browser = await chromium.launch(launch);
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+const errors = [];
+page.on("pageerror", (e) => errors.push(String(e)));
+page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+if (shots) await mkdir(shots, { recursive: true });
+
+// ch02: the footer laboratory.
+await page.goto(base + "anatomy-of-a-parquet-file.html");
+const lab = page.locator('.lab[data-experiment="footer"]');
+await lab.locator('[data-ready="true"]').or(lab).first().waitFor();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]')?.dataset.state === "ok");
+const expected = native(["footer", "fixtures/tiny.parquet", "--json"]);
+check(await lab.getAttribute("data-footer-length") === String(expected.trailer.footer_length),
+  `footer length on the page is the reader's (${expected.trailer.footer_length})`);
+check(await lab.getAttribute("data-requests") === String(expected.requests.length),
+  `request count on the page is the reader's (${expected.requests.length})`);
+const traceRanges = await lab.locator("table.trace tbody tr td:nth-child(3)").allInnerTexts();
+check(JSON.stringify(traceRanges) === JSON.stringify(expected.requests.map((r) => r.range || "·")),
+  `trace ranges match: ${traceRanges.join(", ")}`);
+
+// Click the footer-length step: exactly its four bytes are highlighted.
+await lab.locator(".steps li.key-step button.span").click();
+const lit = await lab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
+const [ls, le] = expected.trailer.length_span;
+check(JSON.stringify(lit) === JSON.stringify(Array.from({ length: le - ls }, (_, i) => ls + i)),
+  `the footer-length step highlights bytes [${ls}, ${le})`);
+const inspector = await lab.locator(".inspector").innerText();
+check(inspector.includes(expected.trailer.footer_length.toLocaleString("en-GB")),
+  "the inspector reads the selected bytes as the footer length");
+if (shots) await lab.screenshot({ path: path.join(shots, "footer-lab.png") });
+
+// Unfetched bytes are dimmed: everything outside the trailer and the footer.
+const dim = await lab.locator(".hex .b.unfetched").count();
+check(dim === expected.file_size - expected.totals.bytes_returned,
+  `${dim} bytes dimmed as never requested`);
+
+// A prefetch large enough for the footer removes the third request.
+await lab.locator('input[name="size"][value="suffix"]').check();
+await lab.locator('input[name="prefetch"]').fill("13");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.requests === "1");
+const one = native(["footer", "fixtures/tiny.parquet", "--size", "suffix", "--prefetch", "65536", "--json"]);
+check(one.requests.length === 1, "a 64 KiB suffix read opens the file in one request, on the page and natively");
+
+// Damage the closing magic: the reader refuses, and says why.
+await lab.locator(`.hex .b[data-o="${expected.file_size - 1}"]`).click();
+await lab.locator('.inspector input[name="byte"]').fill("32");
+await lab.locator(".inspector form.edit button[type=submit]").click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.state === "error");
+check((await lab.locator(".steps li.failed").innerText()).includes("PAR1"), "a damaged magic is reported");
+await lab.locator(".inspector .restore").click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.state === "ok");
+check(true, "restoring the file restores the reader");
+
+// The anatomy panel maps the whole file.
+const anatomy = page.locator('.lab[data-experiment="anatomy"]');
+await anatomy.locator(".tree .node-row").first().waitFor();
+const labels = await anatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
+check(JSON.stringify(labels) === JSON.stringify(["Header", "Row group 0", "Footer", "Trailer"]),
+  `anatomy regions: ${labels.join(", ")}`);
+if (shots) {
+  await anatomy.locator(".hex .b[data-o=\"20\"]").click();
+  await anatomy.screenshot({ path: path.join(shots, "anatomy-lab.png") });
+}
+
+// ch01: the layouts.
+await page.goto(base + "why-parquet-exists.html");
+const layouts = page.locator('.lab[data-experiment="layouts"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]')?.dataset.rowsRanges);
+check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.getAttribute("data-columns-ranges") === "1",
+  "a two-column scan: one range per row by rows, one range by columns");
+if (shots) await layouts.screenshot({ path: path.join(shots, "layouts-lab.png") });
+if (shots) {
+  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await page.screenshot({ path: path.join(shots, "chapter.png") });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.screenshot({ path: path.join(shots, "chapter-dark.png") });
+}
+
+check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
+await browser.close();
+server.close();
+if (failures) {
+  console.log(`${failures} check(s) failed`);
+  process.exit(1);
+}
+console.log("All browser checks passed.");

@@ -1,0 +1,11 @@
+[package]
+name = "pqlab"
+description = "parquet-lab on the command line, and the generator of the book's figures."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+parquet-lab = { path = "../parquet-lab" }

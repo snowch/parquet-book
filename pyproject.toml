@@ -1,0 +1,14 @@
+# Python here is tooling: the fixture generator, the site renderer and the checks. The reader
+# itself is Rust (Cargo.toml).
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+extend-exclude = ["target", "_build", "*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# Line length is the formatter's job. What it leaves long is a string: prose, or JavaScript.
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,148 @@
+# Authoring Guide
+
+How to write a chapter of *Parquet, byte by byte* without breaking the three things that make it
+worth reading: experiments that are views of the real reader, numbers the build computes, and
+problems that cannot lie about whether you solved them.
+
+## Quick start
+
+```bash
+make install     # wasm target, Python packages, pinned MyST
+make             # build everything into _build/html
+make serve       # read it at http://localhost:8000
+make check       # exactly what CI runs
+```
+
+`make` rebuilds the site in a few seconds. There is no live preview: re-run `make site` after an
+edit and reload the page.
+
+## The order to write in
+
+Not the order the chapter is read in.
+
+1. **The reader code.** Add the piece of `crates/parquet-lab` the chapter builds, with unit tests
+   and, where a fixture can check it, a test against the pyarrow manifest in
+   `crates/parquet-lab/tests/fixtures.rs`. If the chapter needs a new fixture, write it first
+   (`fixtures/generate.py`), and say in its `why` what it exists to show.
+2. **The problems and their tests.** Stubs in `exercises/src/<slug>.rs`, tests in
+   `exercises/tests/<slug>.rs`. Make each fail, and read the failure: it is the first thing a
+   reader sees, and it should say where to look. Then solve each one *outside the repository* and
+   check it passes. Never commit the solution.
+3. **The experiment.** A report function that runs the reader, a WASM export, and a panel in
+   `web/lab/`. See CLAUDE.md, *Adding things*.
+4. **The figures.** Every number the prose will need, as a fragment from `pqlab figures`.
+5. **The prose**, last, to serve all of the above.
+
+Writing the prose first produces a chapter that explains what you meant to build.
+
+## The seven sections
+
+`tools/outline.CHAPTER_SHAPE`, and not negotiable; `tests/test_book.py` fails a chapter that adds or
+loses one. A section the chapter needs and the shape lacks is a `###` inside one of them.
+
+**The question** is one question in one sentence, then a paragraph on why the previous chapter
+leaves it open. The outline holds the question; the page expands it.
+
+**The experiment** opens on a `lab` block, then a numbered list of things to try, each saying what
+to click and what to look for. Write it so a reader who does each step in order discovers the
+chapter's point before being told it. Follow it with the generated tables that record what the
+experiment shows, and short sections that name what was seen.
+
+**Building it** quotes the code the experiment ran, in the order it ran. Each quote gets a
+paragraph before it saying what to look for and, where useful, one after it saying what follows.
+End with the command that tests the code against the fixtures.
+
+**What this cannot tell you** is the easiest section to skip and the one that makes the others
+believable. Name what the simulation leaves out, what the fixtures do not contain, and what the
+code does not handle yet, with the chapter that handles it.
+
+**Key takeaways** sits in a `:::{div}` with `:class: takeaways`. Each item opens with its claim in
+bold and gives its reason. Nothing in it is new.
+
+**Problems**: see below.
+
+**Where to go next**: primary sources (the Parquet specification, `parquet.thrift`, RFCs, papers)
+and the next chapter.
+
+## Rules with a check behind them
+
+### Never type a number into prose
+
+Byte counts, offsets, lengths, request counts, times and ratios come from the reader. Add a
+`Figure` to `crates/pqlab/src/figures.rs`, run `make figures`, and include it:
+
+````markdown
+```{include} _generated/tiny-trailer.md
+```
+````
+
+Every fragment ends with the conditions it was computed under: which fixture, which simulated
+network. `scripts/verify-numbers.py` fails on a number with a unit, or any number of two or more
+digits, in prose. Format constants written as words ("the last eight bytes") pass; they are fixed
+by the specification. A definition that must be typed as digits takes
+`% number-ok: <reason>` on the line before its paragraph.
+
+### Never paste code into prose
+
+````markdown
+```{literalinclude} ../crates/parquet-lab/src/format.rs
+:language: rust
+:start-at: pub fn footer_span(
+:end-before: /// Check the opening magic
+```
+````
+
+Anchor on text that will survive `cargo fmt`: a signature's opening, a doc comment's first
+words. Never `:lines:`. The MyST parse fails if an anchor stops matching.
+
+### Never fake the experiment
+
+A panel draws JSON from `parquet_lab::report`. It never computes a Parquet quantity in JavaScript,
+never shows a request the store did not log, and never shows a decoded value the reader did not
+decode. If a panel needs a number, the report must return it. `tests/test_wasm.py` holds every
+browser call to the native reader's answer, and `tests/browser/smoke.mjs` checks the drawn page
+against the native reader.
+
+## Problems
+
+A problem is a stub and a test that passes only when the stub is right.
+
+- The stub's doc comment is the problem statement. Say what to return, what to refuse, and what
+  not to use when using it would skip the lesson (`u32::from_le_bytes` in problem 2.1).
+- Mark each graded test `#[ignore = "problem N.M: fails until you solve it"]` and name it
+  `problem_N_M_…` so the chapter's command can select it.
+- Derive the expected answer at test time: from the reader, from a pyarrow manifest, or from an
+  independent computation. Never store it.
+- Test many cases, including the edges, so a hard-coded answer fails. Hand inputs over in an order
+  that catches a lazy solution (reversed, unsorted).
+- Make failure messages teach: "if you got X, you read the bytes most significant first".
+- Add an unmarked scaffolding test beside the problems proving they are answerable and not
+  trivially so. CI runs it.
+- The chapter shows the command for each tested problem, in a `bash` block, in the form
+  `cargo test -p exercises --test <slug> problem_N_M -- --ignored`. `tests/test_book.py` checks it.
+- The last problem has no test. It is about the reader's own files or systems, says what a good
+  answer contains, and says what a surprising result would mean.
+
+## What no check catches
+
+Read the finished page as somebody who has read every chapter before it and none after, and stop at:
+
+- a sentence that states a fact about the repository ("the reader handles X"). Is it true today?
+  Will it be true after the next phase?
+- a word used technically (*range*, *span*, *chunk*, *page*, *request*) in two senses on one page;
+- *the* in front of something the page has not introduced;
+- a table nobody chose the rows of;
+- the same argument made twice, far apart.
+
+Then run STYLE.md's two passes.
+
+## Definition of done
+
+- [ ] Reader code merged, tested, and quoted by text anchor
+- [ ] Problems written, failing for the right reason, solved outside the repository, scaffolded
+- [ ] Experiment built as a view of `report`, with its calls in `tests/test_wasm.py` and a check in
+      `tests/browser/smoke.mjs`
+- [ ] Every number from a generated fragment
+- [ ] *What this cannot tell you* names the simulation's and the code's limits
+- [ ] Edited against STYLE.md, both passes
+- [ ] The `[To write` markers gone, and `make check` clean
