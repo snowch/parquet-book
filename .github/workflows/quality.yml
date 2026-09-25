@@ -11,11 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Rust, with the WebAssembly target
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-          components: rustfmt, clippy
+      - name: Rust, at the version rust-toolchain.toml pins
+        # rustup reads rust-toolchain.toml and installs that exact toolchain, with its components
+        # and the WebAssembly target. A floating "stable" once turned CI red when a newer clippy
+        # added a lint.
+        run: rustup toolchain install || rustup show
 
       - uses: Swatinem/rust-cache@v2
 

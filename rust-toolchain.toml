@@ -1,0 +1,9 @@
+# The Rust the book is built and checked with, here and in CI.
+#
+# Pinned for the reason everything else is pinned: a newer clippy adds lints, and an unpinned
+# toolchain turns CI red on a commit that changed nothing. Upgrade on purpose, with `make check`.
+[toolchain]
+channel = "1.94.1"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"

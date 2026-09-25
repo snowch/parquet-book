@@ -728,11 +728,7 @@ fn encodings_sizes(root: &Path) -> Result<String, String> {
                 text_of(j.get("path")),
                 encoding.join(", "),
                 text_of(sz.get("count")),
-                if plain == 0 {
-                    0
-                } else {
-                    (enc * 100 + plain / 2) / plain
-                },
+                (enc * 100 + plain / 2).checked_div(plain).unwrap_or(0),
             ));
         }
     }
