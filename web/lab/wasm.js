@@ -74,6 +74,10 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  pages(id, column) {
+    return this.#result(this.exports.pl_pages(id, column));
+  }
+
   encodings(id, column) {
     return this.#result(this.exports.pl_encodings(id, column));
   }

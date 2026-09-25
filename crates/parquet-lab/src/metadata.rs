@@ -348,6 +348,13 @@ pub(crate) fn opt_int(s: &Struct, id: i16) -> Option<i64> {
     }
 }
 
+pub(crate) fn opt_bool(s: &Struct, id: i16) -> Option<bool> {
+    match s.field(id)?.node.value {
+        Value::Bool(v) => Some(v),
+        _ => None,
+    }
+}
+
 fn opt_bytes(s: &Struct, id: i16) -> Option<Vec<u8>> {
     match &s.field(id)?.node.value {
         Value::Binary(b) => Some(b.clone()),

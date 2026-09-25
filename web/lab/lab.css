@@ -215,6 +215,15 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .bar-row .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }
 .bar-row .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
 
+/* Ch06: pages. */
+.p-pages { border-bottom: 1px solid var(--edge); }
+.pages-list { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.pages-list th, .pages-list td { padding: .22rem .45rem; border-bottom: 1px solid var(--edge); text-align: left; white-space: nowrap; }
+.pages-list th { font-size: 10.5px; }
+.pages-list .num { text-align: right; font-variant-numeric: tabular-nums; }
+.pages-list tr.err td { color: var(--stop); }
+.pages-list button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }

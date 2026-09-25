@@ -158,9 +158,9 @@ _CHAPTERS = (
         "Pages",
         "the_values",
         "What is inside a column chunk, and how does a reader walk it?",
-        "A page walker for dictionary pages and data pages v1 and v2.",
-        (),
-        (),
+        "A page walker for dictionary pages and data pages v1 and v2, with row boundaries and checksums.",
+        ("pages",),
+        ("pages.parquet", "pages-v2.parquet"),
     ),
     (
         "compression",
@@ -261,4 +261,4 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
-EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels", "encodings")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels", "encodings", "pages")

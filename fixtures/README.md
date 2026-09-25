@@ -213,3 +213,72 @@ data_page_version='1.0'
 write_page_index=False
 column_encoding={'order_id': 'DELTA_BINARY_PACKED', 'ordered_at': 'DELTA_BINARY_PACKED', 'sku': 'DELTA_LENGTH_BYTE_ARRAY', 'url': 'DELTA_BYTE_ARRAY', 'weight_kg': 'BYTE_STREAM_SPLIT'}
 ```
+
+## `pages.parquet`
+
+Sixty orders written in small pages, so every column chunk holds several data pages, and the country column has a dictionary page in front of them and nulls in them. Data page version 1.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 2102 bytes |
+| Rows | 60 |
+| Row groups | 1 |
+| Footer length | 396 bytes |
+| SHA-256 | `ff3686c993b2a7d4…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=['country']
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+data_page_size=128
+write_batch_size=16
+```
+
+## `pages-v2.parquet`
+
+The same sixty orders in data page version 2, with a CRC-32 checksum in every page header. Compare its pages with pages.parquet's: the levels move out of the compressible section and each header counts its rows and nulls.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 2223 bytes |
+| Rows | 60 |
+| Row groups | 1 |
+| Footer length | 396 bytes |
+| SHA-256 | `07c512f36c0dba3f…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 1 | 0 | PLAIN, RLE, RLE_DICTIONARY | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=['country']
+write_statistics=True
+store_schema=False
+data_page_version='2.0'
+write_page_index=False
+data_page_size=128
+write_batch_size=16
+write_page_checksum=True
+```

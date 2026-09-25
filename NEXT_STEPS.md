@@ -38,13 +38,20 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Fixtures: `dictionary.parquet`, `encodings.parquet`. Experiment: the encodings stepper.
 - Problems 5.1 to 5.3 with tests; 5.4 about the reader's own columns.
 
-## Next: ch06, pages
+## Done: ch06, pages
 
-1. Fixture: `pages.parquet` with several pages per column chunk (a small `data_page_size`), and a
-   data page v2 variant with nulls.
-2. Reader: data page v2 (levels outside the compressed section, `num_rows`, `num_nulls`), RLE for
-   booleans, records that span v1 pages; page CRCs when present.
-3. Experiment: a page walker listing every page's offset, sizes, encoding and statistics.
+- Reader: data page v2 bodies, v2 header fields, CRC-32 page checksums, rows per page
+  (`column::first_rows`). Fixtures `pages.parquet` and `pages-v2.parquet`. The page walker panel.
+- Problems 6.1 (walk a chunk) and 6.2 (CRC-32) with tests; 6.3 open.
+- The Rust toolchain is pinned in `rust-toolchain.toml`, after a floating `stable` turned CI red.
+
+## Next: ch07, compression
+
+1. Decide the codec strategy and record it in PLAN.md §4: the reader has no dependencies, so
+   either write teaching decoders (Snappy and LZ4_RAW are small; GZIP's DEFLATE is manageable)
+   or keep ZSTD out of the reader and measure it with pyarrow at fixture time.
+2. Fixtures: the same table under each codec, and one column with BYTE_STREAM_SPLIT then ZSTD.
+3. Experiment: encoded size, compressed size and ratio per codec, and a page decompressed in view.
 
 ## Then
 

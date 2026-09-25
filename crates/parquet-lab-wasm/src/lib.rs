@@ -232,3 +232,12 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
         None => no_such_file(id),
     }
 }
+
+/// Ch06's experiment: every page of one column chunk. See `report::pages`.
+#[no_mangle]
+pub extern "C" fn pl_pages(id: u32, column: u32) -> usize {
+    match with_file(id, |f| report::pages(&f.bytes, column as usize)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}

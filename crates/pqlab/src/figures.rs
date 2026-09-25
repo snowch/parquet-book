@@ -101,6 +101,18 @@ const FIGURES: &[Figure] = &[
         file: "split-weights.md",
         render: split_weights,
     },
+    Figure {
+        file: "pages-country-v1.md",
+        render: |root| pages_table(root, "pages.parquet"),
+    },
+    Figure {
+        file: "pages-country-v2.md",
+        render: |root| pages_table(root, "pages-v2.parquet"),
+    },
+    Figure {
+        file: "page-header-fields.md",
+        render: page_header_fields,
+    },
 ];
 
 pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
@@ -912,5 +924,135 @@ fn split_weights(root: &Path) -> Result<String, String> {
         ));
     }
     s.push_str(&conditions("encodings.parquet", &bytes, None));
+    Ok(s)
+}
+
+fn pages_table(root: &Path, file: &str) -> Result<String, String> {
+    let bytes = fixture(root, file)?;
+    let j = parquet_lab::report::pages(&bytes, 1);
+    if j.get("ok") != Some(&Json::Bool(true)) {
+        return Err(format!("{file}: {}", j.to_json()));
+    }
+    let pages = j.get("pages").and_then(Json::as_array).ok_or("no pages")?;
+    let v2 = pages
+        .iter()
+        .any(|p| !matches!(p.get("v2"), Some(Json::Null) | None));
+    let dash = |v: String| if v.is_empty() { "·".to_string() } else { v };
+    let mut s = String::from(HEADER);
+    if v2 {
+        s.push_str("| # | Type | Starts at | Body bytes | Values | Rows | Nulls | Level bytes (def) | Checksum |\n|--:|---|--:|--:|--:|--:|--:|--:|---|\n");
+    } else {
+        s.push_str("| # | Type | Starts at | Body bytes | Values | First row | Rows | Nulls | Min | Max |\n|--:|---|--:|--:|--:|--:|--:|--:|---|---|\n");
+    }
+    for p in pages {
+        let start = p
+            .get("span")
+            .and_then(Json::as_array)
+            .and_then(|a| a.first())
+            .map(|x| x.to_json())
+            .unwrap_or_default();
+        let st = p.get("statistics");
+        let pick = |k: &str| dash(text_of(st.and_then(|x| x.get(k))));
+        let v = p.get("v2");
+        let vk = |k: &str| dash(text_of(v.and_then(|x| x.get(k))));
+        if v2 {
+            s.push_str(&format!(
+                "| {} | {} | {start} | {} | {} | {} | {} | {} | {} |\n",
+                text_of(p.get("index")),
+                text_of(p.get("type")),
+                text_of(p.get("compressed_page_size")),
+                dash(text_of(p.get("num_values"))),
+                vk("num_rows"),
+                vk("num_nulls"),
+                vk("definition_levels_byte_length"),
+                match p.get("crc_ok") {
+                    Some(Json::Bool(true)) => "matches",
+                    Some(Json::Bool(false)) => "does not match",
+                    _ => "none stored",
+                },
+            ));
+        } else {
+            s.push_str(&format!(
+                "| {} | {} | {start} | {} | {} | {} | {} | {} | {} | {} |\n",
+                text_of(p.get("index")),
+                text_of(p.get("type")),
+                text_of(p.get("compressed_page_size")),
+                dash(text_of(p.get("num_values"))),
+                dash(text_of(p.get("first_row"))),
+                dash(text_of(p.get("rows_started"))),
+                pick("null_count"),
+                pick("min"),
+                pick("max"),
+            ));
+        }
+    }
+    s.push_str(&format!(
+        "\n*Computed by the reader from `fixtures/{file}` ({} bytes), column `{}`.*\n",
+        bytes.len(),
+        text_of(j.get("path"))
+    ));
+    Ok(s)
+}
+
+fn page_header_fields(root: &Path) -> Result<String, String> {
+    let bytes = fixture(root, "pages.parquet")?;
+    let md = open_bytes(&bytes)?;
+    let chunk = &md.row_groups[0].columns[2];
+    let r = chunk.byte_range();
+    let pages = parquet_lab::pages::walk_pages(&bytes[r.start as usize..r.end as usize], r.start)
+        .map_err(|e| e.to_string())?;
+    let page = pages.first().ok_or("no page")?;
+    let tree = parquet_lab::report::annotate(&page.header, "PageHeader", "PageHeader", Some(chunk));
+    let mut rows = Vec::new();
+    fn walk(n: &Json, prefix: &str, rows: &mut Vec<(String, (u64, u64), String)>) {
+        let label = text_of(n.get("label"));
+        let path = if prefix.is_empty() {
+            label.clone()
+        } else {
+            format!("{prefix}.{label}")
+        };
+        let kids = n
+            .get("children")
+            .and_then(Json::as_array)
+            .cloned()
+            .unwrap_or_default();
+        if kids.is_empty() {
+            let sp = n
+                .get("span")
+                .and_then(Json::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let a = sp.first().and_then(Json::as_u64).unwrap_or(0);
+            let b = sp.get(1).and_then(Json::as_u64).unwrap_or(0);
+            rows.push((path, (a, b), text_of(n.get("value"))));
+        } else {
+            for k in &kids {
+                walk(
+                    k,
+                    if prefix.is_empty() && label == "PageHeader" {
+                        ""
+                    } else {
+                        &path
+                    },
+                    rows,
+                );
+            }
+        }
+    }
+    walk(&tree, "", &mut rows);
+    let mut s = String::from(HEADER);
+    s.push_str("| Field | Bytes | Value |\n|---|---|---|\n");
+    for (path, (a, b), value) in rows {
+        s.push_str(&format!(
+            "| `{path}` | `{}` | {} |\n",
+            parquet_lab::encoding::hex(&bytes[a as usize..b as usize]),
+            value.replace('|', "\\|")
+        ));
+    }
+    s.push_str(&format!(
+        "\nThe header takes bytes {} to {} of the file; the body that follows it is {} bytes.\n",
+        page.header_span.start, page.header_span.end, page.compressed_page_size
+    ));
+    s.push_str(&conditions("pages.parquet", &bytes, None));
     Ok(s)
 }

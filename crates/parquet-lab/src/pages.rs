@@ -4,11 +4,13 @@
 //! by `compressed_page_size` bytes of body. The header says how long the body is, and so where
 //! the next header starts, which is how a reader walks a chunk without any index.
 //!
-//! This module reads the headers and measures the bodies. It does not decode the values in the
-//! bodies: that is ch05's encodings and ch07's decompression.
+//! This module reads the headers, measures the bodies, and checks each body against the CRC its
+//! header carries, when it carries one. [`crate::column`] decodes what the bodies hold.
 
-use crate::bytes::{ByteReader, Span};
-use crate::metadata::{as_struct, opt_int, req_int, statistics, MetadataError, Statistics};
+use crate::bytes::{crc32, ByteReader, Span};
+use crate::metadata::{
+    as_struct, opt_bool, opt_int, req_int, statistics, MetadataError, Statistics,
+};
 use crate::parquet_thrift::{enum_value_name, EnumName};
 use crate::thrift::{read_struct, Node};
 
@@ -24,7 +26,24 @@ pub struct Page {
     pub num_values: Option<i64>,
     pub encoding: Option<String>,
     pub statistics: Option<Statistics>,
+    /// The checksum the header carries, and whether the body still matches it.
+    pub crc: Option<i64>,
+    pub crc_ok: Option<bool>,
+    /// Data page version 2's extra fields.
+    pub v2: Option<PageV2>,
     pub header: Node,
+}
+
+/// What a data page version 2 header adds (ch06).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PageV2 {
+    pub num_nulls: i64,
+    pub num_rows: i64,
+    /// The level streams' lengths: in version 2 they are in the header, not the body.
+    pub definition_levels_byte_length: i64,
+    pub repetition_levels_byte_length: i64,
+    /// Whether the values section is compressed. The levels never are.
+    pub is_compressed: bool,
 }
 
 impl Page {
@@ -72,7 +91,19 @@ pub fn walk_pages(chunk: &[u8], base: u64) -> Result<Vec<Page>, MetadataError> {
         let (body, body_span) = r
             .read_bytes(usize::try_from(compressed).unwrap_or(usize::MAX))
             .map_err(|e| MetadataError::Thrift(e.into()))?;
-        let _ = body;
+        let crc = opt_int(h, 4);
+        // The header stores the CRC as a signed 32-bit integer.
+        let crc_ok = crc.map(|c| c as i32 as u32 == crc32(body));
+        let v2 = match (page_type, sub) {
+            (3, Some(s)) => Some(PageV2 {
+                num_nulls: opt_int(s, 2).unwrap_or(0),
+                num_rows: opt_int(s, 3).unwrap_or(0),
+                definition_levels_byte_length: opt_int(s, 5).unwrap_or(0),
+                repetition_levels_byte_length: opt_int(s, 6).unwrap_or(0),
+                is_compressed: opt_bool(s, 7).unwrap_or(true),
+            }),
+            _ => None,
+        };
         pages.push(Page {
             page_type: enum_value_name(EnumName::PageType, page_type)
                 .map(str::to_string)
@@ -87,6 +118,9 @@ pub fn walk_pages(chunk: &[u8], base: u64) -> Result<Vec<Page>, MetadataError> {
                 .and_then(|v| enum_value_name(EnumName::Encoding, v))
                 .map(str::to_string),
             statistics: stats,
+            crc,
+            crc_ok,
+            v2,
             header,
         });
     }

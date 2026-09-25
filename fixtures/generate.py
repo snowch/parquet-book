@@ -110,6 +110,27 @@ NESTED = pa.schema(
     ]
 )
 
+#: Sixty orders, enough to fill several small pages. Every seventh country is null.
+PAGES_TABLE = pa.table(
+    {
+        "order_id": pa.array(range(1, 61), pa.int64()),
+        "country": pa.array(
+            [["UK", "SE", "PL", "US"][(i * 5) % 4] if i % 7 else None for i in range(60)], pa.string()
+        ),
+        "amount_cents": pa.array([(i * 37) % 5000 for i in range(60)], pa.int64()),
+    },
+    schema=pa.schema(
+        [
+            pa.field("order_id", pa.int64(), nullable=False),
+            pa.field("country", pa.string(), nullable=True),
+            pa.field("amount_cents", pa.int64(), nullable=False),
+        ]
+    ),
+)
+
+#: Small pages: the writer starts a new page after a few values, so each column chunk has several.
+SMALL_PAGES = {"data_page_size": 128, "write_batch_size": 16, "use_dictionary": ["country"]}
+
 FIXTURES = (
     Fixture(
         name="tiny",
@@ -260,6 +281,26 @@ FIXTURES = (
                 "weight_kg": "BYTE_STREAM_SPLIT",
             }
         },
+    ),
+    Fixture(
+        name="pages",
+        why=(
+            "Sixty orders written in small pages, so every column chunk holds several data "
+            "pages, and the country column has a dictionary page in front of them and nulls "
+            "in them. Data page version 1."
+        ),
+        table=PAGES_TABLE,
+        options=SMALL_PAGES,
+    ),
+    Fixture(
+        name="pages-v2",
+        why=(
+            "The same sixty orders in data page version 2, with a CRC-32 checksum in every page "
+            "header. Compare its pages with pages.parquet's: the levels move out of the "
+            "compressible section and each header counts its rows and nulls."
+        ),
+        table=PAGES_TABLE,
+        options={**SMALL_PAGES, "data_page_version": "2.0", "write_page_checksum": True},
     ),
 )
 

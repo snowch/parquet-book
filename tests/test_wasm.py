@@ -27,13 +27,17 @@ pytestmark = [
 SIZE_FLAG = {"head": "head", "known": "known", "suffix": "suffix"}
 
 
+PQLAB = ROOT / "target" / "debug" / "pqlab"
+
+
+@pytest.fixture(scope="module", autouse=True)
+def built_pqlab():
+    # Build once, then run the binary: hundreds of `cargo run`s would each check the build.
+    subprocess.run(["cargo", "build", "--quiet", "-p", "pqlab"], cwd=ROOT, check=True)
+
+
 def pqlab(*args: str) -> dict:
-    out = subprocess.run(
-        ["cargo", "run", "--quiet", "-p", "pqlab", "--", *args],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-    )
+    out = subprocess.run([str(PQLAB), *args], cwd=ROOT, capture_output=True, text=True)
     return json.loads(out.stdout)
 
 
@@ -80,6 +84,8 @@ def cases():
             native.append(("levels", f, str(column)))
             calls.append({"call": "encodings", "file": f, "column": column})
             native.append(("encodings", f, str(column)))
+            calls.append({"call": "pages", "file": f, "column": column})
+            native.append(("pages", f, str(column)))
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))

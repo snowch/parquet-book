@@ -117,6 +117,23 @@ pub fn zigzag_decode(n: u64) -> i64 {
     ((n >> 1) as i64) ^ -((n & 1) as i64)
 }
 
+/// The CRC-32 checksum of `bytes`: the IEEE polynomial, as zlib and Ethernet compute it.
+///
+/// Parquet page headers may carry one over the page body, so a reader can tell a damaged page
+/// from a page whose values happen to look odd. Computed a bit at a time: slower than a table,
+/// and short enough to read.
+pub fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for &b in bytes {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            let mask = (crc & 1).wrapping_neg();
+            crc = (crc >> 1) ^ (0xedb8_8320 & mask);
+        }
+    }
+    !crc
+}
+
 /// A cursor over a slice of bytes that knows the absolute file offset of its first byte.
 ///
 /// The footer arrives as a separate buffer from the rest of the file, but every span this
@@ -256,6 +273,13 @@ mod tests {
                 wanted: 1
             })
         );
+    }
+
+    #[test]
+    fn crc32_matches_the_standard_check_value() {
+        // The check value every CRC-32 implementation is tested against.
+        assert_eq!(crc32(b"123456789"), 0xcbf4_3926);
+        assert_eq!(crc32(b""), 0);
     }
 
     #[test]

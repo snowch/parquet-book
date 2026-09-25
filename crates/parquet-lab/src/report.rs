@@ -1122,3 +1122,172 @@ pub fn encodings(file: &[u8], column: usize) -> Json {
         ),
     ])
 }
+
+/// Ch06's experiment: every page of one column chunk, what its header says, where its parts are,
+/// and which rows it holds.
+pub fn pages(file: &[u8], column: usize) -> Json {
+    use crate::column::read_column;
+    use crate::logical;
+    use crate::schema::{build, leaves};
+
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let md = match open_bytes(file) {
+        Ok(md) => md,
+        Err(e) => return fail(e),
+    };
+    let root = match build(&md.schema) {
+        Ok(r) => r,
+        Err(e) => return fail(e.to_string()),
+    };
+    let all = leaves(&root);
+    let Some(leaf) = all.get(column) else {
+        return fail(format!("the file has no column {column}"));
+    };
+    let columns = Json::Arr(
+        all.iter()
+            .map(|l| {
+                obj([
+                    ("column", l.column.into()),
+                    ("path", l.dotted_path().into()),
+                ])
+            })
+            .collect(),
+    );
+    let stat = |c: &ColumnChunk, b: &Option<Vec<u8>>| -> Json {
+        b.as_ref()
+            .map(|b| {
+                leaf.logical_type
+                    .as_ref()
+                    .and_then(|l| logical::interpret(c.physical_type, l, b))
+                    .or_else(|| plain_scalar(c.physical_type, b))
+                    .unwrap_or_else(|| hex(b))
+            })
+            .into()
+    };
+    let mut out = Vec::new();
+    let mut row = 0u64;
+    for (g, rg) in md.row_groups.iter().enumerate() {
+        let chunk = &rg.columns[leaf.column];
+        let range = chunk.byte_range();
+        let Some(bytes) = file.get(range.start as usize..range.end as usize) else {
+            return fail(format!("column chunk {range} is past the end of the file"));
+        };
+        let walked = match walk_pages(bytes, range.start) {
+            Ok(p) => p,
+            Err(e) => return fail(e.to_string()),
+        };
+        // Rows per page come from the decoded levels: a row starts wherever r is 0.
+        let decoded = read_column(file, chunk, leaf).ok();
+        let per_page: Vec<Vec<u32>> = (0..walked.len())
+            .map(|i| {
+                decoded
+                    .as_ref()
+                    .map(|d| {
+                        d.triples
+                            .iter()
+                            .filter(|t| t.page == i)
+                            .map(|t| t.rep)
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            })
+            .collect();
+        let firsts = crate::column::first_rows(&per_page);
+        let group_start = row;
+        for (i, p) in walked.iter().enumerate() {
+            let starts = decoded
+                .as_ref()
+                .map(|_| per_page[i].iter().filter(|&&r| r == 0).count() as u64);
+            let data_page = decoded.as_ref().and_then(|d| {
+                d.pages
+                    .iter()
+                    .find(|dp| dp.page.header_span == p.header_span)
+            });
+            let first_row = group_start + firsts[i];
+            row += starts.unwrap_or(0);
+            out.push(obj([
+                ("row_group", g.into()),
+                ("index", i.into()),
+                ("type", p.page_type.clone().into()),
+                ("span", p.span().into()),
+                ("header", p.header_span.into()),
+                ("body", p.body_span.into()),
+                ("compressed_page_size", p.compressed_page_size.into()),
+                ("uncompressed_page_size", p.uncompressed_page_size.into()),
+                ("num_values", p.num_values.into()),
+                ("encoding", p.encoding.clone().into()),
+                (
+                    "statistics",
+                    p.statistics
+                        .as_ref()
+                        .map(|s| {
+                            obj([
+                                ("min", stat(chunk, &s.min_value)),
+                                ("max", stat(chunk, &s.max_value)),
+                                ("null_count", s.null_count.into()),
+                            ])
+                        })
+                        .unwrap_or(Json::Null),
+                ),
+                ("crc", p.crc.into()),
+                ("crc_ok", p.crc_ok.into()),
+                (
+                    "v2",
+                    p.v2.map(|v| {
+                        obj([
+                            ("num_nulls", v.num_nulls.into()),
+                            ("num_rows", v.num_rows.into()),
+                            (
+                                "definition_levels_byte_length",
+                                v.definition_levels_byte_length.into(),
+                            ),
+                            (
+                                "repetition_levels_byte_length",
+                                v.repetition_levels_byte_length.into(),
+                            ),
+                            ("is_compressed", v.is_compressed.into()),
+                        ])
+                    })
+                    .unwrap_or(Json::Null),
+                ),
+                (
+                    "repetition_levels",
+                    data_page
+                        .and_then(|d| d.rep_levels.as_ref().map(|(s, _)| Json::from(*s)))
+                        .unwrap_or(Json::Null),
+                ),
+                (
+                    "definition_levels",
+                    data_page
+                        .and_then(|d| d.def_levels.as_ref().map(|(s, _)| Json::from(*s)))
+                        .unwrap_or(Json::Null),
+                ),
+                (
+                    "values",
+                    data_page
+                        .map(|d| Json::from(d.values))
+                        .unwrap_or(Json::Null),
+                ),
+                (
+                    "first_row",
+                    if starts.is_some() && p.page_type != "DICTIONARY_PAGE" {
+                        first_row.into()
+                    } else {
+                        Json::Null
+                    },
+                ),
+                (
+                    "rows_started",
+                    starts.filter(|_| p.page_type != "DICTIONARY_PAGE").into(),
+                ),
+            ]));
+        }
+    }
+    obj([
+        ("ok", true.into()),
+        ("columns", columns),
+        ("column", column.into()),
+        ("path", leaf.dotted_path().into()),
+        ("pages", Json::Arr(out)),
+    ])
+}

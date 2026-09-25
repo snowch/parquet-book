@@ -21,8 +21,10 @@
 //! The values may be encoded in any way [`crate::decode`] knows (ch05). A dictionary page, when
 //! there is one, comes first, and the data pages then hold indices into it.
 //!
-//! What this reader does not do yet, and says so rather than guessing: decompress pages (ch07)
-//! and read data page version 2 (ch06).
+//! A data page version 2 (ch06) keeps the same three parts, but the level streams' lengths move
+//! into the page header, so the levels have no length prefix, and they are never compressed.
+//!
+//! What this reader does not do yet, and says so rather than guessing: decompress pages (ch07).
 
 use std::fmt;
 
@@ -89,14 +91,21 @@ fn err<T>(message: impl Into<String>) -> Result<T, ColumnError> {
     Err(ColumnError(message.into()))
 }
 
-/// Read one level stream: a four-byte length, then that many bytes of RLE/bit-packed runs.
+/// Read one level stream of RLE / bit-packed runs.
+///
+/// In a version 1 page the stream starts with its own four-byte length (`known_len` is `None`).
+/// In a version 2 page the header already gave the length, and the stream has no prefix.
 fn level_stream(
     r: &mut ByteReader,
     max_level: u32,
     count: usize,
+    known_len: Option<usize>,
 ) -> Result<(Span, Vec<Run>), ColumnError> {
     let start = r.offset();
-    let len = r.read_le_u32().map_err(|e| ColumnError(e.to_string()))? as usize;
+    let len = match known_len {
+        Some(n) => n,
+        None => r.read_le_u32().map_err(|e| ColumnError(e.to_string()))? as usize,
+    };
     let (bytes, body) = r.read_bytes(len).map_err(|e| ColumnError(e.to_string()))?;
     let runs = rle::decode(bytes, body.start, bit_width(max_level), count)
         .map_err(|e| ColumnError(format!("levels: {e}")))?;
@@ -131,7 +140,7 @@ pub fn read_column(
         let body_start = page.body_span.start as usize - range.start as usize;
         let body = &bytes[body_start..body_start + page.body_span.len() as usize];
         match page.page_type.as_str() {
-            "DATA_PAGE" => {}
+            "DATA_PAGE" | "DATA_PAGE_V2" => {}
             "DICTIONARY_PAGE" => {
                 // The dictionary: every distinct value, PLAIN-encoded, once.
                 let count = page.num_values.unwrap_or(0).max(0) as usize;
@@ -146,18 +155,40 @@ pub fn read_column(
                 out.dictionary = Some(DictionaryPage { page, entries });
                 continue;
             }
-            "DATA_PAGE_V2" => return err("this column uses data page version 2; ch06 reads it"),
             other => return err(format!("unexpected page type {other}")),
         }
         let count = page.num_values.unwrap_or(0).max(0) as usize;
         let mut r = ByteReader::new(body, page.body_span.start);
+        // Version 2 moves the level lengths into the header and never compresses the levels.
+        let (rep_len, def_len) = match page.v2 {
+            Some(v2) => (
+                Some(v2.repetition_levels_byte_length.max(0) as usize),
+                Some(v2.definition_levels_byte_length.max(0) as usize),
+            ),
+            None => (None, None),
+        };
+        if page.v2.is_some_and(|v2| v2.is_compressed) && chunk.codec != "UNCOMPRESSED" {
+            return err(
+                "this page's values are compressed; the reader decompresses pages from ch07 on",
+            );
+        }
         let rep_levels = if leaf.max_repetition_level > 0 {
-            Some(level_stream(&mut r, leaf.max_repetition_level, count)?)
+            Some(level_stream(
+                &mut r,
+                leaf.max_repetition_level,
+                count,
+                rep_len,
+            )?)
         } else {
             None
         };
         let def_levels = if leaf.max_definition_level > 0 {
-            Some(level_stream(&mut r, leaf.max_definition_level, count)?)
+            Some(level_stream(
+                &mut r,
+                leaf.max_definition_level,
+                count,
+                def_len,
+            )?)
         } else {
             None
         };
@@ -215,4 +246,19 @@ pub fn read_column(
         });
     }
     Ok(out)
+}
+
+/// The index of the first row each page holds, given each page's repetition levels.
+///
+/// A row starts wherever the repetition level is 0. Under data page version 1 a row can begin in
+/// one page and continue in the next, so a page's first slot may not start a row; the page's
+/// first row is then the one that starts next. Counting the zeros before each page is enough.
+pub fn first_rows(rep_levels_per_page: &[Vec<u32>]) -> Vec<u64> {
+    let mut out = Vec::with_capacity(rep_levels_per_page.len());
+    let mut started = 0u64;
+    for page in rep_levels_per_page {
+        out.push(started);
+        started += page.iter().filter(|&&r| r == 0).count() as u64;
+    }
+    out
 }

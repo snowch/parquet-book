@@ -408,3 +408,43 @@ fn records_rebuilt_from_levels_match_pyarrows_rows() {
     }
     assert!(checked > 40, "only {checked} records compared");
 }
+
+#[test]
+fn page_checksums_verify_and_catch_damage() {
+    let (name, bytes, _) = fixtures()
+        .into_iter()
+        .find(|f| f.0 == "pages-v2.parquet")
+        .unwrap();
+    let md = report::open_bytes(&bytes).unwrap();
+    let mut checked = 0;
+    for rg in &md.row_groups {
+        for c in &rg.columns {
+            let r = c.byte_range();
+            let pages =
+                parquet_lab::pages::walk_pages(&bytes[r.start as usize..r.end as usize], r.start)
+                    .unwrap();
+            for p in &pages {
+                assert_eq!(
+                    p.crc_ok,
+                    Some(true),
+                    "{name} {} page at {}",
+                    c.dotted_path(),
+                    p.span()
+                );
+                checked += 1;
+            }
+            // Flip one bit in the first page's body: its checksum must now fail.
+            let mut damaged = bytes[r.start as usize..r.end as usize].to_vec();
+            let at = (pages[0].body_span.start - r.start) as usize;
+            damaged[at] ^= 1;
+            let again = parquet_lab::pages::walk_pages(&damaged, r.start).unwrap();
+            assert_eq!(
+                again[0].crc_ok,
+                Some(false),
+                "{name} {}: damage undetected",
+                c.dotted_path()
+            );
+        }
+    }
+    assert!(checked > 8, "only {checked} pages carried a checksum");
+}

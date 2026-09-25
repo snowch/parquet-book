@@ -141,7 +141,7 @@ and keeps its entries with the bytes each came from:
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: "DICTIONARY_PAGE" => {
-:end-before: "DATA_PAGE_V2" =>
+:end-before: other => return err(format!("unexpected page type
 ```
 
 A data page's indices are the hybrid from [ch04](#nested-data), with the bit width in the byte

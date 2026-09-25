@@ -196,6 +196,25 @@ await page.waitForFunction((v) => document.querySelector('.lab[data-experiment="
 check(true, "dictionary.parquet's country decodes through its dictionary to the reader's values");
 if (shots) await encLab.screenshot({ path: path.join(shots, "encodings-lab.png") });
 
+// ch06: pages. The page list, and a checksum failing after damage, are the reader's.
+await page.goto(base + "pages.html");
+const pagesLab = page.locator('.lab[data-experiment="pages"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="pages"]')?.dataset.state === "ok");
+const nativePages = native(["pages", "fixtures/pages.parquet", "1"]);
+check(await pagesLab.getAttribute("data-pages") === String(nativePages.pages.length),
+  `country's chunk holds the reader's ${nativePages.pages.length} pages`);
+await pagesLab.locator(".lab-head select").selectOption("pages-v2.parquet");
+await page.waitForFunction(() => /^(ok,)+ok$/.test(document.querySelector('.lab[data-experiment="pages"]').dataset.crc || ""));
+check(true, "every v2 page's checksum matches");
+const v2 = native(["pages", "fixtures/pages-v2.parquet", "1"]);
+const target = v2.pages[1].values[0];
+await pagesLab.locator(`.hex .b[data-o="${target}"]`).click();
+await pagesLab.locator('.inspector input[name="byte"]').fill("ff");
+await pagesLab.locator(".inspector form.edit button[type=submit]").click();
+await page.waitForFunction(() => (document.querySelector('.lab[data-experiment="pages"]').dataset.crc || "").split(",")[1] === "bad");
+check(true, `damaging byte ${target} makes page 1's checksum fail, and only page 1's`);
+if (shots) await pagesLab.screenshot({ path: path.join(shots, "pages-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();
