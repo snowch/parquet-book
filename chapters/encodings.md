@@ -349,6 +349,10 @@ different encoding would suit the values better, and say what pattern in the val
 think so. A good answer checks the claim by rewriting that column with the other encoding and
 measuring; if the saving does not appear, say what the values do that you did not expect.
 
+```problems
+chapter: encodings
+```
+
 ## Where to go next
 
 - Every encoding is specified in the format repository's

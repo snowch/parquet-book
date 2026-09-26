@@ -94,15 +94,16 @@ a.xref:hover { text-decoration: underline; }
 
 main { min-width: 0; padding: 1rem 2.2rem 5rem; }
 .page { max-width: 46rem; margin: 0 auto; }
-.page > .wide, .page .lab { max-width: none; }
+.page > .wide, .page :is(.lab, .workbench, .reader-editor) { max-width: none; }
 /* An experiment takes the whole middle column, not the prose measure: a hex dump is sixteen
    columns wide and sits beside a tree. The margin is the difference between the column and the
-   prose, so the panel never reaches under the outline beside it. */
+   prose, so the panel never reaches under the outline beside it. Code a reader edits (a chapter's
+   problems, the reader's own files) gets the same width, for its long lines. */
 @media (min-width: 75rem) {
-  .page .lab { margin-inline: min(0px, calc((100% - min(100vw - var(--nav) - var(--toc) - 5.4rem, 72rem)) / 2)); }
+  .page :is(.lab, .workbench, .reader-editor) { margin-inline: min(0px, calc((100% - min(100vw - var(--nav) - var(--toc) - 5.4rem, 72rem)) / 2)); }
 }
 @media (min-width: 52rem) and (max-width: 75rem) {
-  .page .lab { margin-inline: min(0px, calc((100% - (100vw - var(--nav) - 5.4rem)) / 2)); }
+  .page :is(.lab, .workbench, .reader-editor) { margin-inline: min(0px, calc((100% - (100vw - var(--nav) - 5.4rem)) / 2)); }
 }
 
 main :is(h1, h2, h3, h4) { font-family: var(--chrome); letter-spacing: -.012em; }

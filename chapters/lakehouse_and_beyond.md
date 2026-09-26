@@ -359,6 +359,10 @@ the rows within each partition. For each condition, say whether the path, the lo
 or neither would rule files out. A good answer names one condition neither helps, and says what
 it would cost to change the layout so that one did.
 
+```problems
+chapter: lakehouse_and_beyond
+```
+
 ## Where to go next
 
 - The [Delta Lake protocol](https://github.com/delta-io/delta/blob/master/PROTOCOL.md) specifies

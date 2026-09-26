@@ -1,0 +1,27 @@
+// The book's repository, ready to build, test and edit in GitHub Codespaces or any dev container.
+//
+// It installs what CI installs (.github/workflows/quality.yml): the Rust toolchain that
+// rust-toolchain.toml pins, with the WebAssembly target; Python 3.11 with the pinned packages;
+// Node 22 with the pinned MyST; and Playwright's Chromium for the browser test. After that,
+// `make check` runs exactly what CI runs, and `make serve` serves the book on port 8000.
+{
+  "name": "Parquet, byte by byte",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "postCreateCommand": "rustup show && make install && npm install -g playwright@1.56.1 && playwright install --with-deps chromium && cargo build --workspace",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": { "label": "The book (make serve)", "onAutoForward": "openPreview" }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": ["README.md"]
+    },
+    "vscode": {
+      "extensions": ["rust-lang.rust-analyzer", "ms-python.python", "charliermarsh.ruff"]
+    }
+  }
+}

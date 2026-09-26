@@ -9,7 +9,10 @@
 // The reader exists twice, in Rust and in Python, and the tests hold them to the same JSON. A lab
 // runs on the Rust reader compiled to WebAssembly unless the reader chooses Python, which runs the
 // book's Python files under Pyodide. The choice is remembered, and offered for every lab the
-// Python reader can run, which the build reads from its EXPERIMENTS list.
+// Python reader can run, which the build reads from its EXPERIMENTS list. On Python, a reader can
+// edit the reader's code and run the labs on the edit (editor.js).
+//
+// A chapter's problems workbench (workbench.js) mounts here too.
 
 import { Lab } from "./wasm.js";
 import { PyLab } from "./python.js";
@@ -27,6 +30,8 @@ import { mountWriting } from "./writing.js";
 import { mountEngine } from "./engine.js";
 import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
+import { openEditor } from "./editor.js";
+import { mountWorkbench } from "./workbench.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
@@ -88,17 +93,26 @@ function engineBar(el, engine) {
   const bar = document.createElement("div");
   bar.className = "engine-bar";
   bar.innerHTML = `<span>Run on the reader in</span>` + Object.entries(ENGINES).map(([key, e]) =>
-    `<button type="button" data-engine="${key}" aria-pressed="${key === engine}" title="The book's ${e.name} reader, ${e.detail}">${e.name}</button>`).join("");
+    `<button type="button" data-engine="${key}" aria-pressed="${key === engine}" title="The book's ${e.name} reader, ${e.detail}">${e.name}</button>`).join("") +
+    (engine === "python" ? `<button type="button" class="edit-code" data-edit>Edit the code</button>` : "");
   bar.addEventListener("click", (e) => {
+    if (e.target.closest("button[data-edit]")) {
+      loadEngine("python").then((lab) => openEditor(el, lab, remountAll));
+      return;
+    }
     const b = e.target.closest("button[data-engine]");
     if (!b || b.dataset.engine === el.dataset.engine) return;
     try {
       localStorage.setItem("lab-engine", b.dataset.engine);
     } catch {}
     // Every lab on the page follows the choice.
-    for (const other of document.querySelectorAll(".lab[data-experiment]")) mount(other);
+    remountAll();
   });
   return bar;
+}
+
+function remountAll() {
+  for (const el of document.querySelectorAll(".lab[data-experiment]")) mount(el);
 }
 
 async function mount(el) {
@@ -119,6 +133,14 @@ async function mount(el) {
   try {
     const lab = await loadEngine(engine);
     if (el.dataset.engine !== engine) return; // the reader switched engines while this loaded
+    const edited = engine === "python" ? Object.keys(lab.edits) : [];
+    if (edited.length) {
+      const note = document.createElement("span");
+      note.className = "edited";
+      note.textContent = `running your edits to ${edited.join(", ")}`;
+      bar.querySelector("span").after(note);
+    }
+    if (engine === "python" && lab.error) throw new Error(`the edited Python reader does not import:\n${lab.error}`);
     const names = (config.fixtures || config.fixture || "").split(",").map((s) => s.trim()).filter(Boolean);
     const files = new Fixtures(names);
     el.innerHTML = "";
@@ -126,11 +148,25 @@ async function mount(el) {
     await run(el, lab, files, config.fixture || names[0], config);
     el.dataset.ready = "true";
   } catch (error) {
-    el.innerHTML = `<p class="lab-error">The experiment could not start: ${String(error.message || error)}</p>`;
-    if (bar) el.prepend(bar);
+    // As text: a Python traceback names "<module>", which is not markup.
+    const message = document.createElement("p");
+    message.className = "lab-error";
+    message.textContent = `The experiment could not start: ${String(error.message || error)}`;
+    el.replaceChildren(...(bar ? [bar] : []), message);
     el.dataset.ready = "error";
-    throw error;
+    // An error in the reader's own edits is shown, and is theirs; any other is the book's bug.
+    const edited = engine === "python" && Object.keys((await loadEngine("python").catch(() => ({})))?.edits || {}).length;
+    if (!edited) throw error;
   }
 }
 
 for (const el of document.querySelectorAll(".lab[data-experiment]")) mount(el);
+for (const el of document.querySelectorAll(".workbench[data-chapter]")) {
+  mountWorkbench(el).catch((error) => {
+    const message = document.createElement("p");
+    message.className = "lab-error";
+    message.textContent = `The workbench could not start: ${String(error.message || error)}`;
+    el.replaceChildren(message);
+    el.dataset.ready = "error";
+  });
+}

@@ -389,6 +389,10 @@ which codec you would choose, and for which storage: local disk, a network file 
 object store. A good answer names the column that contributes most to the size, and says whether
 a different encoding for that column would matter more than the codec.
 
+```problems
+chapter: compression
+```
+
 ## Where to go next
 
 - The codecs Parquet allows, and the history of the two LZ4s, are in the format repository's

@@ -9,11 +9,14 @@ A node type the renderer does not know **raises**. It is never skipped: a render
 drops what it does not recognise loses content, and the only symptom is a paragraph nobody
 notices is missing.
 
-Three node shapes are this book's own:
+Four node shapes are this book's own:
 
 - A fenced block in the language ``lab`` is an experiment. It becomes a mount point that
   ``web/lab/lab.js`` fills with the WebAssembly reader, and the renderer checks that the
   experiment and fixture it names exist.
+- A fenced block in the language ``problems`` is a chapter's workbench, where a reader edits the
+  chapter's Python problems and runs their tests in the page (``web/lab/workbench.js``). The
+  renderer checks that the chapter it names has problems.
 - A ``{literalinclude}`` of a file in this repository gets a bar naming the file, because the
   book's code is quoted from the implementation, and the reader should always be able to see
   which file a block came from.
@@ -76,16 +79,21 @@ def heading_id(node: dict) -> str:
     return "-".join(p for p in keep.split("-") if p)
 
 
-def parse_lab_block(value: str) -> dict:
-    """A ``lab`` block is ``key: value`` lines. Validated here, so a typo fails the build."""
+def parse_key_values(value: str, kind: str) -> dict:
     config = {}
     for line in value.splitlines():
         if not line.strip():
             continue
         key, sep, val = line.partition(":")
         if not sep:
-            raise LabBlockError(f"lab block line has no colon: {line!r}")
+            raise LabBlockError(f"{kind} block line has no colon: {line!r}")
         config[key.strip()] = val.strip()
+    return config
+
+
+def parse_lab_block(value: str) -> dict:
+    """A ``lab`` block is ``key: value`` lines. Validated here, so a typo fails the build."""
+    config = parse_key_values(value, "lab")
     experiment = config.get("experiment")
     if experiment not in EXPERIMENTS:
         raise LabBlockError(f"unknown experiment {experiment!r}; known: {', '.join(EXPERIMENTS)}")
@@ -103,6 +111,28 @@ def _lab(node: dict) -> str:
         '<p class="lab-fallback">This experiment runs the book\'s Parquet reader in your '
         "browser, compiled to WebAssembly. It needs JavaScript. The same reader runs at a "
         'desk: see <a href="running-the-lab.html">Appendix A</a>.</p></div>'
+    )
+
+
+def parse_problems_block(value: str) -> str:
+    """A ``problems`` block names its chapter: ``chapter: <slug>``. The chapter must have Python
+    problems, so a typo fails the build."""
+    config = parse_key_values(value, "problems")
+    slug = config.get("chapter", "")
+    if set(config) != {"chapter"} or not (ROOT / "exercises" / "python" / f"{slug}.py").exists():
+        raise LabBlockError(
+            f"a problems block is `chapter: <slug>`, with exercises/python/<slug>.py; got {config}"
+        )
+    return slug
+
+
+def _problems(node: dict) -> str:
+    slug = parse_problems_block(str(node.get("value", "")))
+    return (
+        f'<div class="workbench" data-chapter="{html.escape(slug)}">'
+        '<p class="lab-fallback">Here you can edit this chapter\'s problems and run their tests in your '
+        "browser, in Python. It needs JavaScript. The same problems run at a desk: see "
+        '<a href="running-the-lab.html">Appendix A</a>.</p></div>'
     )
 
 
@@ -214,6 +244,8 @@ def render(node: dict, footnotes: list | None = None) -> str:
     if kind == "code":
         if node.get("lang") == "lab":
             return _lab(node)
+        if node.get("lang") == "problems":
+            return _problems(node)
         return _code(node)
     if kind == "include":
         if node.get("literal"):

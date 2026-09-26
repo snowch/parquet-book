@@ -225,6 +225,8 @@ def test_a_ported_chapter_quotes_both_readers(chapter):
     assert "raise NotImplementedError(" in stubs, "ship the stubs unsolved"
     tests = (ROOT / "exercises" / "python" / "tests" / f"test_{chapter.slug}.py").read_text()
     assert "@pytest.mark.problem(" in tests
+    problems = text[text.index("\n## Problems") : text.index("\n## Where to go next")]
+    assert f"```problems\nchapter: {chapter.slug}\n```" in problems, "end the problems with their workbench"
 
 
 def test_the_python_engine_runs_exactly_the_ported_chapters_labs():

@@ -5,11 +5,24 @@ title: Running the lab
 (running-the-lab)=
 # Running the lab
 
+## In your browser
+
+Nothing to install. Every chapter ends its problems with a workbench, where you edit the Python
+problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
+runs. On any lab, choose **Python**, then **Edit the code**, and you can change any file of the
+Python reader and run the page's labs on your edit. Your edits stay in your browser until you
+restore them.
+
+Rust cannot compile inside a web page. For the Rust reader, open the repository in
+[GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1): an editor, the
+pinned toolchain and every dependency, in the browser, ready for every command below. The
+configuration is in `.devcontainer/`, and works in any editor that supports dev containers.
+
 ## What you need
 
-To read and run the book's reader in Python, Python 3.11 or later is enough: the Python reader and
-its tests use the standard library, and pytest. Everything below that builds the site needs the
-rest.
+At a desk, to read and run the book's reader in Python, Python 3.11 or later is enough: the
+Python reader and its tests use the standard library, and pytest. Everything below that builds
+the site needs the rest.
 
 - A Rust toolchain, with the WebAssembly target: `rustup target add wasm32-unknown-unknown`.
 - Python 3.11 or later, with the packages in `requirements.txt` for building the site and

@@ -288,6 +288,10 @@ bandwidth. Then run `PYTHONPATH=python python3 -m parquet_lab scan FILE --where 
 on one of your files, with a few gaps and connection counts. A good answer names the gap and
 connection count you would choose, and checks the prediction against a real query's timing.
 
+```problems
+chapter: how_readers_read
+```
+
 ## Where to go next
 
 - Amazon's guidance on

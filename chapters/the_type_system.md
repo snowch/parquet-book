@@ -363,6 +363,10 @@ strings or integers, money stored as `DOUBLE`, timestamps stored as `INT96`. For
 say whether it is `UTC` or `local`, and whether that matches what the data means. A good answer
 names each column, what it should be, and what a reader would get wrong because of the gap.
 
+```problems
+chapter: the_type_system
+```
+
 ## Where to go next
 
 - The physical and logical types are specified in the Parquet format repository's

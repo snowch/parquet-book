@@ -307,6 +307,10 @@ the file the footer takes. Then find one column where the statistics could not h
 run, and say why: no statistics, a range as wide as the column's, or a comparison the order does
 not support. A good answer says what the writer could change.
 
+```problems
+chapter: metadata_and_statistics
+```
+
 ## Where to go next
 
 - The `Statistics` and `ColumnOrder` structures, and the rules for floating point, are documented

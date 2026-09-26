@@ -133,11 +133,13 @@ on every write, so the encrypted fixtures cannot be reproduced byte for byte: th
 the committed bytes while they decrypt, with test keys published in the generator, to exactly the
 intended rows, and the tests hold the keyless reader to pyarrow's keyed description of them.
 
-**Problems are tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page under
-Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the
-problems run with `cargo test -- --ignored`, or in Python with `pytest --problems`, and the page
-shows both commands. The experiments carry the in-browser
-interactivity instead.
+**Problems are tests, run in the page or at a desk.** Each chapter's Python problems run in the
+page: its workbench holds the stub, and pytest runs the chapter's graders under Pyodide in a web
+worker, unchanged from the files a desk runs. A reader can also edit the Python reader itself and
+run the page's labs on the edit. A Rust problem cannot be compiled in a browser page at reasonable
+cost, so the repository ships a dev container, and a Codespace gives a reader the Rust toolchain
+and an editor in the browser; at a desk the problems run with `cargo test -- --ignored` or
+`pytest --problems`, and the page shows both commands.
 
 ## 5. The chapter shape
 

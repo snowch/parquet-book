@@ -211,6 +211,10 @@ reads and what fraction of the rows. A good answer sorts the queries into scans 
 says which layout suits the mix. If most of them are lookups of whole rows, a columnar format is
 the wrong tool for that table, and the answer should say so.
 
+```problems
+chapter: why_parquet_exists
+```
+
 ## Where to go next
 
 - The column-store idea predates Parquet by decades. Stonebraker and others' 2005 paper

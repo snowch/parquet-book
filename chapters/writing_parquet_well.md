@@ -233,6 +233,10 @@ one column. Measure each with `PYTHONPATH=python python3 -m parquet_lab scan FIL
 often. A good answer reports the file sizes, what each query read, and which setting you would
 change in production, with the cost that change puts on writing.
 
+```problems
+chapter: writing_parquet_well
+```
+
 ## Where to go next
 
 - pyarrow's [`write_table`](https://arrow.apache.org/docs/python/generated/pyarrow.parquet.write_table.html)

@@ -9,7 +9,7 @@
 
 import { createServer } from "node:http";
 import { readFile, readdir, stat, mkdir } from "node:fs/promises";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 
@@ -444,6 +444,54 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
         `${f}: the ${r.experiment} lab shows the same on the Python engine${JSON.stringify(python[i]) === JSON.stringify(r) ? "" : `: ${JSON.stringify(python[i])} vs ${JSON.stringify(r)}`}`);
     }
   }
+  await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
+}
+
+// The problems workbench: pytest, run in the page under Pyodide on the stub as it ships, must
+// report what it reports at a desk. The stub is unsolved, so the problems fail and the
+// scaffolding passes, in the page as natively.
+{
+  const desk = spawnSync("python3", ["-m", "pytest", "exercises/python/tests/test_compression.py", "--problems",
+    "-q", "-p", "no:cacheprovider"], { encoding: "utf8" }).stdout;
+  const count = (word) => Number((desk.match(new RegExp(`(\\d+) ${word}`)) || [0, 0])[1]);
+  await page.goto(base + "compression.html");
+  const wb = page.locator('.workbench[data-chapter="compression"]');
+  await wb.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 30000 });
+  await wb.locator('button[data-act="run"]').click();
+  await wb.and(page.locator('[data-state="idle"]')).waitFor({ timeout: 300000 });
+  const outcomes = await wb.locator(".results li").evaluateAll((els) => els.map((e) => e.className));
+  const passed = outcomes.filter((o) => o === "passed").length;
+  const failed = outcomes.filter((o) => o === "failed").length;
+  check(passed === count("passed") && failed === count("failed") && failed > 0,
+    `the workbench runs the chapter's tests in the page as pytest does at a desk: ${failed} failed, ${passed} passed`);
+  const first = await wb.locator(".results li.failed pre").first().innerText();
+  check(first.includes("NotImplementedError: problem 7.1"), "and says which problem is unsolved");
+}
+
+// The reader editor: an edit to the Python reader reaches every lab on the page, and restoring
+// the book's version brings back the reader's answer.
+{
+  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await page.evaluate(() => localStorage.setItem("lab-engine", "python"));
+  await page.reload();
+  const footer = page.locator('.lab[data-experiment="footer"]');
+  await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 180000 });
+  const length = await footer.getAttribute("data-footer-length");
+  await footer.locator("button[data-edit]").click();
+  const editor = page.locator(".reader-editor");
+  check(await editor.locator("select").inputValue() === "reader.py", "Edit the code opens the module the lab's chapter builds");
+  const text = await editor.locator("textarea").inputValue();
+  await editor.locator("textarea").fill(`${text}\nraise RuntimeError("an edit that breaks the reader")\n`);
+  await editor.locator('button[data-act="run"]').click();
+  await footer.and(page.locator('[data-ready="error"]')).waitFor({ timeout: 30000 });
+  check((await footer.locator(".lab-error").innerText()).includes("RuntimeError: an edit that breaks the reader")
+    && (await footer.locator(".engine-bar .edited").innerText()).includes("reader.py"),
+    "an edit that breaks the reader shows Python's error in the lab, which says it runs the edit");
+  await editor.locator('button[data-act="restore"]').click();
+  await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 30000 });
+  check(await footer.getAttribute("data-footer-length") === length
+    && await page.evaluate(() => localStorage.getItem("reader-edits")) === null,
+    `restoring the book's version brings back the reader's footer length (${length}) and forgets the edit`);
   await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 }
 

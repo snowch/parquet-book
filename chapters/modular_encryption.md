@@ -301,6 +301,10 @@ would still learn in your choice, from the sizes, offsets and page counts this c
 A good answer names one thing the plaintext footer reveals that matters for your data, and says
 whether that justifies an encrypted footer and the cost of making every reader hold a key.
 
+```problems
+chapter: modular_encryption
+```
+
 ## Where to go next
 
 - Modular encryption is specified in the format repository's

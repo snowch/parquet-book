@@ -26,10 +26,22 @@ make serve      # http://localhost:8000
 You need a Rust toolchain, Python 3.11+, and Node.js 22. `make check` runs everything CI runs,
 including a headless-browser test of the experiments if Playwright is installed.
 
+## Edit and run it online
+
+- **Python, in the book's pages.** Every chapter ends its problems with a workbench: edit the
+  Python stub and run its tests, which pytest runs in your browser under Pyodide. On any lab,
+  choose Python, then **Edit the code** to change the Python reader and run the page's labs on
+  your edit.
+- **Rust, in a Codespace.** Rust cannot compile inside a web page, so the repository comes with a
+  dev container. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+  for an editor, the pinned toolchain and every dependency in the browser; `make check`,
+  `make problems` and `make serve` then work as they do at a desk. The same configuration
+  (`.devcontainer/`) works in any editor that supports dev containers.
+
 ## Use the reader
 
 ```bash
-PYTHONPATH=python python3 -m parquet_lab footer fixtures/tiny.parquet   # the Python reader
+PYTHONPATH=python python3 -m parquet_lab structure fixtures/tiny.parquet   # the Python reader
 python3 -m pytest python/tests tests/test_python.py                     # its tests, and parity with Rust
 cargo run -p pqlab -- inspect fixtures/tiny.parquet     # the file's structure, as a tree
 cargo run -p pqlab -- footer fixtures/tiny.parquet      # open it through the simulated store
@@ -54,7 +66,7 @@ make problems                                           # the chapter exercises 
 ## Status
 
 Every chapter is written, from ch01 (row and column layouts) to ch14 (lakehouse and beyond),
-with working experiments and graded problems. See `PLAN.md` for the plan and `NEXT_STEPS.md` for
+in Python and in Rust, with working experiments and graded problems. See `PLAN.md` for the plan and `NEXT_STEPS.md` for
 what could come next.
 
 ## Contributing

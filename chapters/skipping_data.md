@@ -314,6 +314,10 @@ how many row groups and bytes it skips, and with which mechanisms. Then rewrite 
 that column and run it again. A good answer reports both, says what the sort cost the other
 columns' compression, and names a condition the sort does not help.
 
+```problems
+chapter: skipping_data
+```
+
 ## Where to go next
 
 - The page index is specified in the format repository's

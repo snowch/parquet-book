@@ -57,7 +57,8 @@ Either way the page runs the code the tests run.
 | `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
 | `tools/` | Python: the outline (`outline.py`), the renderer (`render.py`), the highlighter. |
 | `scripts/` | Build and check entry points. `ci-check.sh` is what CI runs. |
-| `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory. |
+| `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory, the problems workbench and the reader editor. |
+| `.devcontainer/` | The repository as a Codespace: the pinned toolchains, for editing and running the Rust reader online. |
 | `tests/` | Python tests of the book, the renderer, WASM/native parity; `tests/browser/` drives Chromium. |
 
 ## Build, run, test
@@ -115,6 +116,15 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
 
 `tools/render.py` validates the experiment name and the fixtures and emits a mount point;
 `web/lab/lab.js` loads the WASM module and the fixtures, relative to its own URL, and mounts it.
+
+**Code runs where the reader is.** Every chapter's Problems section ends with a ```` ```problems ````
+block (`chapter: <slug>`): a workbench (`web/lab/workbench.js`) where the reader edits the Python
+stub and runs its graders with pytest under Pyodide, in a worker (`workbench-worker.js`), on the
+repository's own files laid out as a desk has them. On the Python engine, **Edit the code**
+(`web/lab/editor.js`) swaps the reader's edits into the Python reader and remounts every lab.
+Edits live in the browser's storage, never on the server. Rust cannot compile in a page, so
+`.devcontainer/` gives a Codespace with the pinned toolchain instead. The browser test runs a
+workbench and an edit.
 
 ## The invariants
 

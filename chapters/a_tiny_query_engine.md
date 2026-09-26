@@ -255,6 +255,10 @@ trust. Record whether the answers agree and how many row groups the scan read. T
 that read the most, and say how page-level skipping from [ch09](#skipping-data) would change its
 scan. A good answer estimates the rows it would no longer decode, using the page index.
 
+```problems
+chapter: a_tiny_query_engine
+```
+
 ## Where to go next
 
 - The pipeline here is the iterator model Goetz Graefe described in *Volcano, an Extensible and

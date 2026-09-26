@@ -454,6 +454,10 @@ when it opens the file. If you can trace the engine's requests, check your predi
 trace. A disagreement means the engine does something this chapter has not described, and finding
 out what is the useful result.
 
+```problems
+chapter: anatomy_of_a_parquet_file
+```
+
 ## Where to go next
 
 - The file layout, magic and footer are specified in the

@@ -312,7 +312,7 @@ def build(out: Path) -> None:
         mdast = parse[p["source"]]["mdast"]
         normalise_headings(mdast)
         body = renderer.render_page(mdast)
-        has_lab = 'class="lab"' in body
+        has_lab = 'class="lab"' in body or 'class="workbench"' in body
         text = page_html(
             p,
             body,
@@ -346,14 +346,34 @@ def build(out: Path) -> None:
         for n in tree.body
         if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
     )
-    (out / "lab" / "py" / "package.json").write_text(
-        json.dumps({"modules": modules, "experiments": list(experiments)})
+    # The problems and their graders, for the page's workbench, which runs them under Pyodide
+    # exactly as `pytest --problems` runs them at a desk.
+    exercises = ROOT / "exercises" / "python"
+    problems = sorted(
+        str(f.relative_to(exercises)) for f in exercises.rglob("*.py") if "__pycache__" not in f.parts
     )
-    for f in sorted((ROOT / "fixtures").glob("*.parquet")):
-        shutil.copy(f, out / "fixtures" / f.name)
-    # ch14's table: its listing, and every object under table/, in their directories.
-    shutil.copy(ROOT / "fixtures" / "table.json", out / "fixtures" / "table.json")
+    for name in problems:
+        (out / "lab" / "py" / "exercises" / name).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(exercises / name, out / "lab" / "py" / "exercises" / name)
+    # Every fixture, with the manifest pyarrow wrote about it: the graders read both. ch14's
+    # table keeps its directories.
+    for f in sorted((ROOT / "fixtures").glob("*")):
+        if f.suffix in (".parquet", ".json"):
+            shutil.copy(f, out / "fixtures" / f.name)
     shutil.copytree(ROOT / "fixtures" / "table", out / "fixtures" / "table")
+    fixtures = sorted(
+        str(f.relative_to(out / "fixtures")) for f in (out / "fixtures").rglob("*") if f.is_file()
+    )
+    (out / "lab" / "py" / "package.json").write_text(
+        json.dumps(
+            {
+                "modules": modules,
+                "experiments": list(experiments),
+                "exercises": problems,
+                "fixtures": fixtures,
+            }
+        )
+    )
     (out / ".nojekyll").write_text("")
 
     files = sorted(str(f.relative_to(out)) for f in out.rglob("*") if f.is_file() and f.name != ".nojekyll")

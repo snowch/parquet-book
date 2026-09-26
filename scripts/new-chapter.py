@@ -31,8 +31,10 @@ def skeleton(slug: str) -> str:
         "What this cannot tell you": f"{UNWRITTEN}: what the experiment and the code leave out.]",
         "Key takeaways": f"{UNWRITTEN}: the claims made and shown above, each in bold with its reason.]",
         "Problems": (
-            f"{UNWRITTEN}: problems as stubs in `exercises/src/{slug}.rs`, graded by "
+            f"{UNWRITTEN}: problems as stubs in `exercises/python/{slug}.py` and "
+            f"`exercises/src/{slug}.rs`, graded by `exercises/python/tests/test_{slug}.py` and "
             f"`exercises/tests/{slug}.rs`, and at least one problem about the reader's own files.]"
+            f"\n\n```problems\nchapter: {slug}\n```"
         ),
         "Where to go next": f"{UNWRITTEN}: primary sources.]",
     }

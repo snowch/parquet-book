@@ -286,6 +286,10 @@ find the writer's page-size setting in its configuration or documentation, and c
 answer explains any gap between the setting and what the pages show; a page far smaller than the
 target usually means a row count limit was reached first, and the answer should say which limit.
 
+```problems
+chapter: pages
+```
+
 ## Where to go next
 
 - Page headers are defined in

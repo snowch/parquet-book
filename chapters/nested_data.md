@@ -324,6 +324,10 @@ among the leaves. Pick three records and write down, before looking, the levels 
 each value slot. Then compare. A good answer explains every disagreement. If your records never
 reach the column's maximum repetition level, say what the schema allows that the data never uses.
 
+```problems
+chapter: nested_data
+```
+
 ## Where to go next
 
 - The levels come from Melnik and others'
