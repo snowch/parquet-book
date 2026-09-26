@@ -13,7 +13,7 @@ from .reader import FooterOptions, Head, Known, SuffixRange
 
 FILES: list[tuple[str, bytearray]] = []
 
-EXPERIMENTS = ("layouts", "footer", "anatomy")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema")
 """The labs this engine can run so far. The rest arrive as their chapters are ported."""
 
 
@@ -68,3 +68,8 @@ def interpret(id: int, offset: int) -> str:
 def layouts(column_mask: int, row: int, latency_us: int, bandwidth: int) -> str:
     model = NetworkModel(int(latency_us), int(bandwidth))
     return report.dumps(report.layouts(column_mask, row if row >= 0 else None, model))
+
+
+def schema(id: int) -> str:
+    data = _file(id)
+    return _no_such_file(id) if data is None else report.dumps(report.schema(data))

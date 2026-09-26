@@ -3,6 +3,7 @@
     PYTHONPATH=python python3 -m parquet_lab footer fixtures/tiny.parquet --size suffix --prefetch 65536
     PYTHONPATH=python python3 -m parquet_lab structure fixtures/tiny.parquet
     PYTHONPATH=python python3 -m parquet_lab interpret fixtures/tiny.parquet 629
+    PYTHONPATH=python python3 -m parquet_lab schema fixtures/types.parquet
     PYTHONPATH=python python3 -m parquet_lab layouts --columns 2,3
 
 ``pqlab``, the Rust reader's command line, takes the same commands and prints the same JSON.
@@ -32,6 +33,7 @@ def main() -> None:
     layouts.add_argument("--columns", default="")
     layouts.add_argument("--row", type=int)
     sub.add_parser("structure", help="every region of a file").add_argument("file", type=Path)
+    sub.add_parser("schema", help="the schema, flat and as a tree (ch03)").add_argument("file", type=Path)
     inspect = sub.add_parser("interpret", help="every reading of the bytes at an offset")
     inspect.add_argument("file", type=Path)
     inspect.add_argument("offset", type=int)
@@ -44,6 +46,8 @@ def main() -> None:
         out = report.footer_lab(data, a.file.name, FooterOptions(size, a.prefetch), model)
     elif a.command == "structure":
         out = report.structure(a.file.read_bytes())
+    elif a.command == "schema":
+        out = report.schema(a.file.read_bytes())
     elif a.command == "interpret":
         out = report.interpret(a.file.read_bytes(), a.offset)
     else:

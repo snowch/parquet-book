@@ -11,8 +11,8 @@ reader in the browser: Rust compiled to WebAssembly, or Python through Pyodide. 
 browser is a scripted animation: every byte range, request and decoded value on screen was
 computed by the reader.
 
-The Python reader is being ported chapter by chapter; ch01 and ch02 are done, and the Rust reader
-covers every chapter.
+The Python reader is being ported chapter by chapter, and `NEXT_STEPS.md` says how far it has got;
+the Rust reader covers every chapter.
 
 ## Build and read it
 

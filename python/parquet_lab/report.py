@@ -12,7 +12,7 @@ import json
 import math
 import struct
 
-from . import bloom, crypto, page_index
+from . import bloom, crypto, logical, page_index
 from .bytes import ByteReader, Span, le_terms, zigzag_decode
 from .encoding import hex, plain_scalar, quote
 from .format import MIN_FILE_LEN, TRAILER_LEN, check_header, footer_span, parse_trailer
@@ -22,6 +22,7 @@ from .object_store import Bounded, MemoryStore, NetworkModel, Request, StoreErro
 from .pages import walk_pages
 from .parquet_thrift import Kind, enum_value_name, field_def
 from .reader import FooterOptions, Head, Known, SuffixRange, read_footer
+from .schema import SchemaNode, build, leaves, to_text
 from .thrift import Map, Node, Struct, WireType
 
 MAX_SAFE = 2**53 - 1
@@ -574,4 +575,93 @@ def layouts(column_mask: int, row: int | None, model: NetworkModel) -> dict:
         },
         "rows_layout": layout_json(Layout.ROWS, "sales.rows"),
         "columns_layout": layout_json(Layout.COLUMNS, "sales.columns"),
+    }
+
+
+def _open(file: bytes) -> FileMetaData | str:
+    """The file's metadata, or why it could not be read, for the reports that start from it."""
+    try:
+        return open_bytes(file)
+    except (ValueError, StoreError) as e:
+        return str(e)
+
+
+def schema(file: bytes) -> dict:
+    """Ch03's experiment: the schema as the footer stores it, as the reader rebuilds it, and what
+    each column's statistics mean once its logical type is applied."""
+    md = _open(file)
+    if isinstance(md, str):
+        return {"ok": False, "error": md}
+    try:
+        root = build(md.schema)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    elements = [
+        {
+            "index": i,
+            "name": e.name,
+            "span": e.span,
+            "num_children": e.num_children,
+            "repetition": e.repetition,
+            "physical_type": e.physical_type.name if e.physical_type is not None else None,
+            "type_length": e.type_length,
+            "logical_type": str(e.logical_type) if e.logical_type else None,
+            "converted_type": e.converted_type,
+        }
+        for i, e in enumerate(md.schema)
+    ]
+
+    def reading(c: ColumnChunk, lt, data: bytes | None, span: Span | None):
+        if data is None or span is None:
+            return None
+        return {
+            "span": span,
+            "hex": hex(data),
+            "physical": plain_scalar(c.physical_type, data),
+            "logical": logical.interpret(c.physical_type, lt, data) if lt else None,
+        }
+
+    first = md.row_groups[0] if md.row_groups else None
+    out_leaves = []
+    for leaf in leaves(root):
+        chunk = first.columns[leaf.column] if first and leaf.column < len(first.columns) else None
+        stats = None
+        if chunk is not None and chunk.statistics is not None:
+            s = chunk.statistics
+            stats = {
+                "span": s.span,
+                "min": reading(chunk, leaf.logical_type, s.min_value, s.min_span),
+                "max": reading(chunk, leaf.logical_type, s.max_value, s.max_span),
+                "null_count": s.null_count,
+            }
+        out_leaves.append(
+            {
+                "column": leaf.column,
+                "path": leaf.dotted_path(),
+                "element": leaf.element,
+                "repetitions": leaf.repetitions,
+                "max_definition_level": leaf.max_definition_level,
+                "max_repetition_level": leaf.max_repetition_level,
+                "physical_type": leaf.physical_type.name,
+                "logical_type": str(leaf.logical_type) if leaf.logical_type else None,
+                "chunk": chunk.byte_range() if chunk else None,
+                "statistics": stats,
+            }
+        )
+
+    def tree(node: SchemaNode) -> dict:
+        return {
+            "name": node.name,
+            "element": node.element,
+            "span": node.span,
+            "repetition": node.repetition,
+            "children": [tree(c) for c in node.children],
+        }
+
+    return {
+        "ok": True,
+        "elements": elements,
+        "tree": tree(root),
+        "text": to_text(root),
+        "leaves": out_leaves,
     }

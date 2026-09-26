@@ -14,10 +14,8 @@ import struct
 import unicodedata
 from decimal import Decimal
 
-from .metadata import PhysicalType
 
-
-def plain_scalar(physical: PhysicalType, data: bytes) -> str | None:
+def plain_scalar(physical: int, data: bytes) -> str | None:
     """One value in PLAIN form, rendered for display. ``None`` when the bytes do not fit the
     type.
 

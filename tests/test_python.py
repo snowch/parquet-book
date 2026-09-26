@@ -103,6 +103,11 @@ def test_the_structure_view_matches(tmp_path):
         assert python(report.structure(path.read_bytes())) == rust("structure", path), path.name
 
 
+def test_the_schema_lab_matches(tmp_path):
+    for path in files(tmp_path):
+        assert python(report.schema(path.read_bytes())) == rust("schema", path), path.name
+
+
 def test_the_byte_inspector_matches(tmp_path):
     for path in files(tmp_path):
         data = path.read_bytes()

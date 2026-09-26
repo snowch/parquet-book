@@ -3,27 +3,12 @@
 python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems
 """
 
-import json
-from pathlib import Path
-
 import pytest
 from anatomy_of_a_parquet_file import footer_length, footer_range, gets_to_open
 from parquet_lab.object_store import MemoryStore, NetworkModel, TracingStore
 from parquet_lab.reader import FooterOptions, Known, read_footer
 
-FIXTURES = Path(__file__).resolve().parents[3] / "fixtures"
-
-
-def fixtures():
-    """The fixtures, each with what pyarrow said about it when it wrote it."""
-    out = []
-    for path in sorted(FIXTURES.glob("*.parquet")):
-        manifest = json.loads(path.with_suffix(".json").read_text())
-        # ch13's encrypted fixtures need keys for most of what these problems read.
-        if "encryption" not in manifest["generator"]:
-            out.append((path.name, path.read_bytes(), manifest))
-    assert out
-    return out
+from fixtures import fixtures
 
 
 def samples() -> list[int]:

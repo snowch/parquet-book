@@ -8,7 +8,7 @@
 // The browser and the command line must agree to the byte, because they run the same code.
 
 import { createServer } from "node:http";
-import { readFile, stat, mkdir } from "node:fs/promises";
+import { readFile, readdir, stat, mkdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -411,6 +411,41 @@ await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="
 check(await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
   `listing, it reads all ${byList.totals.files_read} files and answers the same`);
 if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") });
+
+// Every lab the Python engine can run shows the same numbers on both engines: the data
+// attributes each experiment writes, on every page where it appears.
+{
+  const { experiments } = JSON.parse(await readFile(path.join(root, "lab", "py", "package.json"), "utf8"));
+  const pages = [];
+  for (const f of (await readdir(root)).filter((n) => n.endsWith(".html")).sort()) {
+    const html = await readFile(path.join(root, f), "utf8");
+    const used = [...html.matchAll(/data-experiment="([a-z]+)"/g)].map((m) => m[1]);
+    if (used.some((e) => experiments.includes(e))) pages.push(f);
+  }
+  const settled = async (engine) => {
+    await page.evaluate((e) => localStorage.setItem("lab-engine", e), engine);
+    await page.reload();
+    await page.waitForFunction(() => [...document.querySelectorAll(".lab[data-experiment]")]
+      .every((el) => el.dataset.ready === "true" || el.dataset.ready === "error"), null, { timeout: 180000 });
+    await page.waitForTimeout(1500);
+    return page.evaluate(() => [...document.querySelectorAll(".lab[data-experiment]")].map((el) => {
+      const d = { ...el.dataset };
+      delete d.engine;
+      return d;
+    }));
+  };
+  for (const f of pages) {
+    await page.goto(base + f);
+    const rust = await settled("rust");
+    const python = await settled("python");
+    for (const [i, r] of rust.entries()) {
+      if (!experiments.includes(r.experiment)) continue;
+      check(JSON.stringify(python[i]) === JSON.stringify(r),
+        `${f}: the ${r.experiment} lab shows the same on the Python engine${JSON.stringify(python[i]) === JSON.stringify(r) ? "" : `: ${JSON.stringify(python[i])} vs ${JSON.stringify(r)}`}`);
+    }
+  }
+  await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
+}
 
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();

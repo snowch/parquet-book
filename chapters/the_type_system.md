@@ -140,11 +140,24 @@ Table formats use it to match columns between files written years apart
 The rebuild reads an element, and if it has children, reads that many subtrees after it, each
 the same way. The recursion consumes the list from the front:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/schema.py
+:language: python
+:start-at: def build(elements: list[SchemaElement])
+:end-before: def _subtree(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/schema.rs
 :language: rust
 :start-at: pub fn build(elements: &[SchemaElement])
 :end-before: /// The largest definition
 ```
+:::
+::::
 
 Two checks make a damaged schema an error rather than a wrong tree. A group that claims more
 children than the list has left is refused. So is a list with elements left over after the root's
@@ -155,11 +168,24 @@ subtree ends, which is what the experiment's damaged byte produced.
 A leaf's maximum definition level counts the fields on its path that may be absent. Its maximum
 repetition level counts the fields that repeat:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/schema.py
+:language: python
+:start-at: def max_levels(path: list[str])
+:end-before: def leaves(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/schema.rs
 :language: rust
 :start-at: pub fn max_levels(path: &[Repetition])
 :end-before: /// Every leaf of the tree
 ```
+:::
+::::
 
 When both are zero, as for every column of `tiny.parquet`, the column stores no levels at all:
 its pages hold values and nothing else. [ch04](#nested-data) shows what the levels are when they
@@ -168,23 +194,49 @@ are not zero.
 ### Reading a value through its logical type
 
 The logical type arrives from the footer as a Thrift union: a struct with exactly one field set,
-whose id names the type. `crates/parquet-lab/src/logical.rs` decodes it into an enum. Applying it
-is a match on the pair of physical and logical type:
+whose id names the type. The `logical` module decodes it into a value naming the type and its
+parameters. Applying it is a match on the pair of physical and logical type:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/logical.py
+:language: python
+:start-at: def interpret(physical: int
+:end-before: def int96_timestamp(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/logical.rs
 :language: rust
 :start-at: pub fn interpret(physical: PhysicalType
 :end-before: /// An `INT96` value
 ```
+:::
+::::
 
 The decimal case is the one that reads bytes most significant first. Its helper sign-extends from
 the top bit of the first byte:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/logical.py
+:language: python
+:start-at: def be_twos_complement(data: bytes)
+:end-before: def f16_to_float(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/logical.rs
 :language: rust
 :start-at: pub fn be_twos_complement(bytes: &[u8])
 :end-before: /// A half-precision
 ```
+:::
+::::
 
 ### Checking it
 
@@ -192,9 +244,20 @@ The fixture tests compare the rebuilt schema with pyarrow's own reading of it: e
 physical type and maximum levels. They also apply each column's logical type to its statistics and
 compare with the values pyarrow reports:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -232,34 +295,69 @@ loses information. [ch11](#writing-parquet-well) looks at those choices from the
 
 ## Problems
 
-Four, in `exercises/src/the_type_system.rs`. The first three have tests that fail until you solve
+Four, in `exercises/python/the_type_system.py`, or in Rust in
+`exercises/src/the_type_system.rs`. The first three have tests that fail until you solve
 them. The fourth has no test.
 
 **3.1 Rebuild the tree.** Given each element's name and number of children, in depth-first order,
 return every leaf's path. The test uses the fixtures and hundreds of generated schemas.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test the_type_system problem_3_1 -- --ignored
 ```
+:::
+::::
 
 **3.2 Maximum levels.** Given the repetitions along a path, return the maximum definition and
 repetition levels. The test checks every path up to five fields deep, and the fixtures against
 pyarrow.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test the_type_system problem_3_2 -- --ignored
 ```
+:::
+::::
 
 **3.3 A decimal from bytes.** Read a big-endian two's-complement integer and place the decimal
 point. The test compares with pyarrow on the fixture and with the reader on generated values,
 negative ones included.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_3
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test the_type_system problem_3_3 -- --ignored
 ```
+:::
+::::
 
 **3.4 Your own schema.** No test: the tables are yours. Print the schema of a Parquet file your
-systems write (`cargo run -p pqlab -- schema FILE`, or any Parquet tool). List every column whose
+systems write (`PYTHONPATH=python python3 -m parquet_lab schema FILE`, `cargo run -p pqlab -- schema FILE`, or any
+Parquet tool). List every column whose
 logical type is missing where you would expect one: text stored without `STRING`, dates stored as
 strings or integers, money stored as `DOUBLE`, timestamps stored as `INT96`. For each timestamp,
 say whether it is `UTC` or `local`, and whether that matches what the data means. A good answer

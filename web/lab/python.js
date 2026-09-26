@@ -61,6 +61,10 @@ export class PyLab {
     return this.#json(this.api.structure(id));
   }
 
+  schema(id) {
+    return this.#json(this.api.schema(id));
+  }
+
   interpret(id, offset) {
     return this.#json(this.api.interpret(id, offset));
   }

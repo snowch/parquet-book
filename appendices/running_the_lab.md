@@ -57,7 +57,8 @@ cargo run -p pqlab -- interpret fixtures/tiny.parquet 629
 :::
 ::::
 
-The Python reader so far covers what ch01 and ch02 build; the Rust reader covers every chapter.
+The Python reader covers every chapter whose excerpts have a Python tab; the Rust reader covers
+every chapter.
 
 ## Solving the problems
 
