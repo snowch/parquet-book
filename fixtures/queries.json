@@ -1,0 +1,266 @@
+[
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT count(*) FROM orders",
+    "columns": [
+      "count(*)"
+    ],
+    "rows": [
+      [
+        800
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT count(*) FROM orders WHERE country = 'UK'",
+    "columns": [
+      "count(*)"
+    ],
+    "rows": [
+      [
+        299
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT country, count(*) FROM orders GROUP BY country ORDER BY country",
+    "columns": [
+      "country",
+      "count(*)"
+    ],
+    "rows": [
+      [
+        "DE",
+        100
+      ],
+      [
+        "FR",
+        99
+      ],
+      [
+        "PL",
+        100
+      ],
+      [
+        "SE",
+        100
+      ],
+      [
+        "UK",
+        299
+      ],
+      [
+        "US",
+        102
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT status, sum(amount_cents) FROM orders GROUP BY status ORDER BY status",
+    "columns": [
+      "status",
+      "sum(amount_cents)"
+    ],
+    "rows": [
+      [
+        "cancelled",
+        180633
+      ],
+      [
+        "paid",
+        3649387
+      ],
+      [
+        "refunded",
+        173130
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT min(amount_cents), max(amount_cents), avg(amount_cents) FROM orders WHERE country = 'SE'",
+    "columns": [
+      "min(amount_cents)",
+      "max(amount_cents)",
+      "avg(amount_cents)"
+    ],
+    "rows": [
+      [
+        244,
+        9994,
+        4868.16
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT order_id, amount_cents FROM orders WHERE amount_cents > 9800 ORDER BY amount_cents DESC, order_id LIMIT 5",
+    "columns": [
+      "order_id",
+      "amount_cents"
+    ],
+    "rows": [
+      [
+        96,
+        9994
+      ],
+      [
+        87,
+        9976
+      ],
+      [
+        694,
+        9958
+      ],
+      [
+        172,
+        9956
+      ],
+      [
+        135,
+        9937
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT order_id, customer_id FROM orders WHERE order_id >= 431 AND order_id < 436 ORDER BY order_id",
+    "columns": [
+      "order_id",
+      "customer_id"
+    ],
+    "rows": [
+      [
+        431,
+        819085
+      ],
+      [
+        432,
+        217090
+      ],
+      [
+        433,
+        689843
+      ],
+      [
+        434,
+        790736
+      ],
+      [
+        435,
+        662857
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT country, max(order_id) FROM orders WHERE status = 'refunded' GROUP BY country ORDER BY country",
+    "columns": [
+      "country",
+      "max(order_id)"
+    ],
+    "rows": [
+      [
+        "DE",
+        136
+      ],
+      [
+        "FR",
+        726
+      ],
+      [
+        "PL",
+        629
+      ],
+      [
+        "SE",
+        739
+      ],
+      [
+        "UK",
+        789
+      ],
+      [
+        "US",
+        575
+      ]
+    ]
+  },
+  {
+    "file": "writing-baseline.parquet",
+    "sql": "SELECT count(*) FROM orders WHERE country = 'FR' AND amount_cents < 1000",
+    "columns": [
+      "count(*)"
+    ],
+    "rows": [
+      [
+        8
+      ]
+    ]
+  },
+  {
+    "file": "statistics.parquet",
+    "sql": "SELECT count(*), count(coupon) FROM orders",
+    "columns": [
+      "count(*)",
+      "count(coupon)"
+    ],
+    "rows": [
+      [
+        12,
+        5
+      ]
+    ]
+  },
+  {
+    "file": "statistics.parquet",
+    "sql": "SELECT coupon, count(*) FROM orders WHERE coupon IS NOT NULL GROUP BY coupon ORDER BY coupon",
+    "columns": [
+      "coupon",
+      "count(*)"
+    ],
+    "rows": [
+      [
+        "SPRING",
+        2
+      ],
+      [
+        "SUMMER",
+        2
+      ],
+      [
+        "WELCOME",
+        1
+      ]
+    ]
+  },
+  {
+    "file": "statistics.parquet",
+    "sql": "SELECT city, delta FROM orders WHERE delta < 0 ORDER BY delta",
+    "columns": [
+      "city",
+      "delta"
+    ],
+    "rows": [
+      [
+        "Z\u00fcrich",
+        -120
+      ],
+      [
+        "Leeds",
+        -5
+      ],
+      [
+        "York",
+        -3
+      ],
+      [
+        "Bergen",
+        -1
+      ]
+    ]
+  }
+]

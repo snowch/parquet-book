@@ -311,6 +311,25 @@ check((await writeLab.getAttribute("data-bytes")).split(",")[0] === String(basel
 check((await writeLab.getAttribute("data-bytes")).split(",").length === 7, "and the query runs against all seven files");
 if (shots) await writeLab.screenshot({ path: path.join(shots, "writing-lab.png") });
 
+// ch12: the query engine. The answer is the engine's.
+await page.goto(base + "a-tiny-query-engine.html");
+const engineLab = page.locator('.lab[data-experiment="engine"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="engine"]')?.dataset.state === "ok");
+const byCountry = native(["query", "fixtures/writing-baseline.parquet", "SELECT country, count(*) FROM orders GROUP BY country ORDER BY country"]);
+check(await engineLab.getAttribute("data-answer") === JSON.stringify(byCountry.rows), "the first example answers as the engine does natively");
+await engineLab.locator('textarea[name="sql"]').fill("SELECT order_id FROM orders WHERE order_id >= 431 AND order_id < 434");
+await engineLab.locator('button[type="submit"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="engine"]').dataset.rows === "3");
+check(await engineLab.locator(".pipeline li").count() === 3, "a filtered projection has three stages: scan, filter, project");
+await engineLab.locator('textarea[name="sql"]').fill("SELECT FROM");
+await engineLab.locator('button[type="submit"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="engine"]').dataset.state === "error");
+check(true, "a malformed query is reported, not guessed at");
+if (shots) {
+  await engineLab.locator('button[data-example="1"]').click();
+  await engineLab.screenshot({ path: path.join(shots, "engine-lab.png") });
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

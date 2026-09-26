@@ -26,6 +26,9 @@
 //! | [`encoding`] | turning encoded bytes back into values | ch05 |
 //! | [`object_store`] | a simulated S3: `HEAD`, `GET`, ranges, and a trace | ch02, ch10 |
 //! | [`reader`] | opening a file in an object store | ch02, ch10 |
+//! | [`prune`] | conditions judged against metadata: what a reader may skip | ch09 |
+//! | [`scan`] | a query's requests: phases, merged ranges, connections | ch10 |
+//! | [`engine`] | SQL over the reader: scan, filter, aggregate, sort, limit | ch12 |
 //! | [`report`] | what the reader did, as JSON for the browser and the book | all |
 //!
 //! ## What it does not do yet
@@ -47,6 +50,7 @@ pub mod compress;
 pub mod decode;
 pub mod delta;
 pub mod encoding;
+pub mod engine;
 pub mod format;
 pub mod json;
 pub mod layout;

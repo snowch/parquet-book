@@ -1059,3 +1059,40 @@ fn every_strategy_returns_the_rows_a_full_read_finds() {
     }
     assert!(scans > 200, "only {scans} scans");
 }
+
+#[test]
+fn the_engine_answers_as_pyarrow_does() {
+    // fixtures/queries.json holds queries and pyarrow's answers to them, computed by pyarrow's own
+    // compute functions when the fixtures were written.
+    let text = std::fs::read_to_string(root().join("fixtures/queries.json")).unwrap();
+    let queries = Json::parse(&text).unwrap();
+    let mut checked = 0;
+    for q in queries.as_array().unwrap() {
+        let file = q.get("file").and_then(Json::as_str).unwrap();
+        let sql = q.get("sql").and_then(Json::as_str).unwrap();
+        let bytes = std::fs::read(root().join("fixtures").join(file)).unwrap();
+        let a = parquet_lab::engine::run(&bytes, sql).unwrap_or_else(|e| panic!("{sql}: {e}"));
+        let columns: Vec<String> = q
+            .get("columns")
+            .and_then(Json::as_array)
+            .unwrap()
+            .iter()
+            .map(|c| c.as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(a.columns, columns, "{sql}");
+        let expected = q.get("rows").and_then(Json::as_array).unwrap();
+        assert_eq!(a.rows.len(), expected.len(), "{sql}: row count");
+        for (mine, theirs) in a.rows.iter().zip(expected) {
+            for (m, t) in mine.iter().zip(theirs.as_array().unwrap()) {
+                let same = match (m.to_json(), t) {
+                    (Json::Float(x), Json::Float(y)) => (x - y).abs() < 1e-9,
+                    (Json::Float(x), Json::Int(y)) => (x - *y as f64).abs() < 1e-9,
+                    (m, t) => m.to_json() == t.to_json(),
+                };
+                assert!(same, "{sql}: {:?} against {}", m, t.to_json());
+            }
+        }
+        checked += 1;
+    }
+    assert!(checked >= 10);
+}

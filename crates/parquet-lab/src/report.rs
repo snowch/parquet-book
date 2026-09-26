@@ -2178,3 +2178,45 @@ pub fn scan(
         ),
     ])
 }
+
+/// Ch12's experiment: `sql` answered from `file`, with every stage of the pipeline.
+pub fn query(file: &[u8], sql: &str) -> Json {
+    let a = match crate::engine::run(file, sql) {
+        Ok(a) => a,
+        Err(e) => return obj([("ok", false.into()), ("error", e.into())]),
+    };
+    let rows = |rows: &[Vec<crate::engine::Value>]| {
+        Json::Arr(
+            rows.iter()
+                .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()))
+                .collect(),
+        )
+    };
+    let names = |c: &[String]| Json::Arr(c.iter().map(|n| n.clone().into()).collect());
+    obj([
+        ("ok", true.into()),
+        ("columns", names(&a.columns)),
+        ("rows", rows(&a.rows)),
+        ("row_groups", a.row_groups.into()),
+        ("row_groups_read", a.row_groups_read.into()),
+        ("bytes_read", a.bytes_read.into()),
+        (
+            "stages",
+            Json::Arr(
+                a.stages
+                    .iter()
+                    .map(|s| {
+                        obj([
+                            ("name", s.name.clone().into()),
+                            ("detail", s.detail.clone().into()),
+                            ("rows_in", s.rows_in.into()),
+                            ("rows_out", s.rows_out.into()),
+                            ("columns", names(&s.columns)),
+                            ("sample", rows(&s.sample)),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+    ])
+}

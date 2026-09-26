@@ -14,6 +14,7 @@
 //! reader (`parquet-lab`) or from what pyarrow reported when it wrote the fixture, and compares
 //! your function against it across many cases.
 
+pub mod a_tiny_query_engine;
 pub mod anatomy_of_a_parquet_file;
 pub mod compression;
 pub mod encodings;

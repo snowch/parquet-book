@@ -83,6 +83,9 @@ same request. [ch02](#anatomy-of-a-parquet-file)
 
 **Projection.** Reading only the columns a query names. [ch01](#why-parquet-exists)
 
+**Query engine.** Software that parses a query and runs it as a pipeline of stages, from reading
+data to returning an answer. [ch12](#a-tiny-query-engine)
+
 **Range request.** An HTTP request for part of an object, `Range: bytes=a-b`, inclusive at both
 ends. [ch02](#anatomy-of-a-parquet-file)
 

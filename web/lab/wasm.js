@@ -74,6 +74,13 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  /** Answer SQL from the file, stage by stage. */
+  query(id, sql) {
+    const text = encoder.encode(sql);
+    const ptr = this.#copyIn(text);
+    return this.#result(this.exports.pl_query(id, ptr, text.length));
+  }
+
   /**
    * Run a query through the simulated object store. `where` is null or {column, op, value};
    * `s` is the strategy: {footer: "head"|"suffix", prefetch, connections, gap (null: never merge), statistics, bloom,

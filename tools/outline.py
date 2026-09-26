@@ -230,8 +230,8 @@ _CHAPTERS = (
         "writing_and_querying",
         "What does it take to answer SQL from Parquet bytes?",
         "A minimal query engine: scan, filter, project, aggregate and group, with every stage shown.",
-        (),
-        (),
+        ("engine",),
+        ("writing-baseline.parquet", "statistics.parquet"),
     ),
     (
         "modular_encryption",
@@ -291,4 +291,5 @@ EXPERIMENTS = (
     "skipping",
     "scan",
     "writing",
+    "engine",
 )

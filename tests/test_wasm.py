@@ -157,6 +157,12 @@ def cases():
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))
+    for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
+        f = f"fixtures/{q['file']}"
+        calls.append({"call": "query", "file": f, "sql": q["sql"]})
+        native.append(("query", f, q["sql"]))
+    calls.append({"call": "query", "file": "fixtures/tiny.parquet", "sql": "SELECT nonsense FROM"})
+    native.append(("query", "fixtures/tiny.parquet", "SELECT nonsense FROM"))
     for columns, row in (([2, 3], -1), ([3], -1), ([0, 1, 2, 3, 4], 3), ([0, 4], -1), ([], -1)):
         calls.append({"call": "layouts", "options": {"columns": columns, "row": row}})
         args = ["layouts", "--columns", ",".join(map(str, columns))]

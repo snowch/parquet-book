@@ -37,7 +37,7 @@ needs it, and each is finished, tested and quoted before the chapters that use i
 | 2 | PLAIN, dictionary, RLE/bit-packing hybrid, delta encodings, BYTE_STREAM_SPLIT; levels | ch04, ch05 | done |
 | 3 | page walking with values, data page v1 and v2, decompression | ch06, ch07 | done; ZSTD and Brotli sizes only |
 | 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | done |
-| 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | read path, coalescing and concurrency done; caching and the engine to do |
+| 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | done; caching not modelled |
 | 6 | encrypted modules, multi-file datasets, manifests | ch13, ch14 | to do |
 
 **Deliberately unsupported**, and reported as unsupported rather than guessed at: decryption,

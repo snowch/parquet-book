@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
 HERE = Path(__file__).resolve().parent
@@ -800,6 +801,127 @@ def readme(manifests: list[dict]) -> str:
     return "\n".join(out)
 
 
+def _rows(table: pa.Table, columns: list[str], names: list[str] | None = None) -> dict:
+    """A result: column names as the engine writes them, and rows as lists."""
+    return {
+        "columns": names or columns,
+        "rows": [[_stat(r[c]) for c in columns] for r in table.select(columns).to_pylist()],
+    }
+
+
+def _grouped(t: pa.Table, key: str, aggs: list, names: list[str]) -> dict:
+    g = t.group_by(key).aggregate(aggs).sort_by(key)
+    out_cols = [key] + [c for c in g.column_names if c != key]
+    return _rows(g, out_cols, [key] + names)
+
+
+#: Queries for ch12's engine, each answered here by pyarrow's own compute functions. The engine
+#: runs the SQL; the test compares its answer with pyarrow's. (file, SQL, how pyarrow answers.)
+QUERIES = [
+    (
+        "writing-baseline",
+        "SELECT count(*) FROM orders",
+        lambda t: {"columns": ["count(*)"], "rows": [[t.num_rows]]},
+    ),
+    (
+        "writing-baseline",
+        "SELECT count(*) FROM orders WHERE country = 'UK'",
+        lambda t: {"columns": ["count(*)"], "rows": [[t.filter(pc.equal(t["country"], "UK")).num_rows]]},
+    ),
+    (
+        "writing-baseline",
+        "SELECT country, count(*) FROM orders GROUP BY country ORDER BY country",
+        lambda t: _grouped(t, "country", [([], "count_all")], ["count(*)"]),
+    ),
+    (
+        "writing-baseline",
+        "SELECT status, sum(amount_cents) FROM orders GROUP BY status ORDER BY status",
+        lambda t: _grouped(t, "status", [("amount_cents", "sum")], ["sum(amount_cents)"]),
+    ),
+    (
+        "writing-baseline",
+        "SELECT min(amount_cents), max(amount_cents), avg(amount_cents) FROM orders WHERE country = 'SE'",
+        lambda t: (
+            lambda f: {
+                "columns": ["min(amount_cents)", "max(amount_cents)", "avg(amount_cents)"],
+                "rows": [
+                    [
+                        pc.min(f["amount_cents"]).as_py(),
+                        pc.max(f["amount_cents"]).as_py(),
+                        pc.mean(f["amount_cents"]).as_py(),
+                    ]
+                ],
+            }
+        )(t.filter(pc.equal(t["country"], "SE"))),
+    ),
+    (
+        "writing-baseline",
+        "SELECT order_id, amount_cents FROM orders WHERE amount_cents > 9800 "
+        "ORDER BY amount_cents DESC, order_id LIMIT 5",
+        lambda t: _rows(
+            t.filter(pc.greater(t["amount_cents"], 9800))
+            .sort_by([("amount_cents", "descending"), ("order_id", "ascending")])
+            .slice(0, 5),
+            ["order_id", "amount_cents"],
+        ),
+    ),
+    (
+        "writing-baseline",
+        "SELECT order_id, customer_id FROM orders WHERE order_id >= 431 AND order_id < 436 ORDER BY order_id",
+        lambda t: _rows(
+            t.filter(pc.and_(pc.greater_equal(t["order_id"], 431), pc.less(t["order_id"], 436))).sort_by(
+                "order_id"
+            ),
+            ["order_id", "customer_id"],
+        ),
+    ),
+    (
+        "writing-baseline",
+        "SELECT country, max(order_id) FROM orders WHERE status = 'refunded' GROUP BY country ORDER BY country",
+        lambda t: _grouped(
+            t.filter(pc.equal(t["status"], "refunded")), "country", [("order_id", "max")], ["max(order_id)"]
+        ),
+    ),
+    (
+        "writing-baseline",
+        "SELECT count(*) FROM orders WHERE country = 'FR' AND amount_cents < 1000",
+        lambda t: {
+            "columns": ["count(*)"],
+            "rows": [
+                [t.filter(pc.and_(pc.equal(t["country"], "FR"), pc.less(t["amount_cents"], 1000))).num_rows]
+            ],
+        },
+    ),
+    (
+        "statistics",
+        "SELECT count(*), count(coupon) FROM orders",
+        lambda t: {
+            "columns": ["count(*)", "count(coupon)"],
+            "rows": [[t.num_rows, pc.count(t["coupon"]).as_py()]],
+        },
+    ),
+    (
+        "statistics",
+        "SELECT coupon, count(*) FROM orders WHERE coupon IS NOT NULL GROUP BY coupon ORDER BY coupon",
+        lambda t: _grouped(t.filter(pc.is_valid(t["coupon"])), "coupon", [([], "count_all")], ["count(*)"]),
+    ),
+    (
+        "statistics",
+        "SELECT city, delta FROM orders WHERE delta < 0 ORDER BY delta",
+        lambda t: _rows(t.filter(pc.less(t["delta"], 0)).sort_by("delta"), ["city", "delta"]),
+    ),
+]
+
+
+def query_answers(written: dict[str, bytes]) -> bytes:
+    """queries.json: each query, and pyarrow's answer to it from the fixture's bytes."""
+    out = []
+    for name, sql, answer in QUERIES:
+        table = pq.read_table(io.BytesIO(written[name]))
+        out.append({"file": f"{name}.parquet", "sql": sql, **answer(table)})
+    return (json.dumps(out, indent=2) + "\n").encode()
+
+
 def dump_manifest(m: dict) -> str:
     """The manifest as indented JSON, except that each row is on one line: the rows are most of
     a manifest, and one line each keeps them readable and the file small."""
@@ -822,6 +944,7 @@ def outputs() -> dict[Path, bytes]:
         files[HERE / m["file"]] = data
         files[HERE / f"{fixture.name}.json"] = (dump_manifest(m) + "\n").encode()
     files[HERE / "README.md"] = readme(manifests).encode()
+    files[HERE / "queries.json"] = query_answers({m["name"]: files[HERE / m["file"]] for m in manifests})
     return files
 
 

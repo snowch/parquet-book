@@ -233,6 +233,21 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch12's experiment: SQL answered from the file, stage by stage. `sql` is a `pl_alloc` buffer
+/// this call takes and frees. See `report::query`.
+///
+/// # Safety
+/// `sql_ptr` and `sql_len` must come from one call to `pl_alloc`.
+#[no_mangle]
+pub unsafe extern "C" fn pl_query(id: u32, sql_ptr: *mut u8, sql_len: usize) -> usize {
+    let sql = Box::from_raw(std::ptr::slice_from_raw_parts_mut(sql_ptr, sql_len));
+    let sql = String::from_utf8_lossy(&sql).into_owned();
+    match with_file(id, |f| report::query(&f.bytes, &sql)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch10's experiment: a query run through the simulated object store. `columns` is a bit set
 /// of leaf columns to return (0 for all). `where_column` is `u32::MAX` for no condition; then
 /// `op` indexes `report::OPS` and `text` (a `pl_alloc` buffer this call frees) is the value.

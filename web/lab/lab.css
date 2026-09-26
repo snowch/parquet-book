@@ -155,6 +155,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
   .scan-grid .p-scan-sum { border-right: 0; }
+  .engine-grid { grid-template-columns: minmax(0, 1fr); }
+  .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -326,6 +328,19 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .p-writing tr.chosen td { background: var(--wash); }
 .p-writing td button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
 
+/* Ch12: the query engine. */
+.engine-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); }
+.engine-form textarea { width: 100%; font: 13px/1.5 var(--mono); padding: .4rem .5rem; background: var(--code);
+  color: var(--ink); border: 1px solid var(--edge); border-radius: 4px; resize: vertical; }
+.engine-form .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .4rem; font-size: 13px; }
+.engine-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); border-bottom: 1px solid var(--edge); }
+.engine-grid .p-pipeline { border-right: 1px solid var(--edge); }
+.pipeline { margin: 0; padding-left: 1.3rem; font-size: 12.5px; }
+.pipeline li { margin-bottom: .7rem; }
+.pipeline .stage-head { display: flex; gap: .6rem; align-items: baseline; }
+.pipeline .flow { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pipeline .detail { margin: .15rem 0 .3rem; color: var(--muted); overflow-wrap: anywhere; }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -358,6 +373,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .stats-grid .p-stats-fields { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
   .scan-grid .p-scan-sum { border-right: 0; }
+  .engine-grid { grid-template-columns: minmax(0, 1fr); }
+  .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

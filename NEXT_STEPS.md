@@ -97,13 +97,25 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: one query against every file. Figures: the files, lookups per row group, five
   queries' costs. Problems 11.1 and 11.2 with tests; 11.3 open.
 
-## Next: ch12, a tiny query engine
+## Done: ch12, a tiny query engine
 
-1. A parser for a small SQL subset: `SELECT cols | aggregates FROM t WHERE conjunction GROUP BY
-   col ORDER BY col LIMIT n`.
-2. Operators over the read path: scan (with pruning from the WHERE clause), filter, project,
-   hash aggregate, sort, limit; each stage's rows and costs shown.
-3. Experiment: a query box over the fixtures, with the plan and every stage's output.
+- Reader: `engine.rs` (a tokenizer and parser for a small SQL; a scan that skips row groups by
+  every condition's statistics; filter, aggregate, project, sort and limit, each recording its
+  rows). `fixtures/queries.json` holds pyarrow's answers to twelve queries, and the engine must
+  match them.
+- Experiment: a query box with every stage shown. Problems 12.1 (hash aggregate) and 12.2 (top n)
+  graded against pyarrow; 12.3 open.
+
+## Next: ch13, modular encryption
+
+1. Check whether pyarrow 25 can write encrypted files without a KMS server (an in-memory KMS
+   client class in Python). If it can, write `encrypted-footer.parquet` and
+   `plaintext-footer.parquet` with a test key committed as a fixture input.
+2. Reader: recognise `PARE`, read `FileCryptoMetaData`, report what a reader without keys can see
+   (in plaintext-footer mode: the schema and the plaintext columns' statistics), and refuse
+   encrypted modules by name. Decrypting AES-GCM needs AES, which would be written from the
+   specification if at all.
+3. Experiment: the structure view of both files side by side, marking what is readable.
 
 ## Then
 
