@@ -14,18 +14,129 @@ left a problem. A column layout scatters each row across the file, so a reader c
 the start and pick values up as it goes. It needs a map: which bytes hold which column, for
 which rows. A Parquet file carries that map, and it carries it at the end.
 
-This chapter follows a reader that knows one thing: the name of an object in object storage. You
-will watch every request it makes, see the bytes each request returns, and then build the code
-that made those requests.
+First you will read a file's bytes yourself, a few at a time. Then you will follow the book's
+reader, which knows one thing: the name of an object in object storage. You will watch every
+request it makes, see the bytes each request returns, and then build the code that made those
+requests.
 
 ## The experiment
 
+### Read the bytes yourself
+
+`tiny.parquet` is a real Parquet file written by pyarrow: four orders from a sales table, and
+[Appendix B](#the-fixtures) says exactly how it was written. Before any reader opens it, open it
+yourself. Each step below is a few lines of code. In Python, run them in the page, change them
+with **Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name.
+
+**The first bytes.** A file format usually announces itself at the start.
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/first_bytes.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/first_bytes.rs
+:language: rust
+```
+:::
+::::
+
+Four ASCII letters, `PAR1`: Parquet's *magic number*, which says what kind of file this is.
+
+**The last bytes.** Now the other end of the file.
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/last_bytes.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/last_bytes.rs
+:language: rust
+```
+:::
+::::
+
+The same four letters. A Parquet file carries its magic at both ends, and the end is the one a
+reader starts from, as you will see.
+
+**The four bytes before them.** These are not letters. Read them as a number, least significant
+byte first, which is what *little-endian* means:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/footer_length.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/footer_length.rs
+:language: rust
+```
+:::
+::::
+
+That number is the length of the footer: the file's map of everything else in it.
+
+**Where the footer is.** The footer ends where the last eight bytes begin, and it is as long as
+they say, so it starts that many bytes earlier:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/footer_start.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/footer_start.rs
+:language: rust
+```
+:::
+::::
+
+Those bytes are the footer. The rest of this chapter follows a reader to them, and
+[ch03](#the-type-system) decodes them field by field.
+
+**Break it.** Change one byte of the length and do the same arithmetic:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/damaged_length.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/damaged_length.rs
+:language: rust
+```
+:::
+::::
+
+The arithmetic cannot tell that anything is wrong: it puts the footer before the start of the
+file. A reader has to check what it reads before it trusts it, and the book's reader below
+refuses this very damage.
+
+Try changes of your own with **Edit**: read the first eight bytes, print the whole footer, or
+open another fixture, such as `fixtures/multiple-row-groups.parquet`.
+
 ### Open a file from its last byte
 
-The panel below runs the book's reader on `tiny.parquet`, a real Parquet file written by pyarrow.
-The reader sees the file only through a simulated object store, which logs every request. The
-file holds four orders from a sales table, and [Appendix B](#the-fixtures) says exactly how it
-was written.
+Now watch the book's reader do what you have done. The panel below runs it on the same file. The
+reader sees the file only through a simulated object store, which logs every request.
 
 ```lab
 experiment: footer

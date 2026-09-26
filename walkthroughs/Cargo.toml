@@ -1,0 +1,8 @@
+[package]
+name = "walkthroughs"
+description = "Short programs a chapter asks you to run and change before it builds the reader: reading a file's bytes by hand. Each has a Python twin in python/<chapter>/."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false

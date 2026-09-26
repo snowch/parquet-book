@@ -52,6 +52,7 @@ Either way the page runs the code the tests run.
 | `crates/parquet-lab-wasm/` | The reader behind a numbers-only C ABI, compiled to `wasm32-unknown-unknown`. |
 | `crates/pqlab/` | The reader on the command line (its commands in `cli.rs`, a library the WASM crate runs too), and `pqlab figures`, which writes every generated fragment. |
 | `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`); in Python, `python/<slug>.py` and `python/tests/test_<slug>.py`, run with `--problems`. |
+| `walkthroughs/` | Short programs a chapter asks you to run and change before it builds the reader, reading bytes by hand: `python/<slug>/<step>.py` and a Rust twin in `src/bin/<step>.rs` (`cargo run -p walkthroughs --bin <step>`). `tests/test_walkthroughs.py` runs both and checks what they print against pyarrow's manifest. |
 | `fixtures/` | Parquet files written by pyarrow, each with a manifest (`.json`) pyarrow wrote about it. |
 | `chapters/`, `parts/`, `appendices/`, `index.md` | The book, in MyST markdown. |
 | `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
@@ -131,8 +132,10 @@ that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, nev
 Edits live in the browser's storage, never on the server. Rust cannot compile in a page, so
 `.devcontainer/` gives a Codespace with the pinned toolchain instead, and on the Rust engine
 **Edit the code** says which `crates/parquet-lab/src/*.rs` file to edit there and how to see the
-labs on the edit (`make && make serve`). The browser test runs a workbench, Run buttons in both
-languages against the same commands at a desk, and an edit.
+labs on the edit (`make && make serve`). A walkthrough step (a `{literalinclude}` of a file in
+`walkthroughs/`, labelled "Try it") gets Edit and Run in Python, in the same worker, and Open in
+Codespaces in Rust. The browser test runs a workbench, Run buttons in both languages against the
+same commands at a desk, a walkthrough step and an edit.
 
 ## The invariants
 

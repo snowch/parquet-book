@@ -125,6 +125,22 @@ decode. If a panel needs a number, the report must return it. `tests/test_wasm.p
 browser call to the native reader's answer, and `tests/browser/smoke.mjs` checks the drawn page
 against the native reader.
 
+## Walkthroughs
+
+A chapter can open its experiment by having you do the reader's job by hand, a few lines at a
+time, before the lab shows the reader doing it and *Building it* turns the lines into the reader.
+ch02's "Read the bytes yourself" reads the magic at both ends, the footer length and where the
+footer starts, then breaks the length to show why a reader must check what it reads.
+
+- Each step is a file: `walkthroughs/python/<slug>/<step>.py` and its Rust twin
+  `walkthroughs/src/bin/<step>.rs`, self-contained, run from the repository's root. Name steps by
+  what they do; no numbers in names. Quote both in a tab set, whole, like the reader's code.
+- Keep them short enough to read in one glance, and idiomatic: they are for changing, not for
+  reuse. Print facts in both languages' own idiom; do not bend them to print identical text.
+- Add what each step must print to `tests/test_walkthroughs.py`, derived from the fixture and its
+  manifest. The prose that follows a step describes what it printed without typing a number.
+- End with an invitation to change something, and say what to try.
+
 ## Problems
 
 A problem is a stub and a test that passes only when the stub is right.

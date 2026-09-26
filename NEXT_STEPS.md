@@ -160,6 +160,15 @@ reader's numbers too.
 - `.devcontainer/` makes the repository a Codespace, for the Rust reader and its problems.
 - The browser test runs a workbench against native pytest and checks an edit and its restore.
 
+## Done: walking through the bytes by hand (ch02)
+
+ch02's experiment now opens with "Read the bytes yourself": five steps, in Python and Rust
+(`walkthroughs/`), that read the magic at both ends, the footer length and where the footer
+starts, then damage the length. In the page each Python step can be edited and run; each Rust
+step opens a Codespace. Candidates for the same treatment, once ch02 has been tried on a phone:
+ch03 (decode a few Thrift fields of the footer by hand), ch04 (levels from a page by hand), ch05
+(a PLAIN page, then a dictionary page, by hand).
+
 ## Trying: Rust compiled in the page
 
 So that a Run button could run the Rust problems' tests on a reader's own Rust.

@@ -18,7 +18,8 @@ export function savedAnswers() {
 }
 
 /**
- * Run `argv` (["pytest", …] or ["parquet_lab", …]) from the repository's root, with `answers`
+ * Run `argv` (["pytest", …], ["parquet_lab", …] or ["python", source, file name]) from the
+ * repository's root, with `answers`
  * as the chapters' problem files. Resolves with {exit, output, tests, seconds}.
  */
 export function runPython(argv, { answers = savedAnswers(), onStatus = () => {} } = {}) {

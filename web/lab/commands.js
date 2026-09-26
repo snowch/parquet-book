@@ -1,5 +1,6 @@
 // Buttons on the commands a page prints: Run for the ones the page can run itself, and Open in
-// Codespaces for the ones that need a toolchain.
+// Codespaces for the ones that need a toolchain. Also a chapter's walkthrough steps (below):
+// short programs to run and change, Python in the page and Rust in a Codespace.
 //
 // A `bash` block whose every command is one of these gets a Run button:
 //
@@ -20,8 +21,12 @@
 
 import { Lab } from "./wasm.js";
 import { packageList } from "./pyodide.js";
+import { codeArea } from "./code.js";
 import { runPython, stopPython } from "./runner.js";
 import { CODESPACES, CODESPACES_COST } from "./workbench.js";
+
+/** A duration as the status line shows it: milliseconds under a second. */
+const took = (ms) => (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
 
 /** A shell line as words: quotes group, a backslash escapes the next character. */
 function words(line) {
@@ -174,7 +179,7 @@ function mountRun(pre, runs) {
         codes.push(r.exit);
       }
       const failed = codes.find((c) => c !== 0);
-      status.textContent = `Ran in your browser in ${Math.round((Date.now() - started) / 100) / 10} s` +
+      status.textContent = `Ran in your browser in ${took(Date.now() - started)}` +
         (rust ? ", on the Rust reader compiled to WebAssembly" : "") +
         (failed === undefined ? "" : `; exit status ${failed}`);
       box.dataset.exit = String(failed ?? 0);
@@ -217,7 +222,82 @@ function mountCodespace(pre, lines) {
   });
 }
 
+/**
+ * A chapter's walkthrough steps: short programs quoted from walkthroughs/ that ask you to run them
+ * and change them. A Python step can be edited in place and run in the page's Python worker, from
+ * the repository's root, where the fixtures are; a Rust step opens a Codespace with its
+ * `cargo run` command copied, since the page cannot compile Rust.
+ */
+function mountWalkthroughs(root) {
+  for (const figure of root.querySelectorAll("figure.walkthrough[data-file]")) {
+    const file = figure.dataset.file;
+    const pre = figure.querySelector("pre");
+    if (!pre || pre.parentElement.classList.contains("runnable")) continue;
+    if (file.endsWith(".rs")) {
+      const bin = file.split("/").pop().replace(/\.rs$/, "");
+      mountCodespace(pre, [`cargo run -q -p walkthroughs --bin ${bin}`]);
+      continue;
+    }
+    const original = pre.textContent.replace(/\n$/, "");
+    const box = wrap(pre);
+    box.dataset.state = "idle";
+    const run = button(box, "▶ Run", "Run in your browser, with Python under Pyodide, from the repository's root");
+    const change = button(box, "Edit", "Change the code, then run it");
+    change.classList.add("edit-button");
+    let area = null;
+    const result = document.createElement("div");
+    result.className = "run-result";
+    result.hidden = true;
+    result.innerHTML = '<div class="run-head"><span class="status" role="status"></span></div><pre class="run-output"></pre>';
+    box.after(result);
+    const status = result.querySelector(".status");
+    const output = result.querySelector(".run-output");
+
+    const go = async () => {
+      if (box.dataset.state === "running") return;
+      box.dataset.state = "running";
+      result.hidden = false;
+      output.textContent = "";
+      const started = Date.now();
+      let phase = "Waiting for the page's other Python runs…";
+      const tick = setInterval(() => {
+        status.textContent = `${phase} ${Math.round((Date.now() - started) / 1000)} s`;
+      }, 1000);
+      status.textContent = phase;
+      try {
+        const source = area ? area.value : original;
+        const r = await runPython(["python", source, file], { onStatus: (t) => { phase = t; } });
+        output.textContent = r.output;
+        status.textContent = `Ran in your browser in ${took(Date.now() - started)}` +
+          (area && area.value !== original ? ", your edited version" : "") + (r.exit === 0 ? "" : `; exit status ${r.exit}`);
+        box.dataset.exit = String(r.exit);
+      } catch (error) {
+        status.textContent = `Could not run: ${error.message}`;
+      } finally {
+        clearInterval(tick);
+        box.dataset.state = "idle";
+      }
+    };
+    run.addEventListener("click", go);
+    change.addEventListener("click", () => {
+      if (area) {
+        // Back to the book's version.
+        area.replaceWith(pre);
+        area = null;
+        change.textContent = "Edit";
+        return;
+      }
+      area = codeArea(original, { label: `Your version of ${file}`, onRun: go });
+      area.rows = original.split("\n").length + 1;
+      pre.replaceWith(area);
+      area.focus();
+      change.textContent = "Restore";
+    });
+  }
+}
+
 export function mountCommands(root = document) {
+  mountWalkthroughs(root);
   for (const code of root.querySelectorAll("pre > code.language-bash")) {
     const pre = code.parentElement;
     if (pre.parentElement.classList.contains("runnable")) continue;

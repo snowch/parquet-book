@@ -9,7 +9,7 @@
 # works on a fresh clone and the browser runs exactly the code the tests run.
 [workspace]
 resolver = "2"
-members = ["crates/parquet-lab", "crates/parquet-lab-wasm", "crates/pqlab", "exercises"]
+members = ["crates/parquet-lab", "crates/parquet-lab-wasm", "crates/pqlab", "exercises", "walkthroughs"]
 
 [workspace.package]
 version = "0.1.0"

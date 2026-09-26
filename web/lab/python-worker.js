@@ -5,8 +5,9 @@
 // It lays out the repository as a desk has it (the reader and its tests, the problems and their
 // graders, every fixture and its manifest, and pyproject.toml), changes to its root, and runs
 // the command there: `python3 -m pytest …` through pytest.main, `python3 -m parquet_lab …`
-// through runpy. The files are the ones the repository's tests run; nothing about them is changed
-// for the page. They use the book's reader as it ships, not any edits you made to it in the labs.
+// through runpy, and a chapter's walkthrough step (`python3 walkthroughs/…`) as its source. The
+// files are the ones the repository's tests run; nothing about them is changed for the page.
+// They use the book's reader as it ships, not any edits you made to it in the labs.
 //
 // Every chapter's stub is written on each run, as your saved answer or as the book ships it,
 // because one chapter's problems can use another's, as they do at a desk (5.3 uses 4.1).
@@ -46,7 +47,8 @@ class Collect:
 
 
 def run(argv_json, answers_json):
-    """Run \`argv\`: ["pytest", ...] or ["parquet_lab", ...], from the repository's root."""
+    """Run \`argv\` from the repository's root: ["pytest", ...], ["parquet_lab", ...], or
+    ["python", source, file name] for a walkthrough step."""
     argv, answers = json.loads(argv_json), json.loads(answers_json)
     for name, stub in STUBS.items():
         with open(f"{EXERCISES}/{name}.py", "w") as f:
@@ -65,6 +67,16 @@ def run(argv_json, answers_json):
             code = int(pytest.main(
                 [*argv[1:], "--color=no", "--capture=sys", "-p", "no:cacheprovider"], plugins=[collect]
             ))
+        elif argv[0] == "python":
+            # A walkthrough step: its source (as the reader may have edited it) and its file name.
+            try:
+                exec(compile(argv[1], argv[2], "exec"), {"__name__": "__main__"})
+                code = 0
+            except SystemExit as e:
+                code = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+            except BaseException:
+                traceback.print_exc()
+                code = 1
         else:
             sys.argv = argv
             try:

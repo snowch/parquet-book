@@ -144,15 +144,21 @@ def _code(node: dict) -> str:
     return f"<pre><code{cls}>{body}</code></pre>"
 
 
-def _source_bar(include: dict) -> str:
-    path = str(include.get("file", ""))
+def _repo_path(include: dict) -> str:
     # MyST gives the path as written in the page, relative to it. Resolve against the
     # repository, so the bar can name the file the way the reader will find it on disk.
-    clean = path
+    clean = str(include.get("file", ""))
     while clean.startswith("../"):
         clean = clean[3:]
+    return clean
+
+
+def _source_bar(include: dict) -> str:
+    clean = _repo_path(include)
+    # A walkthrough is a short program the chapter asks you to run and change, not the reader.
+    label = "Try it" if clean.startswith("walkthroughs/") else "From the implementation"
     return (
-        '<div class="source-bar"><span class="source-label">From the implementation</span>'
+        f'<div class="source-bar"><span class="source-label">{label}</span>'
         f'<a href="{REPO_URL}{html.escape(clean)}"><code>{html.escape(clean)}</code></a></div>'
     )
 
@@ -249,8 +255,13 @@ def render(node: dict, footnotes: list | None = None) -> str:
         return _code(node)
     if kind == "include":
         if node.get("literal"):
+            walkthrough = _repo_path(node).startswith("walkthroughs/")
             return (
-                '<figure class="quoted">'
+                (
+                    f'<figure class="quoted walkthrough" data-file="{html.escape(_repo_path(node))}">'
+                    if walkthrough
+                    else '<figure class="quoted">'
+                )
                 + _source_bar(node)
                 + "".join(render(c, footnotes) for c in node.get("children", []))
                 + "</figure>"

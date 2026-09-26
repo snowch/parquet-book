@@ -530,6 +530,35 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
   check(rust.trim() === deskRust.trim(), "Run on `cargo run -p pqlab` prints, in the page, what the binary prints");
 }
 
+// ch02's walkthrough: short programs that read the file's bytes by hand. A Python step runs in
+// the page and prints the footer length the native reader decodes; an edited step runs the
+// edit; a Rust step offers a Codespace.
+{
+  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  const native = JSON.parse(execFileSync("target/debug/pqlab", ["footer", "fixtures/tiny.parquet", "--json"], { encoding: "utf8" }));
+  const runStep = async (step) => {
+    const box = step.locator(".runnable");
+    await box.locator(".run-button:not(.edit-button)").click();
+    await box.and(page.locator('[data-state="running"]')).waitFor({ timeout: 10000 }).catch(() => {});
+    await box.and(page.locator('[data-state="idle"]')).waitFor({ timeout: 300000 });
+    return step.locator(".run-output").innerText();
+  };
+  const length = page.locator('figure.walkthrough[data-file$="footer_length.py"]');
+  const out = await runStep(length);
+  check(out.includes(`read little-endian: ${native.trailer.footer_length}`),
+    `the walkthrough reads the footer length by hand in the page: ${native.trailer.footer_length}, as the reader decodes it`);
+  const first = page.locator('figure.walkthrough[data-file$="first_bytes.py"]');
+  await first.locator(".edit-button").click();
+  const area = first.locator("textarea");
+  await area.fill((await area.inputValue()).replace("data[:4]", "data[-4:]"));
+  const edited = await runStep(first);
+  check(edited.includes("PAR1") && (await first.locator(".status").innerText()).includes("your edited version"),
+    "an edited walkthrough step runs the edit");
+  check(await page.locator('figure.walkthrough[data-file$=".rs"] .runnable[data-codespace]').count()
+    === await page.locator('figure.walkthrough[data-file$=".py"]').count(),
+    "every Rust walkthrough step offers a Codespace");
+}
+
 // The reader editor: an edit to the Python reader reaches every lab on the page, and restoring
 // the book's version brings back the reader's answer.
 {
