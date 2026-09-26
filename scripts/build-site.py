@@ -341,13 +341,20 @@ def build(out: Path) -> None:
     modules = sorted(f.name for f in package.glob("*.py"))
     for name in modules:
         shutil.copy(package / name, out / "lab" / "py" / "parquet_lab" / name)
-    # Which labs the Python engine can run: the lab offers the choice only for those.
+    # Which labs the Python engine can run: the lab offers the choice only for those. An
+    # introduction's lab is a picture, not the reader at work, and the chapter has no code to
+    # edit, so it runs on the Rust reader and offers no choice of engine and no editor.
     tree = ast.parse((package / "browser.py").read_text())
-    experiments = next(
-        ast.literal_eval(n.value)
-        for n in tree.body
-        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
-    )
+    pictures = {e for c in CHAPTERS if c.introduction for e in c.experiments}
+    experiments = [
+        e
+        for e in next(
+            ast.literal_eval(n.value)
+            for n in tree.body
+            if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
+        )
+        if e not in pictures
+    ]
     # The problems and their graders, for the page's workbench, which runs them under Pyodide
     # exactly as `pytest --problems` runs them at a desk.
     exercises = ROOT / "exercises" / "python"

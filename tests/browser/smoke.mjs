@@ -202,15 +202,22 @@ await pyAnatomy.locator(".tree .node-row").first().waitFor();
 const pyLabels = await pyAnatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
 check(JSON.stringify(pyLabels) === JSON.stringify(labels), "every lab on the page follows the engine choice, and maps the same regions");
 if (shots) await footerLab.screenshot({ path: path.join(shots, "footer-lab-python.png") });
-await page.goto(base + "why-parquet-exists.html");
+await page.goto(base + "the-type-system.html");
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="layouts"]');
-  return el?.dataset.engine === "python" && el.dataset.rowsRanges;
+  const el = document.querySelector('.lab[data-experiment="schema"]');
+  return el?.dataset.engine === "python" && el.dataset.ready === "true";
 }, null, { timeout: 180000 });
-check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.getAttribute("data-columns-ranges") === "1",
-  "the engine choice holds on the next page, and the layouts lab agrees");
-await layouts.locator('.engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]').dataset.engine === "rust");
+check(true, "the engine choice holds on the next page");
+await page.locator('.lab[data-experiment="schema"] .engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="schema"]').dataset.engine === "rust");
+// ch01 is an introduction: its lab is a picture, with no engine to choose and no code to edit,
+// whatever engine the reader chose elsewhere.
+await page.evaluate(() => localStorage.setItem("lab-engine", "python"));
+await page.goto(base + "why-parquet-exists.html");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]')?.dataset.ready === "true");
+check(await layouts.getAttribute("data-engine") === "rust" && await layouts.locator(".engine-bar").count() === 0,
+  "ch01's lab offers no engine choice and no editor");
+await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 if (shots) {
   await page.goto(base + "anatomy-of-a-parquet-file.html");
   await page.screenshot({ path: path.join(shots, "chapter.png") });

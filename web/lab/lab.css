@@ -403,9 +403,21 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .strips { padding: 0 1rem; }
 .strip { margin: .8rem 0; }
 .strip figcaption { font: 13px/1.4 var(--chrome); color: var(--muted); margin-bottom: .3rem; }
-.cells { display: flex; flex-wrap: wrap; gap: 1px; }
-.cell { width: 9px; height: 14px; border-radius: 1px; opacity: .25; }
-.cell.start { margin-left: 2px; }
+.cells .line { display: flex; align-items: center; gap: .4rem; margin: 2px 0; }
+.cells .line-name { flex: 0 0 6.5rem; font: 11px var(--mono); color: var(--muted); text-align: right;
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cells .line-cells { flex: 1; display: grid; grid-template-columns: repeat(var(--widest), minmax(0, 1fr)); gap: 1px; }
+.cell { height: 12px; min-width: 0; border-radius: 1px; opacity: .25; }
+.cell.start { margin-left: 1px; }
+.lab table.costs th[scope=row] { text-align: left; }
+.lab table.costs small { display: block; font-size: 11.5px; color: var(--muted); font-weight: 400; }
+@media (max-width: 36rem) {
+  .cells .line-name { flex-basis: 4.2rem; font-size: 10px; }
+  .lab table.data, .lab table.costs { margin: 0 .5rem; font-size: 12px; }
+  .lab table.data td, .lab table.data th { padding: .2rem .3rem; }
+  .lab table.data th { text-transform: none; letter-spacing: 0; font-size: 10.5px; }
+  .strips { padding: 0 .5rem; }
+}
 .cell.on { opacity: 1; }
 .cell.c0 { background: #35648f; } .cell.c1 { background: #2e7d32; } .cell.c2 { background: #9c4f96; }
 .cell.c3 { background: #c8791a; } .cell.c4 { background: #5a707b; }

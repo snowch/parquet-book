@@ -10,7 +10,7 @@ import { escapeHtml } from "./hexview.js";
 import { engineNote } from "./footer.js";
 
 const fmt = (n) => Number(n).toLocaleString("en-GB");
-const ms = (us) => `${(us / 1000).toLocaleString("en-GB", { maximumFractionDigits: 3 })} ms`;
+const ms = (us) => `${(us / 1000).toLocaleString("en-GB", { maximumFractionDigits: 1 })} ms`;
 
 export function mountLayouts(root, lab) {
   const first = lab.layouts({ columns: [] });
@@ -64,27 +64,30 @@ function draw(root, r, one) {
 
   const wanted = new Set(r.query.rows);
   root.querySelector("table.data").innerHTML =
-    `<thead><tr>${r.columns.map((c, i) => `<th class="c${i}${cols.includes(i) ? " on" : ""}">${escapeHtml(c)}</th>`).join("")}</tr></thead>` +
+    `<thead><tr>${r.columns.map((c, i) => `<th class="c${i}${cols.includes(i) ? " on" : ""}">${escapeHtml(c).replace(/_/g, "_<wbr>")}</th>`).join("")}</tr></thead>` +
     `<tbody>${r.rows.map((row, ri) => `<tr>${row.map((v, ci) =>
       `<td class="c${ci}${cols.includes(ci) && wanted.has(ri) ? " on" : ""}">${escapeHtml(v)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 
   const strips = root.querySelector(".strips");
   strips.innerHTML = [r.rows_layout, r.columns_layout].map((L) => strip(L, r)).join("");
 
-  const line = (L, name) => {
-    const n = L.needed.length;
-    return `<tr><th scope="row">${name}</th><td class="num">${fmt(L.needed_bytes)} of ${fmt(L.total_bytes)}</td>` +
-      `<td class="num">${fmt(n)}</td>` +
-      `<td class="num">${fmt(L.by_range.requests.length)} · ${ms(L.by_range.elapsed_us)}</td>` +
-      `<td class="num">${fmt(L.whole.bytes)} bytes · ${ms(L.whole.elapsed_us)}</td></tr>`;
-  };
+  // One column per layout, so the table fits a phone: what the query needs, and what each way
+  // of fetching it costs.
+  const [R, C] = [r.rows_layout, r.columns_layout];
+  const requests = (L) => `${fmt(L.by_range.requests.length)} request${L.by_range.requests.length === 1 ? "" : "s"}`;
+  const row = (name, f) => `<tr><th scope="row">${name}</th><td class="num">${f(R)}</td><td class="num">${f(C)}</td></tr>`;
   root.querySelector("table.costs").innerHTML =
-    `<thead><tr><th>Layout</th><th class="num">Bytes the query needs</th><th class="num">Separate ranges</th>` +
-    `<th class="num">Fetch each range: requests · time</th><th class="num">Fetch everything: bytes · time</th></tr></thead>` +
-    `<tbody>${line(r.rows_layout, "Rows")}${line(r.columns_layout, "Columns")}</tbody>`;
+    `<thead><tr><th></th><th class="num">By rows</th><th class="num">By columns</th></tr></thead><tbody>` +
+    row("Bytes the query needs", (L) => `${fmt(L.needed_bytes)} of ${fmt(L.total_bytes)}`) +
+    row("Separate ranges", (L) => fmt(L.needed.length)) +
+    row("Fetch range by range", (L) => `${ms(L.by_range.elapsed_us)}<small>${requests(L)}</small>`) +
+    row("Fetch the whole object", (L) => `${ms(L.whole.elapsed_us)}<small>${fmt(L.whole.bytes)} bytes</small>`) +
+    "</tbody>";
 }
 
 // One layout's bytes, a cell per byte, coloured by column and lit where the query needs them.
+// Each line is one unit of the layout: an order in the row layout, a column in the column
+// layout. The cells share the width between them, so a line always fits, on a phone too.
 function strip(L, r) {
   const owner = new Array(L.total_bytes);
   L.cells.forEach((row, ri) => row.forEach(([a, b], ci) => {
@@ -92,13 +95,21 @@ function strip(L, r) {
   }));
   const need = new Array(L.total_bytes).fill(false);
   for (const [a, b] of L.needed) for (let i = a; i < b; i++) need[i] = true;
-  const cells = L.bytes.map((byte, i) => {
+  const byRows = L.layout === "rows";
+  const units = byRows
+    ? L.cells.map((row, ri) => [`order ${r.rows[ri][0]}`, row])
+    : r.columns.map((name, ci) => [name, L.cells.map((row) => row[ci])]);
+  const lines = units.map(([label, spans]) => [label, Math.min(...spans.map((s) => s[0])), Math.max(...spans.map((s) => s[1]))]);
+  const widest = Math.max(...lines.map(([, a, b]) => b - a));
+  const cell = (i) => {
     const [ri, ci] = owner[i];
     const starts = L.cells[ri][ci][0] === i ? " start" : "";
     return `<span class="cell c${ci}${need[i] ? " on" : ""}${starts}" title="${escapeHtml(r.columns[ci])}, row ${ri + 1}, byte ${i}"></span>`;
-  }).join("");
-  const title = L.layout === "rows" ? "Stored by rows" : "Stored by columns";
+  };
+  const html = lines.map(([label, a, b]) => `<div class="line"><span class="line-name">${escapeHtml(label)}</span>` +
+    `<span class="line-cells">${Array.from({ length: b - a }, (_, k) => cell(a + k)).join("")}</span></div>`).join("");
+  const title = byRows ? "Stored by rows" : "Stored by columns";
   return `<figure class="strip"><figcaption><strong>${title}</strong>: ${fmt(L.total_bytes)} bytes, ` +
-    `one square per byte. Lit squares are the bytes the query needs, in ${fmt(L.needed.length)} ` +
-    `separate range${L.needed.length === 1 ? "" : "s"}.</figcaption><div class="cells">${cells}</div></figure>`;
+    `one square per byte, one line per ${byRows ? "order" : "column"}. Lit squares are the bytes the query needs, in ${fmt(L.needed.length)} ` +
+    `separate range${L.needed.length === 1 ? "" : "s"}.</figcaption><div class="cells" style="--widest:${widest}">${html}</div></figure>`;
 }

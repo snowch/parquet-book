@@ -106,7 +106,8 @@ through both, on every fixture and on damaged copies, requiring identical JSON, 
 error messages included. `python/parquet_lab/browser.py` is the Python engine's equivalent of the
 C ABI; `web/lab/python.js` loads it into Pyodide (pinned, from a CDN) behind the same methods as
 `wasm.js`. Its `EXPERIMENTS` names the labs it can run, which is every lab; the page offers the
-Python engine for those, and a test requires them to be exactly the chapters' experiments.
+Python engine and the editor for those, except an introduction's lab, which is a picture with
+no code behind it on the page, and a test requires them to be exactly the chapters' experiments.
 
 **Experiments are fenced blocks.** A page embeds one with:
 
