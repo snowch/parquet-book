@@ -115,20 +115,24 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   the structure view shows modules, signatures and `PARE` files.
 - Experiment: what a reader without keys can and cannot see. Problems 13.1 and 13.2; 13.3 open.
 
-## Next: ch14, lakehouse and beyond
+## Done: ch14, lakehouse and beyond
 
-1. Fixtures: a small table as several files in Hive-style partition directories
-   (`country=UK/part-0.parquet`), written by pyarrow's dataset writer, and a minimal manifest file
-   listing them with per-file statistics, in the spirit of Iceberg and Delta.
-2. Reader: list the objects under a prefix in the simulated store; prune files by partition value
-   and by manifest statistics before opening any footer; run ch12's engine over the surviving
-   files.
-3. Experiment: a query over the table, with the files skipped and why, and the requests made.
+- Fixtures: `fixtures/table/`, the ch11 orders written by pyarrow's dataset writer into
+  Hive-style `country=` directories with at most a hundred rows a file, and a Delta-style log
+  beside them; `fixtures/table.json` lists the objects. pyarrow's answers to five table queries
+  are in `fixtures/queries.json`.
+- Reader: `table.rs` (partition values from paths; the log's `add` and `remove` actions with their
+  statistics; files ruled out by path and by statistics; the survivors fetched whole and queried
+  together by the ch12 engine, with partition columns from the paths). The object store gained
+  `LIST` and whole-object reads.
+- Experiment: a query over the table with the files found by listing, by listing and pruning by
+  path, or by the log. Problems 14.1 (partition values) and 14.2 (plan from the log); 14.3 open.
 
 ## Then
 
-- **ch11**: writing well, measured: row group and page sizes, sorting, dictionary fallback.
-- **ch12**: a tiny query engine over the reader.
+- A multi-version log with a checkpoint, and time travel between versions.
+- Decryption with the published test keys, so ch13's reader can go past where it stops.
+- Caching in the ch10 scan model.
 
 ## Book infrastructure
 

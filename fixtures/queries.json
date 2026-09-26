@@ -262,5 +262,113 @@
         -1
       ]
     ]
+  },
+  {
+    "file": "table",
+    "sql": "SELECT count(*) FROM orders",
+    "columns": [
+      "count(*)"
+    ],
+    "rows": [
+      [
+        800
+      ]
+    ]
+  },
+  {
+    "file": "table",
+    "sql": "SELECT count(*), sum(amount_cents) FROM orders WHERE country = 'UK'",
+    "columns": [
+      "count(*)",
+      "sum(amount_cents)"
+    ],
+    "rows": [
+      [
+        299,
+        1524551
+      ]
+    ]
+  },
+  {
+    "file": "table",
+    "sql": "SELECT order_id, country, amount_cents FROM orders WHERE order_id >= 431 AND order_id < 436 ORDER BY order_id",
+    "columns": [
+      "order_id",
+      "country",
+      "amount_cents"
+    ],
+    "rows": [
+      [
+        431,
+        "DE",
+        8755
+      ],
+      [
+        432,
+        "UK",
+        5764
+      ],
+      [
+        433,
+        "SE",
+        3515
+      ],
+      [
+        434,
+        "FR",
+        2634
+      ],
+      [
+        435,
+        "DE",
+        9058
+      ]
+    ]
+  },
+  {
+    "file": "table",
+    "sql": "SELECT country, count(*) FROM orders WHERE status = 'refunded' GROUP BY country ORDER BY country",
+    "columns": [
+      "country",
+      "count(*)"
+    ],
+    "rows": [
+      [
+        "DE",
+        1
+      ],
+      [
+        "FR",
+        6
+      ],
+      [
+        "PL",
+        7
+      ],
+      [
+        "SE",
+        5
+      ],
+      [
+        "UK",
+        12
+      ],
+      [
+        "US",
+        2
+      ]
+    ]
+  },
+  {
+    "file": "table",
+    "sql": "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200",
+    "columns": [
+      "count(*)"
+    ],
+    "rows": [
+      [
+        75
+      ]
+    ]
   }
 ]

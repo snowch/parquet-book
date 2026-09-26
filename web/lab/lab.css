@@ -159,6 +159,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
   .crypt-grid .p-seen { border-right: 0; }
+  .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
+  .table-grid .p-files { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -355,6 +357,15 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .crypt-grid .detail { color: var(--muted); overflow-wrap: anywhere; }
 .crypt-grid button.span { font: 12px var(--chrome); padding: 0 .3rem; background: var(--code); border-color: var(--edge); text-align: left; }
 
+/* Ch14: tables. */
+.table-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+              grid-template-areas: "files reqs" "answer answer"; border-bottom: 1px solid var(--edge); }
+.table-grid .p-files { grid-area: files; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.table-grid .p-t-reqs { grid-area: reqs; border-bottom: 1px solid var(--edge); }
+.table-grid .p-t-answer { grid-area: answer; }
+.table-grid tr.skipped td { color: var(--faint); }
+.table-grid .pages-list td { white-space: normal; }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -391,6 +402,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
   .crypt-grid .p-seen { border-right: 0; }
+  .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
+  .table-grid .p-files { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

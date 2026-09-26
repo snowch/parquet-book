@@ -318,6 +318,9 @@ def build(out: Path) -> None:
     shutil.copy(WASM, out / "lab" / "parquet_lab.wasm")
     for f in sorted((ROOT / "fixtures").glob("*.parquet")):
         shutil.copy(f, out / "fixtures" / f.name)
+    # ch14's table: its listing, and every object under table/, in their directories.
+    shutil.copy(ROOT / "fixtures" / "table.json", out / "fixtures" / "table.json")
+    shutil.copytree(ROOT / "fixtures" / "table", out / "fixtures" / "table")
     (out / ".nojekyll").write_text("")
 
     files = sorted(str(f.relative_to(out)) for f in out.rglob("*") if f.is_file() and f.name != ".nojekyll")

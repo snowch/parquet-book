@@ -1080,6 +1080,9 @@ fn the_engine_answers_as_pyarrow_does() {
     let mut checked = 0;
     for q in queries.as_array().unwrap() {
         let file = q.get("file").and_then(Json::as_str).unwrap();
+        if file == "table" {
+            continue; // ch14's queries, over many files: the_table_answers_as_pyarrow_does
+        }
         let sql = q.get("sql").and_then(Json::as_str).unwrap();
         let bytes = std::fs::read(root().join("fixtures").join(file)).unwrap();
         let a = parquet_lab::engine::run(&bytes, sql).unwrap_or_else(|e| panic!("{sql}: {e}"));
@@ -1210,5 +1213,86 @@ fn a_plaintext_footer_shows_everything_but_the_encrypted_columns() {
                 assert_eq!(modules[1].span.end, chunk.byte_range().end);
             }
         }
+    }
+}
+
+/// The table's objects, loaded into a store under the keys `fixtures/table.json` lists.
+fn table_store() -> parquet_lab::object_store::MemoryStore {
+    let listing =
+        Json::parse(&std::fs::read_to_string(root().join("fixtures/table.json")).unwrap()).unwrap();
+    let mut store = parquet_lab::object_store::MemoryStore::new();
+    for o in listing.get("objects").and_then(Json::as_array).unwrap() {
+        let key = o.get("key").and_then(Json::as_str).unwrap();
+        store.put(
+            key,
+            std::fs::read(root().join("fixtures").join(key)).unwrap(),
+        );
+    }
+    store
+}
+
+#[test]
+fn the_table_answers_as_pyarrow_does_however_its_files_are_found() {
+    use parquet_lab::table::{query, Discovery};
+    let text = std::fs::read_to_string(root().join("fixtures/queries.json")).unwrap();
+    let queries = Json::parse(&text).unwrap();
+    let mut checked = 0;
+    for q in queries
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|q| q.get("file").and_then(Json::as_str) == Some("table"))
+    {
+        let sql = q.get("sql").and_then(Json::as_str).unwrap();
+        let expected: Vec<String> = q
+            .get("rows")
+            .and_then(Json::as_array)
+            .unwrap()
+            .iter()
+            .map(|r| r.to_json())
+            .collect();
+        let mut read = Vec::new();
+        for d in [Discovery::List, Discovery::ListAndPrune, Discovery::Log] {
+            let a = query(table_store(), "table/", sql, d, 4, NetworkModel::default())
+                .unwrap_or_else(|e| panic!("{sql} {d:?}: {e}"));
+            let got: Vec<String> = a
+                .answer
+                .rows
+                .iter()
+                .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()).to_json())
+                .collect();
+            assert_eq!(got, expected, "{sql} {d:?}");
+            read.push(a.files.iter().filter(|f| f.read).count());
+            checked += 1;
+        }
+        // Each way of finding files reads no more than the one before it.
+        assert!(read[0] >= read[1] && read[1] >= read[2], "{sql}: {read:?}");
+    }
+    assert!(checked >= 15);
+}
+
+#[test]
+fn the_log_lists_exactly_the_files_a_listing_finds() {
+    use parquet_lab::object_store::ObjectStore;
+    let log = std::fs::read_to_string(root().join("fixtures/table").join(parquet_lab::table::LOG))
+        .unwrap();
+    let (files, columns) = parquet_lab::table::read_log(&log).unwrap();
+    assert!(columns.contains(&"country".to_string()));
+    let mut store = table_store();
+    let listed: Vec<(String, u64)> = store
+        .list("table/", "")
+        .into_iter()
+        .filter(|(k, _)| k.ends_with(".parquet"))
+        .map(|(k, n)| (k["table/".len()..].to_string(), n))
+        .collect();
+    let logged: Vec<(String, u64)> = files.iter().map(|f| (f.key.clone(), f.size)).collect();
+    assert_eq!(logged, listed);
+    // And its statistics are each file's own, as the reader finds them in the file's footer.
+    for f in &files {
+        let bytes = std::fs::read(root().join("fixtures/table").join(&f.key)).unwrap();
+        let md = report::open_bytes(&bytes).unwrap();
+        let s = f.stats.as_ref().unwrap();
+        assert_eq!(s.num_records, md.num_rows, "{}", f.key);
+        assert_eq!(f.partition, parquet_lab::table::partition_values(&f.key));
     }
 }

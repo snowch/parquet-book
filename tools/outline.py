@@ -247,9 +247,9 @@ _CHAPTERS = (
         "Lakehouse and beyond",
         "beyond_one_file",
         "How does one Parquet file become one part of a larger analytical system?",
-        "Many files, partitions, manifests and file pruning over the same object store.",
-        (),
-        (),
+        "Many files, partitions, a table log and file pruning over the same object store.",
+        ("table",),
+        ("table.json",),
     ),
 )
 
@@ -293,4 +293,5 @@ EXPERIMENTS = (
     "writing",
     "engine",
     "encryption",
+    "table",
 )

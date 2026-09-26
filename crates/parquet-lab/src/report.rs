@@ -2588,3 +2588,103 @@ pub fn encryption(file: &[u8]) -> Json {
         ("columns", Json::Arr(columns)),
     ])
 }
+
+/// Ch14's experiment: `sql` over the table under `table/` in a store holding `objects`, with its
+/// files found by `discovery`: every file considered, every request made, and the answer.
+pub fn table(
+    objects: Vec<(String, Vec<u8>)>,
+    sql: &str,
+    discovery: crate::table::Discovery,
+    connections: usize,
+    model: NetworkModel,
+) -> Json {
+    let mut store = MemoryStore::new();
+    for (k, v) in objects {
+        store.put(&k, v);
+    }
+    let a = match crate::table::query(store, "table/", sql, discovery, connections, model) {
+        Ok(a) => a,
+        Err(e) => return obj([("ok", false.into()), ("error", e.into())]),
+    };
+    let rows = |rows: &[Vec<crate::engine::Value>]| {
+        Json::Arr(
+            rows.iter()
+                .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()))
+                .collect(),
+        )
+    };
+    obj([
+        ("ok", true.into()),
+        (
+            "discovery",
+            match discovery {
+                crate::table::Discovery::List => "list",
+                crate::table::Discovery::ListAndPrune => "list and prune",
+                crate::table::Discovery::Log => "log",
+            }
+            .into(),
+        ),
+        (
+            "files",
+            Json::Arr(
+                a.files
+                    .iter()
+                    .map(|f| {
+                        obj([
+                            ("key", f.key.clone().into()),
+                            (
+                                "partition",
+                                Json::Arr(
+                                    f.partition
+                                        .iter()
+                                        .map(|(k, v)| format!("{k}={v}").into())
+                                        .collect(),
+                                ),
+                            ),
+                            ("size", f.size.into()),
+                            ("rows", f.stats.as_ref().map(|s| s.num_records).into()),
+                            ("read", f.read.into()),
+                            ("why", f.why.clone().into()),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+        ("requests", requests_json(&a.requests)),
+        (
+            "totals",
+            obj([
+                ("requests", a.requests.len().into()),
+                ("elapsed_us", a.elapsed_us.into()),
+                ("bytes_fetched", a.bytes_fetched.into()),
+                ("files", a.files.len().into()),
+                (
+                    "files_read",
+                    a.files.iter().filter(|f| f.read).count().into(),
+                ),
+            ]),
+        ),
+        (
+            "columns",
+            Json::Arr(a.answer.columns.iter().map(|c| c.clone().into()).collect()),
+        ),
+        ("rows", rows(&a.answer.rows)),
+        (
+            "stages",
+            Json::Arr(
+                a.answer
+                    .stages
+                    .iter()
+                    .map(|s| {
+                        obj([
+                            ("name", s.name.clone().into()),
+                            ("detail", s.detail.clone().into()),
+                            ("rows_in", s.rows_in.into()),
+                            ("rows_out", s.rows_out.into()),
+                        ])
+                    })
+                    .collect(),
+            ),
+        ),
+    ])
+}

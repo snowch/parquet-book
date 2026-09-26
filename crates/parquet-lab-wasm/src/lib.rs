@@ -233,6 +233,53 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch14's experiment: SQL over a table of files. `ids` is a `pl_alloc` buffer of `count`
+/// little-endian `u32` file ids, each file loaded under its object key; `sql` is another. This
+/// call takes and frees both. `discovery`: 0 list, 1 list and prune, 2 read the log.
+///
+/// # Safety
+/// Both buffers must come from `pl_alloc` with exactly these lengths.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn pl_table(
+    ids_ptr: *mut u8,
+    count: usize,
+    sql_ptr: *mut u8,
+    sql_len: usize,
+    discovery: u32,
+    connections: u32,
+    latency_us: u32,
+    bandwidth: u32,
+) -> usize {
+    use parquet_lab::table::Discovery;
+    let ids = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ids_ptr, count * 4));
+    let sql = Box::from_raw(std::ptr::slice_from_raw_parts_mut(sql_ptr, sql_len));
+    let sql = String::from_utf8_lossy(&sql).into_owned();
+    let objects: Vec<(String, Vec<u8>)> = ids
+        .chunks(4)
+        .filter_map(|c| {
+            let id = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+            with_file(id, |f| (f.name.clone(), f.bytes.clone()))
+        })
+        .collect();
+    let discovery = match discovery {
+        0 => Discovery::List,
+        1 => Discovery::ListAndPrune,
+        _ => Discovery::Log,
+    };
+    let model = NetworkModel {
+        latency_us: u64::from(latency_us),
+        bandwidth_bytes_per_sec: u64::from(bandwidth),
+    };
+    emit(report::table(
+        objects,
+        &sql,
+        discovery,
+        connections.max(1) as usize,
+        model,
+    ))
+}
+
 /// Ch13's experiment: what a reader without keys can see. See `report::encryption`.
 #[no_mangle]
 pub extern "C" fn pl_encryption(id: u32) -> usize {

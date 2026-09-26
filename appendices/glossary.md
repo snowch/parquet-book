@@ -47,6 +47,10 @@ position and description of every column chunk. [ch02](#anatomy-of-a-parquet-fil
 **Footer length.** The four-byte little-endian integer immediately before the closing magic.
 [ch02](#anatomy-of-a-parquet-file)
 
+**Hive-style partition.** A directory named `name=value` holding a table's files whose rows all
+share that value. The files omit the column; a reader takes it from the path.
+[ch14](#lakehouse-and-beyond)
+
 **Key metadata.** Bytes stored with an encrypted module that name the key protecting it without
 revealing it. [ch13](#modular-encryption)
 
@@ -112,8 +116,15 @@ a reader can decide not to read it. [ch08](#metadata-and-statistics)
 **Suffix range.** A range request for the last `n` bytes of an object, `Range: bytes=-n`. The
 response reports the object's size. [ch02](#anatomy-of-a-parquet-file)
 
+**Table format.** A record, kept beside a table's data files, of which files make up the table and
+what each holds: Delta Lake and Apache Iceberg are two. [ch14](#lakehouse-and-beyond)
+
 **Thrift compact protocol.** The binary serialisation Parquet uses for its footer and page
 headers. [ch02](#anatomy-of-a-parquet-file)
 
 **Trailer.** The last eight bytes of a file: the footer length and the closing magic.
 [ch02](#anatomy-of-a-parquet-file)
+
+**Transaction log.** Delta Lake's table format: numbered JSON files of `add` and `remove` actions,
+each a version of the table, with each file's partition values and statistics.
+[ch14](#lakehouse-and-beyond)

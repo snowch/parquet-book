@@ -343,6 +343,22 @@ await page.waitForFunction(() => document.querySelector('.lab[data-experiment="e
 check((await cryptLab.locator(".p-tree").innerText()).includes("Encrypted FileMetaData"), "the structure view shows the encrypted footer as one module");
 if (shots) await cryptLab.screenshot({ path: path.join(shots, "encryption-lab.png") });
 
+// ch14: a table of files. What is read is what the reader's plan kept.
+await page.goto(base + "lakehouse-and-beyond.html");
+const tableLab = page.locator('.lab[data-experiment="table"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="table"]')?.dataset.state === "ok", null, { timeout: 60000 });
+const ukSql = "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200";
+const byLog = native(["table", "fixtures/table.json", ukSql, "--discovery", "log"]);
+check(await tableLab.getAttribute("data-files-read") === String(byLog.totals.files_read) &&
+  await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
+  `reading the log, the reader reads ${byLog.totals.files_read} of ${byLog.totals.files} files and answers ${JSON.stringify(byLog.rows)}`);
+await tableLab.locator('input[name="discovery"][value="list"]').check();
+const byList = native(["table", "fixtures/table.json", ukSql, "--discovery", "list"]);
+await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="table"]').dataset.filesRead === String(n), byList.totals.files_read);
+check(await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
+  `listing, it reads all ${byList.totals.files_read} files and answers the same`);
+if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

@@ -1,0 +1,46 @@
+{
+  "why": "ch14's table: the ch11 orders partitioned by country, with a Delta-style transaction log.",
+  "rows": 800,
+  "objects": [
+    {
+      "key": "table/country=DE/part-0.parquet",
+      "size": 4071
+    },
+    {
+      "key": "table/country=FR/part-0.parquet",
+      "size": 4051
+    },
+    {
+      "key": "table/country=PL/part-0.parquet",
+      "size": 4064
+    },
+    {
+      "key": "table/country=SE/part-0.parquet",
+      "size": 4069
+    },
+    {
+      "key": "table/country=UK/part-0.parquet",
+      "size": 4074
+    },
+    {
+      "key": "table/country=UK/part-1.parquet",
+      "size": 4062
+    },
+    {
+      "key": "table/country=UK/part-2.parquet",
+      "size": 4052
+    },
+    {
+      "key": "table/country=US/part-0.parquet",
+      "size": 4049
+    },
+    {
+      "key": "table/country=US/part-1.parquet",
+      "size": 1674
+    },
+    {
+      "key": "table/_delta_log/00000000000000000000.json",
+      "size": 6332
+    }
+  ]
+}

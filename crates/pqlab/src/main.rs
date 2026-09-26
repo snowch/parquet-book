@@ -5,6 +5,8 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab table LISTING SQL [--discovery list|prune|log] [--connections N]
+//!                                    SQL over a table of files; LISTING is fixtures/table.json
 //! pqlab encryption FILE             what a reader without keys can see
 //! pqlab query FILE SQL             SQL answered from the file, stage by stage
 //! pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N]
@@ -61,6 +63,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab table LISTING SQL [--discovery list|prune|log] [--connections N]
   pqlab encryption FILE
   pqlab query FILE SQL
   pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N] [--connections N] [--gap BYTES] [--chunks] [--use statistics,bloom,page-index] [--latency-us N] [--bandwidth N]
@@ -107,6 +110,61 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "table" => {
+            use parquet_lab::table::Discovery;
+            let listing_path = PathBuf::from(file()?);
+            let listing = Json::parse(&String::from_utf8_lossy(&read(
+                &listing_path.display().to_string(),
+            )?))
+            .map_err(|e| format!("{}: {e}", listing_path.display()))?;
+            let dir = listing_path.parent().unwrap_or(Path::new("."));
+            let mut objects = Vec::new();
+            for o in listing
+                .get("objects")
+                .and_then(Json::as_array)
+                .ok_or("the listing has no objects")?
+            {
+                let key = o
+                    .get("key")
+                    .and_then(Json::as_str)
+                    .ok_or("an object with no key")?;
+                objects.push((key.to_string(), read(&dir.join(key).display().to_string())?));
+            }
+            let sql = args.get(2).ok_or("table needs SQL, in quotes")?;
+            let (mut discovery, mut connections) = (Discovery::Log, 4);
+            let mut i = 3;
+            while let Some(a) = args.get(i) {
+                match a.as_str() {
+                    "--discovery" => {
+                        discovery = match args.get(i + 1).map(String::as_str) {
+                            Some("list") => Discovery::List,
+                            Some("prune") => Discovery::ListAndPrune,
+                            Some("log") => Discovery::Log,
+                            _ => return Err("--discovery is list, prune or log".into()),
+                        }
+                    }
+                    "--connections" => {
+                        connections = args
+                            .get(i + 1)
+                            .and_then(|n| n.parse().ok())
+                            .ok_or("--connections needs a number")?
+                    }
+                    other => return Err(format!("unknown option {other}")),
+                }
+                i += 2;
+            }
+            out!(
+                "{}",
+                report::table(
+                    objects,
+                    sql,
+                    discovery,
+                    connections,
+                    NetworkModel::default()
+                )
+                .to_json_pretty()
+            );
+        }
         "encryption" => out!("{}", report::encryption(&read(file()?)?).to_json_pretty()),
         "query" => {
             let sql = args.get(2).ok_or("query needs SQL, in quotes")?;

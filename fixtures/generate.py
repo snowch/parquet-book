@@ -34,11 +34,13 @@ import io
 import json
 import math
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pyarrow.parquet.encryption as pe
 
@@ -1033,7 +1035,159 @@ def query_answers(written: dict[str, bytes]) -> bytes:
     for name, sql, answer in QUERIES:
         table = pq.read_table(io.BytesIO(written[name]))
         out.append({"file": f"{name}.parquet", "sql": sql, **answer(table)})
+    out += table_answers()
     return (json.dumps(out, indent=2) + "\n").encode()
+
+
+#: ch14's table: the ch11 orders, partitioned by country into directories, at most 100 rows a
+#: file, sorted by order_id within each country.
+TABLE_DIR = "table"
+TABLE_LOG = "_delta_log/00000000000000000000.json"
+
+
+def table_files() -> dict[str, bytes]:
+    """The table's Parquet files, by key under ``table/``, as pyarrow's dataset writer lays them
+    out. The partition column leaves the files and becomes part of each path."""
+    rows = sorted(WRITING_ROWS, key=lambda r: (r["country"], r["order_id"]))
+    table = pa.Table.from_pylist(rows, schema=WRITING_SCHEMA)
+    options = ds.ParquetFileFormat().make_write_options(compression="snappy", write_statistics=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        ds.write_dataset(
+            table,
+            tmp,
+            format="parquet",
+            partitioning=["country"],
+            partitioning_flavor="hive",
+            max_rows_per_file=100,
+            max_rows_per_group=100,
+            basename_template="part-{i}.parquet",
+            existing_data_behavior="overwrite_or_ignore",
+            use_threads=False,
+            file_options=options,
+        )
+        return {str(f.relative_to(tmp)): f.read_bytes() for f in sorted(Path(tmp).rglob("*.parquet"))}
+
+
+def _spark_type(t: pa.DataType) -> str:
+    return {pa.int64(): "long", pa.string(): "string"}.get(t, "timestamp")
+
+
+def table_log(files: dict[str, bytes]) -> bytes:
+    """A transaction log in Delta Lake's format, with only the actions ch14 reads: the protocol,
+    the table's metadata, and one ``add`` per file, carrying its partition values and its
+    statistics. The statistics are pyarrow's, from each file's footer. Times and the table id
+    are fixed, so the log is the same on every run."""
+    fields = [
+        {"name": f.name, "type": _spark_type(f.type), "nullable": f.nullable, "metadata": {}}
+        for f in WRITING_SCHEMA
+    ]
+    actions = [
+        {"protocol": {"minReaderVersion": 1, "minWriterVersion": 2}},
+        {
+            "metaData": {
+                "id": "00000000-0000-0000-0000-000000000014",
+                "format": {"provider": "parquet", "options": {}},
+                "schemaString": json.dumps({"type": "struct", "fields": fields}),
+                "partitionColumns": ["country"],
+                "configuration": {},
+                "createdTime": 1767225600000,
+            }
+        },
+    ]
+    for key, data in files.items():
+        md = pq.ParquetFile(io.BytesIO(data)).metadata
+        mins, maxs, nulls = {}, {}, {}
+        for j in range(md.num_columns):
+            name = md.schema.column(j).name
+            stats = [md.row_group(i).column(j).statistics for i in range(md.num_row_groups)]
+            mins[name] = _stat(min(s.min for s in stats))
+            maxs[name] = _stat(max(s.max for s in stats))
+            nulls[name] = sum(s.null_count for s in stats)
+        partition = dict(part.split("=", 1) for part in key.split("/")[:-1])
+        stats_json = {"numRecords": md.num_rows, "minValues": mins, "maxValues": maxs, "nullCount": nulls}
+        actions.append(
+            {
+                "add": {
+                    "path": key,
+                    "partitionValues": partition,
+                    "size": len(data),
+                    "modificationTime": 1767225600000,
+                    "dataChange": True,
+                    "stats": json.dumps(stats_json),
+                }
+            }
+        )
+    return "".join(json.dumps(a) + "\n" for a in actions).encode()
+
+
+def table_outputs() -> dict[Path, bytes]:
+    files = table_files()
+    out = {HERE / TABLE_DIR / k: v for k, v in files.items()}
+    log = table_log(files)
+    out[HERE / TABLE_DIR / TABLE_LOG] = log
+    # What the store holds: every object's key and size. The laboratory loads these into the
+    # simulated store; the reader itself still has to LIST or read the log to find them.
+    objects = [{"key": f"{TABLE_DIR}/{k}", "size": len(v)} for k, v in files.items()]
+    objects.append({"key": f"{TABLE_DIR}/{TABLE_LOG}", "size": len(log)})
+    listing = {
+        "why": "ch14's table: the ch11 orders partitioned by country, with a Delta-style transaction log.",
+        "rows": sum(pq.ParquetFile(io.BytesIO(v)).metadata.num_rows for v in files.values()),
+        "objects": objects,
+    }
+    out[HERE / "table.json"] = (json.dumps(listing, indent=2) + "\n").encode()
+    return out
+
+
+def table_answers() -> list[dict]:
+    """pyarrow's answers to queries over the whole table, read as a Hive-partitioned dataset."""
+    with tempfile.TemporaryDirectory() as tmp:
+        for key, data in table_files().items():
+            path = Path(tmp) / key
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        t = ds.dataset(tmp, format="parquet", partitioning="hive").to_table()
+        # Hive partitions read back as dictionary-encoded strings; make them plain.
+        t = t.set_column(t.schema.get_field_index("country"), "country", t["country"].cast(pa.string()))
+        out = []
+        for sql, answer in TABLE_QUERIES:
+            out.append({"file": TABLE_DIR, "sql": sql, **answer(t)})
+        return out
+
+
+TABLE_QUERIES = [
+    ("SELECT count(*) FROM orders", lambda t: {"columns": ["count(*)"], "rows": [[t.num_rows]]}),
+    (
+        "SELECT count(*), sum(amount_cents) FROM orders WHERE country = 'UK'",
+        lambda t: (
+            lambda f: {
+                "columns": ["count(*)", "sum(amount_cents)"],
+                "rows": [[f.num_rows, pc.sum(f["amount_cents"]).as_py()]],
+            }
+        )(t.filter(pc.equal(t["country"], "UK"))),
+    ),
+    (
+        "SELECT order_id, country, amount_cents FROM orders WHERE order_id >= 431 AND order_id < 436 ORDER BY order_id",
+        lambda t: _rows(
+            t.filter(pc.and_(pc.greater_equal(t["order_id"], 431), pc.less(t["order_id"], 436))).sort_by(
+                "order_id"
+            ),
+            ["order_id", "country", "amount_cents"],
+        ),
+    ),
+    (
+        "SELECT country, count(*) FROM orders WHERE status = 'refunded' GROUP BY country ORDER BY country",
+        lambda t: _grouped(
+            t.filter(pc.equal(t["status"], "refunded")), "country", [([], "count_all")], ["count(*)"]
+        ),
+    ),
+    (
+        "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200",
+        lambda t: {
+            "columns": ["count(*)"],
+            "rows": [[t.filter(pc.and_(pc.equal(t["country"], "UK"), pc.less(t["order_id"], 200))).num_rows]],
+        },
+    ),
+]
 
 
 def dump_manifest(m: dict) -> str:
@@ -1059,6 +1213,7 @@ def outputs() -> dict[Path, bytes]:
         files[HERE / f"{fixture.name}.json"] = (dump_manifest(m) + "\n").encode()
     files[HERE / "README.md"] = readme(manifests).encode()
     files[HERE / "queries.json"] = query_answers({m["name"]: files[HERE / m["file"]] for m in manifests})
+    files.update(table_outputs())
     return files
 
 
@@ -1080,6 +1235,7 @@ def main() -> int:
             if not path.exists() or path.read_bytes() != data:
                 stale.append(path.relative_to(HERE.parent))
         else:
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             print(f"wrote {path.relative_to(HERE.parent)} ({len(data)} bytes)")
     if stale:

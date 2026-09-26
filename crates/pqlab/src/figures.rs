@@ -187,6 +187,14 @@ const FIGURES: &[Figure] = &[
         render: |root| encryption_view(root, "encrypted-footer.parquet"),
     },
     Figure {
+        file: "table-log.md",
+        render: table_log,
+    },
+    Figure {
+        file: "table-discovery.md",
+        render: table_discovery,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -2218,6 +2226,9 @@ fn engine_answers(root: &Path) -> Result<String, String> {
     ];
     for q in queries.as_array().ok_or("queries.json is not a list")? {
         let file = q.get("file").and_then(Json::as_str).ok_or("no file")?;
+        if file == "table" {
+            continue; // ch14's queries over the whole table
+        }
         let sql = q.get("sql").and_then(Json::as_str).ok_or("no sql")?;
         let bytes = fixture(root, file)?;
         let a = parquet_lab::engine::run(&bytes, sql)?;
@@ -2275,5 +2286,114 @@ fn encryption_view(root: &Path, name: &str) -> Result<String, String> {
         "{}\n{}",
         rows.join("\n"),
         conditions(name, &bytes, None)
+    ))
+}
+
+fn table_store(root: &Path) -> Result<MemoryStore, String> {
+    let text = std::fs::read_to_string(root.join("fixtures/table.json"))
+        .map_err(|e| format!("cannot read table.json: {e}"))?;
+    let listing = Json::parse(&text).map_err(|e| e.to_string())?;
+    let mut store = MemoryStore::new();
+    for o in arr(listing.get("objects")) {
+        let key = o
+            .get("key")
+            .and_then(Json::as_str)
+            .ok_or("an object with no key")?;
+        store.put(key, fixture(root, key)?);
+    }
+    Ok(store)
+}
+
+fn table_log(root: &Path) -> Result<String, String> {
+    use parquet_lab::table::{read_log, LOG};
+    let bytes = fixture(root, &format!("table/{LOG}"))?;
+    let (files, _) = read_log(&String::from_utf8_lossy(&bytes))?;
+    let stat = |s: &[(String, Json)]| {
+        s.iter()
+            .find(|(k, _)| k == "order_id")
+            .map(|(_, v)| v.to_json())
+            .unwrap_or_default()
+    };
+    let mut rows = vec![
+        "| File | Partition | Bytes | Rows | `order_id` from | to |".to_string(),
+        "|---|---|--:|--:|--:|--:|".to_string(),
+    ];
+    for f in &files {
+        let s = f.stats.as_ref().ok_or("an add with no statistics")?;
+        rows.push(format!(
+            "| `{}` | {} | {} | {} | {} | {} |",
+            f.key,
+            f.partition
+                .iter()
+                .map(|(k, v)| format!("`{k}={v}`"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            thousands(f.size),
+            thousands(s.num_records as u64),
+            stat(&s.min),
+            stat(&s.max)
+        ));
+    }
+    Ok(format!(
+        "{}\n\n*Every `add` action in `fixtures/table/{LOG}` ({} bytes), as the reader's \
+         `table::read_log` reads it.*\n",
+        rows.join("\n"),
+        bytes.len()
+    ))
+}
+
+fn table_discovery(root: &Path) -> Result<String, String> {
+    use parquet_lab::table::{query, Discovery};
+    let text = std::fs::read_to_string(root.join("fixtures/queries.json"))
+        .map_err(|e| format!("cannot read queries.json: {e}"))?;
+    let queries = Json::parse(&text).map_err(|e| e.to_string())?;
+    let model = NetworkModel::default();
+    let mut rows = vec![
+        "| Query | Files found by | Files read | Requests | Bytes fetched | Time | Same as pyarrow |"
+            .to_string(),
+        "|---|---|--:|--:|--:|--:|---|".to_string(),
+    ];
+    let mut files = 0;
+    for q in arr(Some(&queries))
+        .iter()
+        .filter(|q| q.get("file").and_then(Json::as_str) == Some("table"))
+    {
+        let sql = q.get("sql").and_then(Json::as_str).ok_or("no sql")?;
+        let theirs = q.get("rows").map(Json::to_json).unwrap_or_default();
+        for (d, label) in [
+            (Discovery::List, "listing"),
+            (Discovery::ListAndPrune, "listing, pruned by path"),
+            (Discovery::Log, "the log"),
+        ] {
+            let a = query(table_store(root)?, "table/", sql, d, 4, model)?;
+            files = a.files.len();
+            let mine = Json::Arr(
+                a.answer
+                    .rows
+                    .iter()
+                    .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()))
+                    .collect(),
+            )
+            .to_json();
+            rows.push(format!(
+                "| `{}` | {label} | {} of {} | {} | {} | {} | {} |",
+                cell(sql),
+                a.files.iter().filter(|f| f.read).count(),
+                a.files.len(),
+                a.requests.len(),
+                thousands(a.bytes_fetched),
+                ms_of(a.elapsed_us),
+                if mine == theirs { "yes" } else { "**no**" }
+            ));
+        }
+    }
+    Ok(format!(
+        "{}\n\n*Computed by the reader over the {files} data files of `fixtures/table/`, fetching \
+         through the simulated store with four connections, {} ms before each request's first \
+         byte and {} MB/s after it. The answers are compared with pyarrow's, from \
+         `fixtures/queries.json`.*\n",
+        rows.join("\n"),
+        model.latency_us / 1000,
+        model.bandwidth_bytes_per_sec / 1_000_000
     ))
 }

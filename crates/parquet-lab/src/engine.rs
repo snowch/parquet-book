@@ -513,53 +513,120 @@ impl Acc {
     }
 }
 
+/// One file a query reads, and the partition values its path gives it (ch14). Every source must
+/// have the same schema; partition columns are not in the files, only in their paths.
+#[derive(Clone, Debug)]
+pub struct Source<'a> {
+    pub name: String,
+    pub bytes: &'a [u8],
+    pub partition: Vec<(String, String)>,
+}
+
 /// Answer `sql` from `file`'s bytes.
 pub fn run(file: &[u8], sql: &str) -> Result<Answer, String> {
+    let one = Source {
+        name: "the file".into(),
+        bytes: file,
+        partition: Vec::new(),
+    };
+    run_sources(&[one], sql)
+}
+
+/// A column of the query: one the files hold, or one a partition path supplies.
+#[derive(Clone, Debug)]
+enum Col {
+    Leaf(Leaf),
+    Partition(String),
+}
+
+/// Answer `sql` from several files at once: a table (ch14).
+pub fn run_sources(sources: &[Source], sql: &str) -> Result<Answer, String> {
     let q = parse(sql)?;
-    let md: FileMetaData = crate::report::open_bytes(file)?;
-    let root = build(&md.schema).map_err(|e| e.to_string())?;
+    let mds: Vec<FileMetaData> = sources
+        .iter()
+        .map(|s| crate::report::open_bytes(s.bytes).map_err(|e| format!("{}: {e}", s.name)))
+        .collect::<Result<_, _>>()?;
+    let md0 = mds.first().ok_or("no files to read")?;
+    let root = build(&md0.schema).map_err(|e| e.to_string())?;
     let flat: Vec<Leaf> = leaves(&root)
         .into_iter()
         .filter(|l| l.max_repetition_level == 0)
         .collect();
-    let find = |name: &str| {
-        flat.iter()
-            .find(|l| l.dotted_path() == name)
-            .ok_or(format!("no column {name}"))
+    let partition_names: Vec<String> = sources[0]
+        .partition
+        .iter()
+        .map(|(k, _)| k.clone())
+        .collect();
+    let find = |name: &str| -> Result<Col, String> {
+        if let Some(l) = flat.iter().find(|l| l.dotted_path() == name) {
+            return Ok(Col::Leaf(l.clone()));
+        }
+        if partition_names.iter().any(|p| p == name) {
+            return Ok(Col::Partition(name.to_string()));
+        }
+        Err(format!("no column {name}"))
     };
 
-    // Every column the query mentions, in the order the schema has them.
+    // Every column the query mentions: the files' in schema order, then the partitions'.
     let mut mentioned: Vec<String> = Vec::new();
     for i in &q.items {
         match i {
-            Item::Star => mentioned.extend(flat.iter().map(|l| l.dotted_path())),
+            Item::Star => {
+                mentioned.extend(flat.iter().map(|l| l.dotted_path()));
+                mentioned.extend(partition_names.iter().cloned());
+            }
             Item::Column(c) | Item::Aggregate(_, Some(c)) => mentioned.push(c.clone()),
             Item::Aggregate(_, None) => {}
         }
     }
     mentioned.extend(q.conditions.iter().map(|c| c.column.clone()));
     mentioned.extend(q.group_by.iter().cloned());
-    let mut columns: Vec<&Leaf> = Vec::new();
+    let mut columns: Vec<Col> = Vec::new();
     for name in &mentioned {
-        let leaf = find(name)?;
-        if !columns.iter().any(|l| l.column == leaf.column) {
-            columns.push(leaf);
+        let col = find(name)?;
+        let same = |c: &Col| match (c, &col) {
+            (Col::Leaf(a), Col::Leaf(b)) => a.column == b.column,
+            (Col::Partition(a), Col::Partition(b)) => a == b,
+            _ => false,
+        };
+        if !columns.iter().any(same) {
+            columns.push(col);
         }
     }
-    columns.sort_by_key(|l| l.column);
-    let names: Vec<String> = columns.iter().map(|l| l.dotted_path()).collect();
+    columns.sort_by_key(|c| match c {
+        Col::Leaf(l) => (0, l.column, String::new()),
+        Col::Partition(p) => (1, 0, p.clone()),
+    });
+    let names: Vec<String> = columns
+        .iter()
+        .map(|c| match c {
+            Col::Leaf(l) => l.dotted_path(),
+            Col::Partition(p) => p.clone(),
+        })
+        .collect();
     let position = |name: &str| names.iter().position(|n| n == name);
 
-    let predicates: Vec<(usize, Predicate)> = q
+    // A condition on a file's column compares PLAIN bytes in the column's order; one on a
+    // partition compares the path's text.
+    enum Test {
+        Leaf(Predicate),
+        Partition(Op, String),
+    }
+    let predicates: Vec<(usize, Test)> = q
         .conditions
         .iter()
         .map(|c| {
-            let leaf = find(&c.column)?;
-            let conv = md.schema[leaf.element].converted_type.clone();
-            Ok((
-                position(&c.column).unwrap_or(0),
-                Predicate::new(leaf, conv.as_deref(), c.op, &c.value)?,
-            ))
+            let at = position(&c.column).unwrap_or(0);
+            match find(&c.column)? {
+                Col::Leaf(leaf) => {
+                    let conv = md0.schema[leaf.element].converted_type.clone();
+                    Ok((
+                        at,
+                        Test::Leaf(Predicate::new(&leaf, conv.as_deref(), c.op, &c.value)?),
+                    ))
+                }
+                Col::Partition(_) => Ok((at, Test::Partition(c.op, c.value.clone()))),
+            }
         })
         .collect::<Result<_, String>>()?;
 
@@ -568,84 +635,113 @@ pub fn run(file: &[u8], sql: &str) -> Result<Answer, String> {
     let mut raw: Vec<Vec<Option<Vec<u8>>>> = Vec::new();
     let mut rows: Vec<Vec<Value>> = Vec::new();
     let (mut read, mut bytes, mut skipped_why) = (0, 0u64, Vec::new());
-    for (g, rg) in md.row_groups.iter().enumerate() {
-        // Skip the row group if any condition's comparison with its bounds rules it out.
-        let ruled_out = q
-            .conditions
-            .iter()
-            .zip(&predicates)
-            .find_map(|(c, (_, p))| {
-                let leaf = find(&c.column).ok()?;
-                let chunk = &rg.columns[leaf.column];
-                let s = chunk.statistics.as_ref()?;
-                let type_order = md
-                    .column_orders
-                    .as_ref()
-                    .and_then(|o| o.get(leaf.column))
-                    .is_some_and(|o| o == "TYPE_ORDER");
-                let b = bounds(s, p.comparator, type_order).ok();
-                let d = against_bounds(
-                    p,
-                    b.as_ref().map(|b| (&b.min[..], &b.max[..])),
-                    s.null_count,
-                    chunk.num_values,
-                );
-                d.skip.then(|| {
-                    format!(
-                        "row group {g}: {} {} {}: {}",
-                        c.column,
-                        c.op.symbol(),
-                        c.value,
-                        d.why
-                    )
-                })
-            });
-        if let Some(why) = ruled_out {
-            skipped_why.push(why);
-            continue;
-        }
-        read += 1;
-        let mut cols = Vec::new();
-        for leaf in &columns {
-            let chunk = &rg.columns[leaf.column];
-            bytes += chunk.byte_range().len();
-            let d = crate::column::read_column(file, chunk, leaf).map_err(|e| e.to_string())?;
-            cols.push(
-                d.triples
-                    .iter()
-                    .map(|t| {
-                        let bytes = t
-                            .value
-                            .as_ref()
-                            .map(|v| v.to_plain_bytes(leaf.physical_type));
-                        let shown = t
-                            .value
-                            .as_ref()
-                            .map(|v| {
-                                crate::logical::value_json(
-                                    leaf.physical_type,
-                                    leaf.logical_type.as_ref(),
-                                    v,
-                                )
-                            })
-                            .unwrap_or(Json::Null);
-                        (bytes, Value::from_json(shown))
+    let many = sources.len() > 1;
+    for (source, md) in sources.iter().zip(&mds) {
+        for (g, rg) in md.row_groups.iter().enumerate() {
+            // Skip the row group if any condition's comparison with its bounds rules it out.
+            let ruled_out = q
+                .conditions
+                .iter()
+                .zip(&predicates)
+                .find_map(|(c, (_, t))| {
+                    let (Test::Leaf(p), Ok(Col::Leaf(leaf))) = (t, find(&c.column)) else {
+                        return None;
+                    };
+                    let chunk = &rg.columns[leaf.column];
+                    let s = chunk.statistics.as_ref()?;
+                    let type_order = md
+                        .column_orders
+                        .as_ref()
+                        .and_then(|o| o.get(leaf.column))
+                        .is_some_and(|o| o == "TYPE_ORDER");
+                    let b = bounds(s, p.comparator, type_order).ok();
+                    let d = against_bounds(
+                        p,
+                        b.as_ref().map(|b| (&b.min[..], &b.max[..])),
+                        s.null_count,
+                        chunk.num_values,
+                    );
+                    d.skip.then(|| {
+                        format!(
+                            "{}row group {g}: {} {} {}: {}",
+                            if many {
+                                format!("{} ", source.name)
+                            } else {
+                                String::new()
+                            },
+                            c.column,
+                            c.op.symbol(),
+                            c.value,
+                            d.why
+                        )
                     })
-                    .collect::<Vec<_>>(),
-            );
-        }
-        for r in 0..rg.num_rows as usize {
-            raw.push(cols.iter().map(|c| c[r].0.clone()).collect());
-            rows.push(cols.iter().map(|c| c[r].1.clone()).collect());
+                });
+            if let Some(why) = ruled_out {
+                skipped_why.push(why);
+                continue;
+            }
+            read += 1;
+            let mut cols = Vec::new();
+            for col in &columns {
+                let cells = match col {
+                    Col::Leaf(leaf) => {
+                        let chunk = &rg.columns[leaf.column];
+                        bytes += chunk.byte_range().len();
+                        let d = crate::column::read_column(source.bytes, chunk, leaf)
+                            .map_err(|e| e.to_string())?;
+                        d.triples
+                            .iter()
+                            .map(|t| {
+                                let bytes = t
+                                    .value
+                                    .as_ref()
+                                    .map(|v| v.to_plain_bytes(leaf.physical_type));
+                                let shown = t
+                                    .value
+                                    .as_ref()
+                                    .map(|v| {
+                                        crate::logical::value_json(
+                                            leaf.physical_type,
+                                            leaf.logical_type.as_ref(),
+                                            v,
+                                        )
+                                    })
+                                    .unwrap_or(Json::Null);
+                                (bytes, Value::from_json(shown))
+                            })
+                            .collect::<Vec<_>>()
+                    }
+                    Col::Partition(p) => {
+                        let v = source
+                            .partition
+                            .iter()
+                            .find(|(k, _)| k == p)
+                            .map(|(_, v)| Value::Str(v.clone()))
+                            .unwrap_or(Value::Null);
+                        vec![(None, v); rg.num_rows as usize]
+                    }
+                };
+                cols.push(cells);
+            }
+            for r in 0..rg.num_rows as usize {
+                raw.push(cols.iter().map(|c| c[r].0.clone()).collect());
+                rows.push(cols.iter().map(|c| c[r].1.clone()).collect());
+            }
         }
     }
-    let scanned = md.num_rows as usize;
+    let scanned: usize = mds.iter().map(|m| m.num_rows as usize).sum();
+    let groups: usize = mds.iter().map(|m| m.row_groups.len()).sum();
     stages.push(stage(
         "Scan",
         format!(
-            "read {} of {} row groups, {bytes} bytes of column chunks{}",
+            "read {} of {} row groups{}, {bytes} bytes of column chunks{}",
             read,
-            md.row_groups.len(),
+            groups,
+            if many {
+                format!(" in {} files", sources.len())
+            } else {
+                String::new()
+            },
             if skipped_why.is_empty() {
                 String::new()
             } else {
@@ -662,10 +758,15 @@ pub fn run(file: &[u8], sql: &str) -> Result<Answer, String> {
         let before = rows.len();
         let keep: Vec<bool> = raw
             .iter()
-            .map(|r| {
-                predicates
-                    .iter()
-                    .all(|(i, p)| p.row_matches(r[*i].as_deref()))
+            .zip(&rows)
+            .map(|(r, v)| {
+                predicates.iter().all(|(i, t)| match t {
+                    Test::Leaf(p) => p.row_matches(r[*i].as_deref()),
+                    Test::Partition(op, text) => match &v[*i] {
+                        Value::Str(s) => op.matches(Some(s.as_bytes().cmp(text.as_bytes()))),
+                        _ => matches!(op, Op::IsNull),
+                    },
+                })
             })
             .collect();
         let mut k = keep.iter();
@@ -685,6 +786,53 @@ pub fn run(file: &[u8], sql: &str) -> Result<Answer, String> {
         stages.push(stage("Filter", text, before, &names, &rows));
     }
 
+    finish(&q, names, rows, stages, read, groups, bytes)
+}
+
+/// Answer a query that reads no files: every file was ruled out before reading (ch14). `columns`
+/// are the table's columns, from its log, for `SELECT *`.
+pub fn run_empty(sql: &str, columns: &[String], why: &str) -> Result<Answer, String> {
+    let q = parse(sql)?;
+    let mut names: Vec<String> = Vec::new();
+    for c in columns {
+        let mentioned = q.items.iter().any(|i| match i {
+            Item::Star => true,
+            Item::Column(n) | Item::Aggregate(_, Some(n)) => n == c,
+            Item::Aggregate(_, None) => false,
+        }) || q.group_by.contains(c)
+            || q.conditions.iter().any(|x| &x.column == c);
+        if mentioned {
+            names.push(c.clone());
+        }
+    }
+    for i in &q.items {
+        if let Item::Column(n) | Item::Aggregate(_, Some(n)) = i {
+            if !columns.contains(n) {
+                return Err(format!("no column {n}"));
+            }
+        }
+    }
+    let stages = vec![stage(
+        "Scan",
+        format!("read nothing: {why}"),
+        0,
+        &names,
+        &[],
+    )];
+    finish(&q, names, Vec::new(), stages, 0, 0, 0)
+}
+
+/// Aggregate or project, then sort and limit: everything after the rows are read.
+fn finish(
+    q: &Select,
+    names: Vec<String>,
+    mut rows: Vec<Vec<Value>>,
+    mut stages: Vec<Stage>,
+    read: usize,
+    groups: usize,
+    bytes: u64,
+) -> Result<Answer, String> {
+    let position = |name: &str| names.iter().position(|n| n == name);
     // 3. Aggregate, or project.
     let aggregating =
         !q.group_by.is_empty() || q.items.iter().any(|i| matches!(i, Item::Aggregate(..)));
@@ -840,7 +988,7 @@ pub fn run(file: &[u8], sql: &str) -> Result<Answer, String> {
         rows,
         stages,
         row_groups_read: read,
-        row_groups: md.row_groups.len(),
+        row_groups: groups,
         bytes_read: bytes,
     })
 }

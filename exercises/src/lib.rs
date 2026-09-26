@@ -19,6 +19,7 @@ pub mod anatomy_of_a_parquet_file;
 pub mod compression;
 pub mod encodings;
 pub mod how_readers_read;
+pub mod lakehouse_and_beyond;
 pub mod metadata_and_statistics;
 pub mod modular_encryption;
 pub mod nested_data;

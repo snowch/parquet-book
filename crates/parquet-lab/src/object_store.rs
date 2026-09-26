@@ -29,6 +29,8 @@ pub enum GetRange {
     Bounded(Span),
     /// `bytes=-n`: the last `n` bytes, whatever the object's size.
     Suffix(u64),
+    /// No `Range` header: the whole object (ch14).
+    All,
 }
 
 impl GetRange {
@@ -37,6 +39,7 @@ impl GetRange {
         match self {
             GetRange::Bounded(span) => span.http_range(),
             GetRange::Suffix(n) => format!("bytes=-{n}"),
+            GetRange::All => "the whole object".into(),
         }
     }
 }
@@ -86,6 +89,9 @@ pub trait ObjectStore {
     fn head(&mut self, key: &str, why: &str) -> Result<u64, StoreError>;
     fn get(&mut self, key: &str, range: GetRange, why: &str) -> Result<GetResult, StoreError>;
 
+    /// The keys that start with `prefix`, in order, with each object's size: S3's `LIST` (ch14).
+    fn list(&mut self, prefix: &str, why: &str) -> Vec<(String, u64)>;
+
     /// Say that the next request depends on the answers to earlier ones, so it cannot start
     /// until they have finished. A store that does not model time ignores it.
     fn next_phase(&mut self) {}
@@ -114,6 +120,14 @@ impl MemoryStore {
 }
 
 impl ObjectStore for MemoryStore {
+    fn list(&mut self, prefix: &str, _why: &str) -> Vec<(String, u64)> {
+        self.objects
+            .range(prefix.to_string()..)
+            .take_while(|(k, _)| k.starts_with(prefix))
+            .map(|(k, v)| (k.clone(), v.len() as u64))
+            .collect()
+    }
+
     fn head(&mut self, key: &str, _why: &str) -> Result<u64, StoreError> {
         Ok(self.object(key)?.len() as u64)
     }
@@ -136,6 +150,7 @@ impl ObjectStore for MemoryStore {
                 Span::new(s.start, s.end.min(size))
             }
             GetRange::Suffix(n) => Span::new(size.saturating_sub(n), size),
+            GetRange::All => Span::new(0, size),
         };
         Ok(GetResult {
             bytes: data[span.start as usize..span.end as usize].to_vec(),
@@ -181,6 +196,7 @@ impl Default for NetworkModel {
 pub enum Method {
     Head,
     Get,
+    List,
 }
 
 impl Method {
@@ -188,6 +204,7 @@ impl Method {
         match self {
             Method::Head => "HEAD",
             Method::Get => "GET",
+            Method::List => "LIST",
         }
     }
 }
@@ -313,6 +330,14 @@ impl<S: ObjectStore> ObjectStore for TracingStore<S> {
         self.phase += 1;
     }
 
+    /// A `LIST` is one request. Its response, a page of keys, is not counted in bytes: the
+    /// model prices the request, not the listing's size.
+    fn list(&mut self, prefix: &str, why: &str) -> Vec<(String, u64)> {
+        let out = self.inner.list(prefix, why);
+        self.record(Method::List, prefix, None, why, 200, None);
+        out
+    }
+
     fn head(&mut self, key: &str, why: &str) -> Result<u64, StoreError> {
         let result = self.inner.head(key, why);
         let status = result.as_ref().map(|_| 200).unwrap_or_else(status_of);
@@ -329,7 +354,10 @@ impl<S: ObjectStore> ObjectStore for TracingStore<S> {
         self.record(
             Method::Get,
             key,
-            Some(range.header()),
+            match range {
+                GetRange::All => None,
+                r => Some(r.header()),
+            },
             why,
             status,
             returned,

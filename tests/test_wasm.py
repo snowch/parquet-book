@@ -160,9 +160,19 @@ def cases():
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))
     for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
+        if q["file"] == "table":
+            continue
         f = f"fixtures/{q['file']}"
         calls.append({"call": "query", "file": f, "sql": q["sql"]})
         native.append(("query", f, q["sql"]))
+    listing = json.loads((ROOT / "fixtures" / "table.json").read_text())
+    keys = [o["key"] for o in listing["objects"]]
+    for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
+        if q["file"] != "table":
+            continue
+        for discovery, flag in (("list", "list"), ("prune", "prune"), ("log", "log")):
+            calls.append({"call": "table", "keys": keys, "sql": q["sql"], "discovery": discovery})
+            native.append(("table", "fixtures/table.json", q["sql"], "--discovery", flag))
     calls.append({"call": "query", "file": "fixtures/tiny.parquet", "sql": "SELECT nonsense FROM"})
     native.append(("query", "fixtures/tiny.parquet", "SELECT nonsense FROM"))
     for columns, row in (([2, 3], -1), ([3], -1), ([0, 1, 2, 3, 4], 3), ([0, 4], -1), ([], -1)):
