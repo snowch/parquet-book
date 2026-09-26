@@ -503,3 +503,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .run-output { margin: 0; padding: .6rem .8rem; max-height: 26rem; overflow: auto; background: var(--code);
   font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 0 6px 6px; }
 .run-output:empty { display: none; }
+.runnable[data-codespace] .run-button { color: var(--accent); background: var(--bg); border-color: var(--rule); }
+.runnable[data-codespace] .run-button:hover { border-color: var(--accent); }
+.run-note { margin: .3rem 0 1rem; color: var(--muted); font: 12.5px/1.45 var(--chrome); }
+.rust-steps { margin: 0; padding: .8rem 1rem .8rem 2.4rem; line-height: 1.6; }
+.rust-steps li + li { margin-top: .35rem; }

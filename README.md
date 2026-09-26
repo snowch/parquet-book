@@ -34,8 +34,10 @@ including a headless-browser test of the experiments if Playwright is installed.
   a Run button. On any lab,
   choose Python, then **Edit the code** to change the Python reader and run the page's labs on
   your edit.
-- **Rust, in a Codespace.** Rust cannot compile inside a web page, so the repository comes with a
-  dev container. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+- **Rust, in the pages and in a Codespace.** The `pqlab` commands the pages print have a Run
+  button too: the page runs them on the Rust reader compiled to WebAssembly. Rust cannot compile
+  inside a web page, so every other Rust command, and "Edit the code" on the Rust engine, opens a
+  Codespace, and the repository comes with a dev container for it. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
   for an editor, the pinned toolchain and every dependency in the browser; `make check`,
   `make problems` and `make serve` then work as they do at a desk. The same configuration
   (`.devcontainer/`) works in any editor that supports dev containers.

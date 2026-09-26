@@ -93,6 +93,16 @@ export class Lab {
     return this.#result(this.exports.pl_encryption(id));
   }
 
+  /**
+   * `pqlab ARGS`, run on the files loaded under the names the command uses
+   * (`fixtures/tiny.parquet`). Returns {exit, stdout, stderr}, as the binary would.
+   */
+  cli(args) {
+    const text = encoder.encode(args.join("\0"));
+    const ptr = this.#copyIn(text);
+    return this.#result(this.exports.pl_cli(ptr, text.length));
+  }
+
   /** Answer SQL from the file, stage by stage. */
   query(id, sql) {
     const text = encoder.encode(sql);

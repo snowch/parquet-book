@@ -6,6 +6,9 @@
 // every lab on the page, so what the labs show is what the edited code computes. An edit that
 // breaks the reader shows Python's error here and in every lab. The edits stay in this browser,
 // and every lab's engine bar says so while they are in use.
+//
+// On the Rust engine, "Edit the code" says where the Rust reader can be edited and run: a
+// Codespace, since the page cannot compile Rust.
 
 import { KEYS, codeArea } from "./code.js";
 import { saveEdits } from "./python.js";
@@ -20,6 +23,47 @@ const MODULE = {
 };
 
 let panel = null;
+let rustPanel = null;
+
+const REPO = "https://github.com/snowch/parquet-book/blob/main/";
+
+/**
+ * "Edit the code" on the Rust engine. Rust needs a compiler, which the page does not have, so the
+ * edit happens in a Codespace, where `make` rebuilds the WebAssembly module from your edit and
+ * `make serve` shows the book with every lab on it. The panel says so, names the file, and offers
+ * the Python reader, which the page can edit.
+ */
+export function openRustEditor(labEl, usePython) {
+  const file = `crates/parquet-lab/src/${(MODULE[labEl.dataset.experiment] || "report.py").replace(/\.py$/, ".rs")}`;
+  rustPanel ||= document.createElement("section");
+  const el = rustPanel;
+  el.className = "reader-editor";
+  el.setAttribute("aria-label", "Edit the Rust reader");
+  el.innerHTML = `
+    <div class="lab-head"><span class="lab-title">Edit the Rust reader</span>
+      <span class="lab-note">Rust compiles in a Codespace, not in the page</span>
+      <button type="button" data-act="close" aria-label="Close">Close</button></div>
+    <ol class="rust-steps">
+      <li><a href="${CODESPACES}" target="_blank" rel="noopener">Open the repository in GitHub Codespaces</a>:
+        the pinned Rust toolchain and an editor, in your browser.</li>
+      <li>Edit <a href="${REPO}${file}" target="_blank" rel="noopener"><code>${file}</code></a>, the code
+        this lab runs.</li>
+      <li>In its terminal, run <code>make &amp;&amp; make serve</code>. The book opens on port 8000, and
+        every lab runs your edited reader. <code>cargo test -p parquet-lab</code> checks your edit
+        against what pyarrow wrote.</li>
+    </ol>
+    <div class="workbench-bar"><button type="button" class="primary" data-act="python">Edit the Python reader here instead</button></div>`;
+  el.onclick = (e) => {
+    const act = e.target.closest("button[data-act]")?.dataset.act;
+    if (act === "close") el.remove();
+    if (act === "python") {
+      el.remove();
+      usePython();
+    }
+  };
+  labEl.after(el);
+  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
 
 /** Open the editor below `labEl`, for the Python engine `lab`; `remount` reruns every lab. */
 export function openEditor(labEl, lab, remount) {

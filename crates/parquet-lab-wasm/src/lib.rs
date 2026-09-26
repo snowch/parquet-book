@@ -445,3 +445,41 @@ pub extern "C" fn pl_pages(id: u32, column: u32) -> usize {
         None => no_such_file(id),
     }
 }
+
+/// `pqlab ARGS`, run in the page: the command-line tool the book prints commands for, on the
+/// files the page has loaded, found by the name each was loaded under (`fixtures/tiny.parquet`).
+/// `args` is a `pl_alloc` buffer this call takes and frees, the arguments separated by zero
+/// bytes. The result is `{"exit", "stdout", "stderr"}`: what the binary would exit with and
+/// print, usage errors included. See `pqlab::cli`.
+///
+/// # Safety
+/// `args_ptr` and `args_len` must come from one call to `pl_alloc`.
+#[no_mangle]
+pub unsafe extern "C" fn pl_cli(args_ptr: *mut u8, args_len: usize) -> usize {
+    let args = Box::from_raw(std::ptr::slice_from_raw_parts_mut(args_ptr, args_len));
+    let args: Vec<String> = String::from_utf8_lossy(&args)
+        .split('\0')
+        .map(str::to_string)
+        .collect();
+    let read = |path: &str| {
+        STATE.with(|s| {
+            s.borrow()
+                .files
+                .iter()
+                .rev()
+                .find(|f| f.name == path)
+                .map(|f| f.bytes.clone())
+                .ok_or_else(|| format!("cannot read {path}: the page has no such file"))
+        })
+    };
+    let mut stdout = String::new();
+    let (exit, stderr) = match pqlab::cli::run(&args, &read, &mut stdout) {
+        Ok(code) => (code, String::new()),
+        Err(message) => (2, format!("pqlab: {message}\n{}\n", pqlab::cli::USAGE)),
+    };
+    emit(obj([
+        ("exit", Json::UInt(u64::from(exit))),
+        ("stdout", stdout.into()),
+        ("stderr", stderr.into()),
+    ]))
+}

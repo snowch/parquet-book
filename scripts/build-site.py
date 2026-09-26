@@ -312,11 +312,8 @@ def build(out: Path) -> None:
         mdast = parse[p["source"]]["mdast"]
         normalise_headings(mdast)
         body = renderer.render_page(mdast)
-        # The lab script also puts Run buttons on the Python commands a page prints.
-        has_lab = any(
-            m in body
-            for m in ('class="lab"', 'class="workbench"', "python3 -m pytest", "python3 -m parquet_lab")
-        )
+        # The lab script also puts buttons on the commands a page prints: Run, or Open in Codespaces.
+        has_lab = any(m in body for m in ('class="lab"', 'class="workbench"', "python3 -m ", "cargo "))
         text = page_html(
             p,
             body,

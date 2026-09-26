@@ -31,7 +31,7 @@ import { mountWriting } from "./writing.js";
 import { mountEngine } from "./engine.js";
 import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
-import { openEditor } from "./editor.js";
+import { openEditor, openRustEditor } from "./editor.js";
 import { mountWorkbench } from "./workbench.js";
 import { mountCommands } from "./commands.js";
 
@@ -96,21 +96,32 @@ function engineBar(el, engine) {
   bar.className = "engine-bar";
   bar.innerHTML = `<span>Run on the reader in</span>` + Object.entries(ENGINES).map(([key, e]) =>
     `<button type="button" data-engine="${key}" aria-pressed="${key === engine}" title="The book's ${e.name} reader, ${e.detail}">${e.name}</button>`).join("") +
-    (engine === "python" ? `<button type="button" class="edit-code" data-edit>Edit the code</button>` : "");
+    `<button type="button" class="edit-code" data-edit>Edit the code</button>`;
   bar.addEventListener("click", (e) => {
     if (e.target.closest("button[data-edit]")) {
-      loadEngine("python").then((lab) => openEditor(el, lab, remountAll));
+      const python = () => loadEngine("python").then((lab) => openEditor(el, lab, remountAll));
+      if (el.dataset.engine === "python") python();
+      else {
+        openRustEditor(el, () => {
+          choose("python");
+          python();
+        });
+      }
       return;
     }
     const b = e.target.closest("button[data-engine]");
     if (!b || b.dataset.engine === el.dataset.engine) return;
-    try {
-      localStorage.setItem("lab-engine", b.dataset.engine);
-    } catch {}
-    // Every lab on the page follows the choice.
-    remountAll();
+    choose(b.dataset.engine);
   });
   return bar;
+}
+
+/** Run every lab on the page on `engine`, and remember the choice. */
+function choose(engine) {
+  try {
+    localStorage.setItem("lab-engine", engine);
+  } catch {}
+  remountAll();
 }
 
 function remountAll() {

@@ -50,7 +50,7 @@ Either way the page runs the code the tests run.
 | `crates/parquet-lab/` | The reader. Zero dependencies. One module per layer (see its `lib.rs`). |
 | `python/parquet_lab/` | The same reader in Python, standard library only, module for module. Tests in `python/tests/`. |
 | `crates/parquet-lab-wasm/` | The reader behind a numbers-only C ABI, compiled to `wasm32-unknown-unknown`. |
-| `crates/pqlab/` | The reader on the command line, and `pqlab figures`, which writes every generated fragment. |
+| `crates/pqlab/` | The reader on the command line (its commands in `cli.rs`, a library the WASM crate runs too), and `pqlab figures`, which writes every generated fragment. |
 | `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`); in Python, `python/<slug>.py` and `python/tests/test_<slug>.py`, run with `--problems`. |
 | `fixtures/` | Parquet files written by pyarrow, each with a manifest (`.json`) pyarrow wrote about it. |
 | `chapters/`, `parts/`, `appendices/`, `index.md` | The book, in MyST markdown. |
@@ -86,8 +86,8 @@ failure only. `scripts/build-site.py` renders the parse through `tools/render.py
 any node type it does not handle.
 
 **The browser calls Rust through a C ABI.** `crates/parquet-lab-wasm/src/lib.rs` exports
-`pl_alloc`, `pl_load`, `pl_footer_lab`, `pl_structure`, `pl_interpret`, `pl_layouts`,
-`pl_set_byte` and `pl_out_ptr`. Arguments are numbers; files cross as a pointer and a length;
+`pl_alloc`, `pl_load`, `pl_out_ptr`, `pl_set_byte`, one `pl_<experiment>` per lab, and `pl_cli`,
+which runs `pqlab`'s own command code (`pqlab::cli`) on the loaded files. Arguments are numbers; files cross as a pointer and a length;
 results come back as JSON in a buffer inside the module. `web/lab/wasm.js` is the other half.
 The module imports nothing, so it cannot reach the network, the clock or the page.
 
@@ -121,13 +121,17 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
 block (`chapter: <slug>`): a workbench (`web/lab/workbench.js`) where the reader edits the Python
 stub and runs its graders with pytest under Pyodide, in a worker (`python-worker.js`, shared
 through `runner.js`), on the repository's own files laid out as a desk has them. A `bash` block
-whose every command is `python3 -m pytest` on `python/tests` or `exercises/python`, or
-`PYTHONPATH=python python3 -m parquet_lab`, gets a Run button (`web/lab/commands.js`) that runs it
-in the same worker and shows what it printed; a command the page cannot run gets none. On the Python engine, **Edit the code**
+whose every command the page can run gets a Run button (`web/lab/commands.js`): `python3 -m
+pytest` on `python/tests` or `exercises/python` and `PYTHONPATH=python python3 -m parquet_lab` run
+in that worker, and `cargo run -p pqlab -- …` runs through `pl_cli` in the WebAssembly reader,
+printing what the binary prints (`tests/test_wasm.py` holds it to the byte). A block of commands
+that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, never Run. On the Python engine, **Edit the code**
 (`web/lab/editor.js`) swaps the reader's edits into the Python reader and remounts every lab.
 Edits live in the browser's storage, never on the server. Rust cannot compile in a page, so
-`.devcontainer/` gives a Codespace with the pinned toolchain instead. The browser test runs a
-workbench, two Run buttons against the same commands at a desk, and an edit.
+`.devcontainer/` gives a Codespace with the pinned toolchain instead, and on the Rust engine
+**Edit the code** says which `crates/parquet-lab/src/*.rs` file to edit there and how to see the
+labs on the edit (`make && make serve`). The browser test runs a workbench, Run buttons in both
+languages against the same commands at a desk, and an edit.
 
 ## The invariants
 

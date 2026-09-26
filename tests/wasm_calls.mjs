@@ -6,7 +6,7 @@
 // be identical. This file is how the browser's half of that comparison runs without a browser:
 // it loads web/lab/wasm.js, the loader the pages use, unchanged.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { Lab } from "../web/lab/wasm.js";
 
 const [wasmPath, callsPath] = process.argv.slice(2);
@@ -16,6 +16,19 @@ const ids = new Map();
 const id = (file) => {
   if (!ids.has(file)) ids.set(file, lab.load(file.split("/").pop(), readFileSync(file)));
   return ids.get(file);
+};
+// For `pqlab` commands: every fixture, under the path a command names it by, as the page loads
+// them for its Run buttons.
+let everyFixture = false;
+const loadEveryFixture = () => {
+  if (everyFixture) return;
+  const walk = (dir) => readdirSync(dir).forEach((n) => {
+    const p = `${dir}/${n}`;
+    if (statSync(p).isDirectory()) walk(p);
+    else if (/\.(parquet|json)$/.test(n)) lab.load(p, readFileSync(p));
+  });
+  walk("fixtures");
+  everyFixture = true;
 };
 const out = calls.map((c) => {
   switch (c.call) {
@@ -34,6 +47,7 @@ const out = calls.map((c) => {
     case "compression": return lab.compression(id(c.file), c.column, c.page ?? null);
     case "interpret": return lab.interpret(id(c.file), c.offset);
     case "layouts": return lab.layouts(c.options);
+    case "cli": loadEveryFixture(); return lab.cli(c.args);
     default: throw new Error(`unknown call ${c.call}`);
   }
 });

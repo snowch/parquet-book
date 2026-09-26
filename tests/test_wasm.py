@@ -212,3 +212,46 @@ def test_every_browser_call_matches_the_native_reader(tmp_path):
     assert len(browser) == len(native)
     for call, args, got in zip(calls, native, browser, strict=True):
         assert got == _numbers(pqlab(*args)), f"browser and native disagree on {call}"
+
+
+# Commands the book prints for the Rust reader, and some that fail, as the page's Run buttons send
+# them to `pl_cli`.
+CLI = [
+    ["inspect", "fixtures/tiny.parquet"],
+    ["footer", "fixtures/tiny.parquet"],
+    ["footer", "fixtures/tiny.parquet", "--json"],
+    ["footer", "fixtures/tiny.parquet", "--size", "suffix", "--prefetch", "65536", "--json"],
+    ["interpret", "fixtures/tiny.parquet", "629"],
+    ["query", "fixtures/table/country=UK/part-0.parquet", "SELECT country FROM orders"],
+    [
+        "table",
+        "fixtures/table.json",
+        "SELECT count(*) FROM orders WHERE country = 'UK'",
+        "--discovery",
+        "prune",
+    ],
+    ["scan", "fixtures/writing-baseline.parquet", "--where", "0", "=", "431"],
+    ["levels", "fixtures/nested.parquet"],
+    ["no-such-command"],
+]
+
+
+def test_pqlab_runs_in_the_page_as_it_does_at_a_desk(tmp_path):
+    """A Run button on `cargo run -p pqlab -- ARGS` runs the same code, compiled to WebAssembly:
+    it prints what the binary prints, to the byte, and exits as it exits."""
+    spec = tmp_path / "calls.json"
+    spec.write_text(json.dumps([{"call": "cli", "args": args} for args in CLI]))
+    out = subprocess.run(
+        ["node", str(ROOT / "tests" / "wasm_calls.mjs"), str(WASM), str(spec)],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    for args, got in zip(CLI, json.loads(out.stdout), strict=True):
+        native = subprocess.run([str(PQLAB), *args], cwd=ROOT, capture_output=True, text=True)
+        assert (got["stdout"], got["stderr"], got["exit"]) == (
+            native.stdout,
+            native.stderr,
+            native.returncode,
+        ), args

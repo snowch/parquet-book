@@ -15,10 +15,16 @@ a problem's tests run on your answers from its chapter's workbench. On any lab, 
 Python reader and run the page's labs on your edit. Your edits stay in your browser until you
 restore them.
 
-Rust cannot compile inside a web page. For the Rust reader, open the repository in
-[GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1): an editor, the
-pinned toolchain and every dependency, in the browser, ready for every command below. The
-configuration is in `.devcontainer/`, and works in any editor that supports dev containers.
+The `cargo run -p pqlab` commands below have a Run button too. The page runs them on the Rust
+reader compiled to WebAssembly, the one the labs use, and they print what they print at a desk.
+
+Rust cannot compile inside a web page, so editing the Rust reader, and every other Rust command,
+needs a compiler. Their blocks have an **Open in Codespaces** button, and so does **Edit the
+code** on a lab's Rust engine: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+opens the repository with an editor, the pinned toolchain and every dependency, in the browser.
+Edit a file there and run the command in its terminal; `make && make serve` shows the book with
+every lab on your edited reader. The configuration is in `.devcontainer/`, and works in any editor
+that supports dev containers.
 
 ## What you need
 

@@ -514,8 +514,20 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
     { encoding: "utf8" }).stdout;
   check(summary(tests) && summary(tests) === summary(deskTests),
     `Run on \`pytest python/tests -k records_rebuilt\` selects and passes what it does at a desk: ${summary(tests)}`);
-  check(await page.locator(".tab-panel[data-code=rust] .run-button").count() === 0,
-    "no Run button on a command the page cannot run");
+  // A command that needs a compiler gets Open in Codespaces, never Run.
+  const cargoTest = page.locator(".runnable", { hasText: "cargo test -p parquet-lab" }).first();
+  check(await cargoTest.getAttribute("data-codespace") === "true"
+    && await cargoTest.locator(".run-button").innerText() === "Open in Codespaces",
+    "a `cargo test` command gets Open in Codespaces, not Run");
+  // `cargo run -p pqlab` runs the binary's own command code, compiled to WebAssembly.
+  await page.evaluate(() => localStorage.setItem("code-language", "rust"));
+  const rust = await runBlock("running-the-lab.html", "cargo run -p pqlab -- inspect");
+  await page.evaluate(() => localStorage.setItem("code-language", "python"));
+  const deskRust = ["inspect fixtures/tiny.parquet", "footer fixtures/tiny.parquet --json",
+    "footer fixtures/tiny.parquet --size suffix --prefetch 65536 --json", "interpret fixtures/tiny.parquet 629"]
+    .map((c) => `$ cargo run -p pqlab -- ${c}\n${execFileSync("target/debug/pqlab", c.split(" "), { encoding: "utf8" })}`)
+    .join("\n");
+  check(rust.trim() === deskRust.trim(), "Run on `cargo run -p pqlab` prints, in the page, what the binary prints");
 }
 
 // The reader editor: an edit to the Python reader reaches every lab on the page, and restoring
