@@ -280,6 +280,65 @@ pub unsafe extern "C" fn pl_table(
     ))
 }
 
+/// Ch15's experiment: an operation on a snapshot of a changing table. `ids` is a `pl_alloc`
+/// buffer of `count` little-endian `u32` file ids, each file loaded under its object key;
+/// `snapshot` is another, the snapshot's id. This call takes and frees both. `op`: 0 scan,
+/// 1 look up `key`, 2 plan a compaction with `target_rows` and `small_rows`.
+///
+/// # Safety
+/// Both buffers must come from `pl_alloc` with exactly these lengths.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn pl_changes(
+    ids_ptr: *mut u8,
+    count: usize,
+    snapshot_ptr: *mut u8,
+    snapshot_len: usize,
+    op: u32,
+    key: u32,
+    target_rows: u32,
+    small_rows: u32,
+    prefetch: u32,
+    connections: u32,
+    latency_us: u32,
+    bandwidth: u32,
+) -> usize {
+    use parquet_lab::changes::Operation;
+    let ids = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ids_ptr, count * 4));
+    let snapshot = Box::from_raw(std::ptr::slice_from_raw_parts_mut(
+        snapshot_ptr,
+        snapshot_len,
+    ));
+    let snapshot = String::from_utf8_lossy(&snapshot).into_owned();
+    let objects: Vec<(String, Vec<u8>)> = ids
+        .chunks(4)
+        .filter_map(|c| {
+            let id = u32::from_le_bytes([c[0], c[1], c[2], c[3]]);
+            with_file(id, |f| (f.name.clone(), f.bytes.clone()))
+        })
+        .collect();
+    let op = match op {
+        1 => Operation::Lookup(i64::from(key)),
+        2 => Operation::Compact {
+            target_rows: i64::from(target_rows),
+            small_rows: i64::from(small_rows),
+        },
+        _ => Operation::Scan,
+    };
+    let model = NetworkModel {
+        latency_us: u64::from(latency_us),
+        bandwidth_bytes_per_sec: u64::from(bandwidth),
+    };
+    emit(report::changes(
+        objects,
+        &snapshot,
+        op,
+        u64::from(prefetch),
+        connections.max(1) as usize,
+        model,
+    ))
+}
+
 /// Ch13's experiment: what a reader without keys can see. See `report::encryption`.
 #[no_mangle]
 pub extern "C" fn pl_encryption(id: u32) -> usize {

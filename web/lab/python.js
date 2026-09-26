@@ -177,6 +177,16 @@ importlib.invalidate_caches()
     }
   }
 
+  changes(ids, snapshot, op = "scan", { key = 0, targetRows = 200, smallRows = 100, prefetch = 0, connections = 4, latencyUs = 20000, bandwidth = 100000000 } = {}) {
+    const o = { scan: 0, lookup: 1, compact: 2 }[op] ?? 0;
+    const list = this.pyodide.toPy(ids);
+    try {
+      return this.#run(() => this.api.changes(list, snapshot, o, key, targetRows, smallRows, prefetch, connections, latencyUs, bandwidth));
+    } finally {
+      list.destroy();
+    }
+  }
+
   interpret(id, offset) {
     return this.#run(() => this.api.interpret(id, offset));
   }

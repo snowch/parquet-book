@@ -29,6 +29,8 @@
 //! | [`prune`] | conditions judged against metadata: what a reader may skip | ch09 |
 //! | [`scan`] | a query's requests: phases, merged ranges, connections | ch10 |
 //! | [`engine`] | SQL over the reader: scan, filter, aggregate, sort, limit | ch12 |
+//! | [`table`] | a table of many files: listing, partitions, a log | ch14 |
+//! | [`changes`] | a changing table: lookups, delete files, compaction | ch15 |
 //! | [`report`] | what the reader did, as JSON for the browser and the book | all |
 //!
 //! ## What it does not do yet
@@ -45,6 +47,7 @@
 
 pub mod bloom;
 pub mod bytes;
+pub mod changes;
 pub mod column;
 pub mod compress;
 pub mod crypto;

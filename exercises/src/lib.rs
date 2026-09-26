@@ -16,6 +16,7 @@
 
 pub mod a_tiny_query_engine;
 pub mod anatomy_of_a_parquet_file;
+pub mod changing_a_table;
 pub mod compression;
 pub mod encodings;
 pub mod how_readers_read;

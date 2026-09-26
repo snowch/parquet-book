@@ -55,6 +55,7 @@ needs it, and each is finished, tested and quoted before the chapters that use i
 | 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | done |
 | 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | done; caching not modelled |
 | 6 | encrypted modules, multi-file datasets, manifests | ch13, ch14 | done; decryption not implemented; one log file, no checkpoints |
+| 7 | snapshots, position delete files, lookups, compaction planning | ch15 | done; position deletes only, one snapshots file |
 
 **Deliberately unsupported**, and reported as unsupported rather than guessed at: decryption,
 legacy two-level list layouts, INT96 conversion beyond display, the deprecated LZ4 framing,
@@ -181,7 +182,7 @@ there is a Parquet file to open, so it has no *Building it*, and its problems ar
 reason about rather than tests. It ends on the same table as a Parquet file pyarrow wrote, and
 hands over to ch02, where the method starts.
 
-ch02 is the model for the method; ch03 to ch14 predate it and are being revised to it
+ch02 and ch15 are the models for the method; ch03 to ch14 predate it and are being revised to it
 (NEXT_STEPS.md).
 
 The experiment comes before the code on purpose. A reader who has watched the requests happen

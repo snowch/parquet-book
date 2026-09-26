@@ -1654,3 +1654,137 @@ def table(
             for s in a.answer.stages
         ],
     }
+
+
+def changes(
+    objects: list[tuple[str, bytes]], id: str, op, prefetch: int, connections: int, model: NetworkModel
+) -> dict:
+    """ch15's experiment: an operation on snapshot ``id`` of the changing table under
+    ``changes/``. Every file of the snapshot is listed, with whether the operation read it and
+    why. ``op`` is ``("scan",)``, ``("lookup", key)`` or ``("compact", target_rows, small_rows)``."""
+    from . import changes as ch
+
+    store = MemoryStore()
+    for k, v in objects:
+        store.put(k, v)
+    prefix = "changes/"
+
+    def file(path: str, kind: str, size: int, rows: int, read: bool, why: str) -> dict:
+        return {"path": path, "kind": kind, "size": size, "rows": rows, "read": read, "why": why}
+
+    def totals(requests: list[Request], elapsed: int, fetched: int, rows: int) -> dict:
+        phases = [r.phase for i, r in enumerate(requests) if i == 0 or requests[i - 1].phase != r.phase]
+        return {
+            "requests": len(requests),
+            "round_trips": len(phases),
+            "bytes_fetched": fetched,
+            "elapsed_us": elapsed,
+            "rows_decoded": rows,
+        }
+
+    def head(s: ch.Snapshot, name: str) -> dict:
+        return {"ok": True, "operation": name, "snapshot": {"id": s.id, "summary": s.summary}}
+
+    try:
+        match op:
+            case ("scan",):
+                r = ch.scan_table(store, prefix, id, connections, model)
+                s = r.snapshot
+                files = []
+                for f in s.data_files:
+                    n = len(s.deletes_for(f.path))
+                    why = "read: a scan reads every data file"
+                    if n:
+                        why += f"; {n} delete file{'' if n == 1 else 's'} name{'s' if n == 1 else ''} it"
+                    files.append(file(f.path, "data", f.file_size, f.record_count, True, why))
+                files += [
+                    file(
+                        d.path,
+                        "delete",
+                        d.file_size,
+                        d.record_count,
+                        True,
+                        f"read: it names rows of {d.data_file}",
+                    )
+                    for d in s.delete_files
+                ]
+                return head(s, "scan") | {
+                    "files": files,
+                    "requests": requests_json(r.requests),
+                    "totals": totals(r.requests, r.elapsed_us, r.bytes_fetched, r.rows_decoded),
+                    "answer": {"live_rows": r.live_rows, "sum_amount_cents": r.sum_amount_cents},
+                }
+            case ("lookup", key):
+                r = ch.lookup(store, prefix, id, key, prefetch, connections, model)
+                s = r.snapshot
+                files = []
+                for f in s.data_files:
+                    read = f.path in r.data_files
+                    why = f"{'opened' if read else 'skipped'}: its {ch.KEY} runs from {f.min_key} to {f.max_key}"
+                    files.append(file(f.path, "data", f.file_size, f.record_count, read, why))
+                for d in s.delete_files:
+                    read = d.path in r.delete_files
+                    why = (
+                        f"read: it names rows of {d.data_file}, which may hold the key"
+                        if read
+                        else f"skipped: it names rows of {d.data_file}"
+                    )
+                    files.append(file(d.path, "delete", d.file_size, d.record_count, read, why))
+                # A key-value store's answer: one request for one row's bytes, taken as the share
+                # of its file that one row occupies.
+                holder = next((f for f in s.data_files if r.found and f.path == r.found[0]), None) or next(
+                    (f for f in s.data_files if f.path in r.data_files), None
+                )
+                share = -(-holder.file_size // max(holder.record_count, 1)) if holder else 0
+                return head(s, "lookup") | {
+                    "key": key,
+                    "files": files,
+                    "requests": requests_json(r.requests),
+                    "totals": totals(r.requests, r.elapsed_us, r.bytes_fetched, r.rows_decoded),
+                    "found": {"path": r.found[0], "position": r.found[1]} if r.found else None,
+                    "deleted_by": r.deleted_by,
+                    "row": [{"column": c, "value": v} for c, v in r.row],
+                    "key_value": {"bytes": share, "elapsed_us": model.cost_us(share)},
+                }
+            case ("compact", target_rows, small_rows):
+                t = TracingStore(store, model, connections)
+                s = ch.open_table(t, prefix, id)
+                plan = ch.plan_compaction(s, target_rows, small_rows)
+
+                def group_of(p: str) -> int | None:
+                    return next((i for i, g in enumerate(plan) if p in g.data_files + g.delete_files), None)
+
+                files = []
+                for f in s.data_files:
+                    live, g = s.live_rows(f), group_of(f.path)
+                    why = (
+                        f"rewritten in group {g + 1}: {live} live rows"
+                        if g is not None
+                        else f"kept: {live} live rows, no deletes"
+                    )
+                    files.append(file(f.path, "data", f.file_size, f.record_count, g is not None, why))
+                for d in s.delete_files:
+                    g = group_of(d.path)
+                    why = f"read by group {g + 1}, then no longer needed" if g is not None else "kept"
+                    files.append(file(d.path, "delete", d.file_size, d.record_count, g is not None, why))
+                return head(s, "compact") | {
+                    "target_rows": target_rows,
+                    "small_rows": small_rows,
+                    "files": files,
+                    "requests": requests_json(t.requests),
+                    "totals": totals(t.requests, t.elapsed_us(), t.bytes_returned(), 0),
+                    "groups": [
+                        {
+                            "data_files": g.data_files,
+                            "delete_files": g.delete_files,
+                            "rows_in": g.rows_in,
+                            "rows_out": g.rows_out,
+                            "bytes_in": g.bytes_in,
+                        }
+                        for g in plan
+                    ],
+                    "bytes_in": sum(g.bytes_in for g in plan),
+                }
+    except (ValueError, StoreError) as e:
+        return {"ok": False, "error": str(e)}
+    raise ValueError(f"no operation {op!r}")

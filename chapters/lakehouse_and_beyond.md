@@ -374,4 +374,5 @@ chapter: lakehouse_and_beyond
 - pyarrow's
   [dataset documentation](https://arrow.apache.org/docs/python/dataset.html) covers partitioned
   writing and reading, the way the fixture was written.
+- [ch15](#changing-a-table) changes this kind of table: lookups, deletes and compaction.
 - The [appendices](#glossary) collect the book's terms.

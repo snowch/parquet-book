@@ -282,6 +282,43 @@ def test_the_table_lab_matches():
                 assert mine == theirs, f"{sql} by {flag} over {connections}"
 
 
+def test_the_changes_lab_matches():
+    """ch15: every snapshot scanned, orders looked up with and without a prefetched tail, and
+    compactions planned with several targets."""
+    listing = json.loads((ROOT / "fixtures" / "changes.json").read_text())
+    objects = [(o["key"], (ROOT / "fixtures" / o["key"]).read_bytes()) for o in listing["objects"]]
+    cases = []
+    for snapshot in [*listing["snapshots"], "no-such-snapshot"]:
+        cases.append((snapshot, ("scan",), 0, 4, []))
+        for key in (1, 250, 300, 450, 805, 960, 2000):
+            for prefetch, connections in ((0, 1), (65536, 4)):
+                cases.append(
+                    (
+                        snapshot,
+                        ("lookup", key),
+                        prefetch,
+                        connections,
+                        ["--lookup", key, "--prefetch", prefetch],
+                    )
+                )
+        for target, small in ((200, 100), (400, 150), (50, 10)):
+            cases.append(
+                (
+                    snapshot,
+                    ("compact", target, small),
+                    0,
+                    4,
+                    ["--compact", "--target-rows", target, "--small-rows", small],
+                )
+            )
+    for snapshot, op, prefetch, connections, flags in cases:
+        mine = python(report.changes(objects, snapshot, op, prefetch, connections, NetworkModel()))
+        theirs = rust(
+            "changes", "fixtures/changes.json", "--snapshot", snapshot, *flags, "--connections", connections
+        )
+        assert mine == theirs, f"{snapshot} {op} {prefetch} {connections}"
+
+
 def test_the_byte_inspector_matches(tmp_path):
     for path in files(tmp_path):
         data = path.read_bytes()

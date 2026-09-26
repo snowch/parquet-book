@@ -29,6 +29,7 @@ EXPERIMENTS = (
     "engine",
     "encryption",
     "table",
+    "changes",
 )
 """The labs this engine can run: every lab in the book."""
 
@@ -188,3 +189,25 @@ def table(ids, sql: str, discovery: int, connections: int, latency_us: int, band
     kind = [Discovery.LIST, Discovery.LIST_AND_PRUNE, Discovery.LOG][min(int(discovery), 2)]
     model = NetworkModel(int(latency_us), int(bandwidth))
     return report.dumps(report.table(objects, sql, kind, max(int(connections), 1), model))
+
+
+def changes(
+    ids,
+    snapshot: str,
+    op: int,
+    key: int,
+    target_rows: int,
+    small_rows: int,
+    prefetch: int,
+    connections: int,
+    latency_us: int,
+    bandwidth: int,
+) -> str:
+    """``ids`` are loaded files named by their object keys; ``op`` is 0 to scan, 1 to look up
+    ``key``, 2 to plan a compaction, as in the Rust export ``pl_changes``."""
+    objects = [(FILES[i][0], bytes(FILES[i][1])) for i in ids if 0 <= i < len(FILES)]
+    how = {1: ("lookup", int(key)), 2: ("compact", int(target_rows), int(small_rows))}.get(int(op), ("scan",))
+    model = NetworkModel(int(latency_us), int(bandwidth))
+    return report.dumps(
+        report.changes(objects, snapshot, how, int(prefetch), max(int(connections), 1), model)
+    )

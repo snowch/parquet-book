@@ -437,6 +437,24 @@ check(await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
   `listing, it reads all ${byList.totals.files_read} files and answers the same`);
 if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") });
 
+// ch15: a changing table. A lookup's chain of requests is the native reader's, and a scan of
+// every snapshot counts the rows the native reader counts.
+await page.goto(base + "changing-a-table.html");
+const changesLab = page.locator('.lab[data-experiment="changes"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]')?.dataset.state === "ok", null, { timeout: 60000 });
+const lookup = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"]);
+check(await changesLab.getAttribute("data-requests") === String(lookup.totals.requests) &&
+  await changesLab.getAttribute("data-round-trips") === String(lookup.totals.round_trips) &&
+  await changesLab.getAttribute("data-answer") === "found",
+  `finding order 300 takes ${lookup.totals.requests} requests in ${lookup.totals.round_trips} round trips, as the native reader's lookup does`);
+await changesLab.locator('input[name="op"][value="scan"]').check();
+await changesLab.locator('select[name="snapshot"]').selectOption("merge-on-read-8");
+const mor = native(["changes", "fixtures/changes.json", "--snapshot", "merge-on-read-8"]);
+await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="changes"]').dataset.answer === String(n), mor.answer.live_rows);
+check(await changesLab.getAttribute("data-requests") === String(mor.totals.requests),
+  `a scan of merge-on-read-8 applies its delete files: ${mor.answer.live_rows} rows in ${mor.totals.requests} requests`);
+if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png") });
+
 // Every lab the Python engine can run shows the same numbers on both engines: the data
 // attributes each experiment writes, on every page where it appears.
 {
@@ -557,7 +575,7 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
   check(edited.includes("PAR1") && (await first.locator(".status").innerText()).includes("your edited version"),
     "an edited walkthrough step runs the edit");
   // The step that asks a library loads pyarrow into the page on its first run.
-  const library = await runStep(page.locator('figure.walkthrough[data-file$="with_a_library.py"]'));
+  const library = await runStep(page.locator('figure.walkthrough[data-file$="footer_with_a_library.py"]'));
   check(library.includes(`footer length: ${native.trailer.footer_length}`),
     `the library step runs pyarrow in the page, and it reports the footer length the reader decodes: ${library.split("\n")[0]}`);
   check(await page.locator('figure.walkthrough[data-file$=".rs"] .runnable[data-codespace]').count()

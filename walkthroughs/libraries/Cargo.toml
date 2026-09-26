@@ -14,7 +14,7 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-# The format only, without Arrow, async or compression codecs: these steps read a footer.
-parquet = { version = "60", default-features = false }
+# The format only, without Arrow or async, and Snappy, which ch15's table is compressed with.
+parquet = { version = "60", default-features = false, features = ["snap"] }
 
 [workspace]

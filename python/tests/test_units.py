@@ -143,3 +143,42 @@ def test_connections_overlap_requests_and_phases_wait():
     traced.next_phase()
     traced.get("f", Bounded(Span(0, 10)), "")
     assert traced.requests[-1].start_us == 2000
+
+
+def _changes_snapshot():
+    from parquet_lab.changes import DataFile, DeleteFile, Snapshot
+
+    def file(path, rows, lo, hi):
+        return DataFile(path, rows, 100 * rows, lo, hi)
+
+    return Snapshot(
+        "s",
+        "",
+        [file("a", 100, 1, 100), file("b", 100, 101, 200), file("c", 10, 201, 210), file("d", 10, 211, 220)],
+        [DeleteFile("x", 1, 50, "b"), DeleteFile("y", 1, 50, "b")],
+    )
+
+
+def test_a_lookup_opens_only_the_files_that_could_hold_the_key():
+    from parquet_lab.changes import files_to_open
+
+    s = _changes_snapshot()
+    data, deletes = files_to_open(s, 150)
+    assert [f.path for f in data] == ["b"] and len(deletes) == 2
+    data, deletes = files_to_open(s, 205)
+    assert len(data) == 1 and not deletes
+    assert files_to_open(s, 500)[0] == []
+
+
+def test_compaction_rewrites_deleted_and_small_files_and_leaves_the_rest():
+    from parquet_lab.changes import plan_compaction
+
+    s = _changes_snapshot()
+    assert s.live_rows(s.data_files[1]) == 98
+    # b has deletes; c and d are small. b and c fit in 115 rows together; d starts a group of its
+    # own, which would rewrite one clean file unchanged, so it is dropped.
+    plan = plan_compaction(s, 115, 50)
+    assert len(plan) == 1
+    assert plan[0].data_files == ["b", "c"] and plan[0].delete_files == ["x", "y"]
+    assert (plan[0].rows_in, plan[0].rows_out, plan[0].bytes_in) == (110, 108, 10_000 + 1_000 + 100)
+    assert plan_compaction(s, 200, 50)[0].data_files == ["b", "c", "d"]

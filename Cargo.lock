@@ -31,3 +31,6 @@ dependencies = [
 [[package]]
 name = "walkthroughs"
 version = "0.1.0"
+dependencies = [
+ "parquet-lab",
+]

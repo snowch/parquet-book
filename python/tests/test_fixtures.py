@@ -143,3 +143,75 @@ def test_the_eight_orders_file_holds_the_layouts_table():
         for row in table.rows
     ]
     assert [{k: str(v) for k, v in r.items()} for r in manifest["rows"]] == expected
+
+
+# ---- ch15: a changing table -------------------------------------------------------------------
+
+
+def _changes():
+    listing = json.loads((ROOT / "fixtures" / "changes.json").read_text())
+    store = MemoryStore()
+    for o in listing["objects"]:
+        store.put(o["key"], (ROOT / "fixtures" / o["key"]).read_bytes())
+    return listing, store
+
+
+def test_every_snapshot_scans_to_what_pyarrow_counts():
+    from parquet_lab.changes import scan_table
+
+    listing, store = _changes()
+    for id, expected in listing["snapshots"].items():
+        s = scan_table(store, "changes/", id, 4, NetworkModel())
+        assert (s.live_rows, s.sum_amount_cents) == (expected["live_rows"], expected["sum_amount_cents"]), id
+        assert len(s.requests) == len(s.snapshot.data_files) + len(s.snapshot.delete_files) + 1, id
+
+
+def test_a_lookup_finds_every_live_order_and_no_deleted_one():
+    from parquet_lab.changes import lookup
+
+    listing, store = _changes()
+    deleted = listing["deleted"]
+    for id, gone in (
+        ("written", []),
+        ("copy-on-write", deleted[:1]),
+        ("merge-on-read-2", deleted[:2]),
+        ("after-a-day", deleted),
+        ("compacted", deleted),
+    ):
+        last = 960 if id in ("after-a-day", "compacted") else 800
+        for key in [*range(1, last + 2, 23), *deleted]:
+            r = lookup(store, "changes/", id, key, 0, 1, NetworkModel())
+            live = key <= last and key not in gone
+            assert bool(r.row) == live, (id, key)
+            if live:
+                assert r.row[0] == ("order_id", key)
+            if key in gone and (id.startswith("merge") or id == "after-a-day"):
+                assert r.found is not None and r.deleted_by is not None, (id, key)
+
+
+def test_the_compaction_planner_rewrites_what_the_compacted_snapshot_replaced():
+    from parquet_lab.changes import compaction_cost, plan_compaction, read_snapshots
+
+    snapshots = {
+        s.id: s for s in read_snapshots((ROOT / "fixtures" / "changes" / "_snapshots.json").read_text())
+    }
+    plan = plan_compaction(snapshots["after-a-day"], 200, 100)
+    assert len(plan) == 3
+    cost = compaction_cost(snapshots["after-a-day"], snapshots["compacted"], plan, NetworkModel())
+    assert len(cost.outputs) == 3
+    assert plan_compaction(snapshots["compacted"], 200, 100) == []
+
+
+def test_a_position_delete_file_names_the_order_it_deletes():
+    from parquet_lab import engine
+    from parquet_lab.changes import read_position_deletes
+
+    listing, _ = _changes()
+    for n, order in enumerate(listing["deleted"]):
+        rows = read_position_deletes(
+            (ROOT / "fixtures" / "changes" / "deletes" / f"delete-{n:02d}.parquet").read_bytes()
+        )
+        assert len(rows) == 1
+        path, pos = rows[0]
+        data = (ROOT / "fixtures" / "changes" / path).read_bytes()
+        assert engine.run(data, "SELECT order_id FROM orders").rows[pos][0] == order

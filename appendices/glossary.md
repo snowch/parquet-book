@@ -26,6 +26,12 @@ named in the chunk's metadata: SNAPPY, GZIP, LZ4_RAW, ZSTD, BROTLI, or UNCOMPRES
 **Column order.** The footer's statement, column by column, of which sort order `min_value` and
 `max_value` use. Without it their order is undefined. [ch08](#metadata-and-statistics)
 
+**Compaction.** Rewriting a table's small files, and files with deletes, as a few whole files. It
+costs one large read and write, and makes later scans cheaper. [ch15](#changing-a-table)
+
+**Copy-on-write.** Changing a row by rewriting the whole file that holds it. Writes are expensive;
+reads stay as they were. [ch15](#changing-a-table)
+
 **Data page version 2.** A data page whose header records the level streams' lengths, its rows and
 its nulls, and whose levels are never compressed. [ch06](#pages)
 
@@ -69,6 +75,9 @@ many. Every codec in [ch07](#compression) is built on it.
 **Magic.** The four ASCII bytes `PAR1` at the start and end of every unencrypted Parquet file.
 [ch02](#anatomy-of-a-parquet-file)
 
+**Merge-on-read.** Changing a row by writing a small file that describes the change, such as a
+position delete file, which every reader applies until compaction. [ch15](#changing-a-table)
+
 **Module.** In modular encryption, one separately encrypted piece of a file: the footer, a page
 header or a page, each a length, a nonce, ciphertext and a tag. [ch13](#modular-encryption)
 
@@ -85,6 +94,9 @@ each page's bounds and null count, and the OffsetIndex, with each page's positio
 **Physical type.** How a value is stored: BOOLEAN, INT32, INT64, INT96, FLOAT, DOUBLE, BYTE_ARRAY or
 FIXED_LEN_BYTE_ARRAY. [ch03](#the-type-system)
 
+**Position delete file.** A Parquet file of `file_path` and `pos`: the rows, by their position in a
+data file, that a table no longer holds. [ch15](#changing-a-table)
+
 **Predicate pushdown.** Evaluating a query's condition against metadata before reading data, so that
 row groups and pages that cannot match are never read. [ch09](#skipping-data)
 
@@ -99,6 +111,9 @@ data to returning an answer. [ch12](#a-tiny-query-engine)
 **Range request.** An HTTP request for part of an object, `Range: bytes=a-b`, inclusive at both
 ends. [ch02](#anatomy-of-a-parquet-file)
 
+**Read amplification.** Reading more than the answer needs, as a scan does when it fetches delete
+files and decodes rows they remove. [ch15](#changing-a-table)
+
 **Repetition level.** For each value slot, the depth of the repeated field at which a new element
 starts; zero starts a new record. [ch04](#nested-data)
 
@@ -106,6 +121,9 @@ starts; zero starts a new record. [ch04](#nested-data)
 [ch02](#anatomy-of-a-parquet-file)
 
 **Row layout.** Storing each row's values together. [ch01](#why-parquet-exists)
+
+**Snapshot.** One version of a table: the list of data files and delete files that make it up.
+[ch15](#changing-a-table)
 
 **Sort order.** The order a column's statistics use, fixed by its type: signed, unsigned, by value,
 or byte by byte. [ch08](#metadata-and-statistics)
@@ -128,3 +146,6 @@ headers. [ch02](#anatomy-of-a-parquet-file)
 **Transaction log.** Delta Lake's table format: numbered JSON files of `add` and `remove` actions,
 each a version of the table, with each file's partition values and statistics.
 [ch14](#lakehouse-and-beyond)
+
+**Write amplification.** Writing more than changed, as copy-on-write does when it rewrites a whole
+file for one row. [ch15](#changing-a-table)

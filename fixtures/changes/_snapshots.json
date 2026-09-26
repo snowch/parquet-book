@@ -1,0 +1,644 @@
+{
+  "snapshots": [
+    {
+      "id": "written",
+      "summary": "four files of 200 orders",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": []
+    },
+    {
+      "id": "copy-on-write",
+      "summary": "order 250 deleted by rewriting its file",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1-rewritten.parquet",
+          "record_count": 199,
+          "file_size": 10311,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": []
+    },
+    {
+      "id": "merge-on-read-1",
+      "summary": "1 order deleted by delete files",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": [
+        {
+          "path": "deletes/delete-00.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        }
+      ]
+    },
+    {
+      "id": "merge-on-read-2",
+      "summary": "2 orders deleted by delete files",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": [
+        {
+          "path": "deletes/delete-00.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-01.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        }
+      ]
+    },
+    {
+      "id": "merge-on-read-4",
+      "summary": "4 orders deleted by delete files",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": [
+        {
+          "path": "deletes/delete-00.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-01.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-02.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-03.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        }
+      ]
+    },
+    {
+      "id": "merge-on-read-8",
+      "summary": "8 orders deleted by delete files",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        }
+      ],
+      "delete_files": [
+        {
+          "path": "deletes/delete-00.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-01.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-02.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-03.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-04.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-05.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-06.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-07.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        }
+      ]
+    },
+    {
+      "id": "after-a-day",
+      "summary": "8 deletes and 16 small appends",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "data/part-1.parquet",
+          "record_count": 200,
+          "file_size": 10330,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "data/part-2.parquet",
+          "record_count": 200,
+          "file_size": 10337,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        },
+        {
+          "path": "appends/append-00.parquet",
+          "record_count": 10,
+          "file_size": 2205,
+          "order_id": [
+            801,
+            810
+          ]
+        },
+        {
+          "path": "appends/append-01.parquet",
+          "record_count": 10,
+          "file_size": 2192,
+          "order_id": [
+            811,
+            820
+          ]
+        },
+        {
+          "path": "appends/append-02.parquet",
+          "record_count": 10,
+          "file_size": 2217,
+          "order_id": [
+            821,
+            830
+          ]
+        },
+        {
+          "path": "appends/append-03.parquet",
+          "record_count": 10,
+          "file_size": 2190,
+          "order_id": [
+            831,
+            840
+          ]
+        },
+        {
+          "path": "appends/append-04.parquet",
+          "record_count": 10,
+          "file_size": 2254,
+          "order_id": [
+            841,
+            850
+          ]
+        },
+        {
+          "path": "appends/append-05.parquet",
+          "record_count": 10,
+          "file_size": 2222,
+          "order_id": [
+            851,
+            860
+          ]
+        },
+        {
+          "path": "appends/append-06.parquet",
+          "record_count": 10,
+          "file_size": 2200,
+          "order_id": [
+            861,
+            870
+          ]
+        },
+        {
+          "path": "appends/append-07.parquet",
+          "record_count": 10,
+          "file_size": 2246,
+          "order_id": [
+            871,
+            880
+          ]
+        },
+        {
+          "path": "appends/append-08.parquet",
+          "record_count": 10,
+          "file_size": 2203,
+          "order_id": [
+            881,
+            890
+          ]
+        },
+        {
+          "path": "appends/append-09.parquet",
+          "record_count": 10,
+          "file_size": 2224,
+          "order_id": [
+            891,
+            900
+          ]
+        },
+        {
+          "path": "appends/append-10.parquet",
+          "record_count": 10,
+          "file_size": 2223,
+          "order_id": [
+            901,
+            910
+          ]
+        },
+        {
+          "path": "appends/append-11.parquet",
+          "record_count": 10,
+          "file_size": 2217,
+          "order_id": [
+            911,
+            920
+          ]
+        },
+        {
+          "path": "appends/append-12.parquet",
+          "record_count": 10,
+          "file_size": 2224,
+          "order_id": [
+            921,
+            930
+          ]
+        },
+        {
+          "path": "appends/append-13.parquet",
+          "record_count": 10,
+          "file_size": 2204,
+          "order_id": [
+            931,
+            940
+          ]
+        },
+        {
+          "path": "appends/append-14.parquet",
+          "record_count": 10,
+          "file_size": 2188,
+          "order_id": [
+            941,
+            950
+          ]
+        },
+        {
+          "path": "appends/append-15.parquet",
+          "record_count": 10,
+          "file_size": 2222,
+          "order_id": [
+            951,
+            960
+          ]
+        }
+      ],
+      "delete_files": [
+        {
+          "path": "deletes/delete-00.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-01.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-02.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-03.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-04.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-05.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        },
+        {
+          "path": "deletes/delete-06.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-1.parquet"
+        },
+        {
+          "path": "deletes/delete-07.parquet",
+          "record_count": 1,
+          "file_size": 1018,
+          "data_file": "data/part-2.parquet"
+        }
+      ]
+    },
+    {
+      "id": "compacted",
+      "summary": "after-a-day, compacted",
+      "data_files": [
+        {
+          "path": "data/part-0.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            1,
+            200
+          ]
+        },
+        {
+          "path": "compacted/part-1.parquet",
+          "record_count": 196,
+          "file_size": 10216,
+          "order_id": [
+            201,
+            400
+          ]
+        },
+        {
+          "path": "compacted/part-2.parquet",
+          "record_count": 196,
+          "file_size": 10226,
+          "order_id": [
+            401,
+            600
+          ]
+        },
+        {
+          "path": "data/part-3.parquet",
+          "record_count": 200,
+          "file_size": 10338,
+          "order_id": [
+            601,
+            800
+          ]
+        },
+        {
+          "path": "compacted/part-4.parquet",
+          "record_count": 160,
+          "file_size": 8786,
+          "order_id": [
+            801,
+            960
+          ]
+        }
+      ],
+      "delete_files": []
+    }
+  ]
+}

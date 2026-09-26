@@ -374,6 +374,25 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .table-grid tr.skipped td { color: var(--faint); }
 .table-grid .pages-list td { white-space: normal; }
 
+/* Ch15: a changing table. */
+.changes-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+                grid-template-areas: "files answer" "time time" "reqs reqs"; border-bottom: 1px solid var(--edge); }
+.changes-grid .c-files { grid-area: files; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.changes-grid .c-answer { grid-area: answer; border-bottom: 1px solid var(--edge); }
+.changes-grid .c-time { grid-area: time; border-bottom: 1px solid var(--edge); }
+.changes-grid .c-reqs { grid-area: reqs; }
+.changes-grid tr.skipped td { color: var(--faint); }
+.changes-grid tr.delete td:first-child code { color: var(--warn); }
+.changes-grid .pages-list td { white-space: normal; }
+.changes-grid .pages-list th { text-align: left; }
+.changes-grid .c-files .table-wrap, .changes-grid .c-reqs .table-wrap { max-height: 22rem; overflow: auto; }
+.lab input[name="key"], .lab input[name="target"], .lab input[name="small"] { width: 5.5rem; }
+@media (max-width: 760px) {
+  .changes-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "answer" "time" "files" "reqs"; }
+  .changes-grid .c-files { border-right: 0; }
+  .changes-grid .c-reqs th:last-child, .changes-grid .c-reqs td:last-child { display: none; }
+}
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }

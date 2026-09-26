@@ -1,0 +1,181 @@
+{
+  "why": "ch15's table: the ch11 orders in four files, then changed by copy-on-write, by position delete files and by small appends, and compacted.",
+  "deleted": [
+    250,
+    450,
+    280,
+    480,
+    310,
+    510,
+    340,
+    540
+  ],
+  "objects": [
+    {
+      "key": "changes/data/part-0.parquet",
+      "size": 10338
+    },
+    {
+      "key": "changes/data/part-1.parquet",
+      "size": 10330
+    },
+    {
+      "key": "changes/data/part-2.parquet",
+      "size": 10337
+    },
+    {
+      "key": "changes/data/part-3.parquet",
+      "size": 10338
+    },
+    {
+      "key": "changes/data/part-1-rewritten.parquet",
+      "size": 10311
+    },
+    {
+      "key": "changes/deletes/delete-00.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-01.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-02.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-03.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-04.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-05.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-06.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/deletes/delete-07.parquet",
+      "size": 1018
+    },
+    {
+      "key": "changes/appends/append-00.parquet",
+      "size": 2205
+    },
+    {
+      "key": "changes/appends/append-01.parquet",
+      "size": 2192
+    },
+    {
+      "key": "changes/appends/append-02.parquet",
+      "size": 2217
+    },
+    {
+      "key": "changes/appends/append-03.parquet",
+      "size": 2190
+    },
+    {
+      "key": "changes/appends/append-04.parquet",
+      "size": 2254
+    },
+    {
+      "key": "changes/appends/append-05.parquet",
+      "size": 2222
+    },
+    {
+      "key": "changes/appends/append-06.parquet",
+      "size": 2200
+    },
+    {
+      "key": "changes/appends/append-07.parquet",
+      "size": 2246
+    },
+    {
+      "key": "changes/appends/append-08.parquet",
+      "size": 2203
+    },
+    {
+      "key": "changes/appends/append-09.parquet",
+      "size": 2224
+    },
+    {
+      "key": "changes/appends/append-10.parquet",
+      "size": 2223
+    },
+    {
+      "key": "changes/appends/append-11.parquet",
+      "size": 2217
+    },
+    {
+      "key": "changes/appends/append-12.parquet",
+      "size": 2224
+    },
+    {
+      "key": "changes/appends/append-13.parquet",
+      "size": 2204
+    },
+    {
+      "key": "changes/appends/append-14.parquet",
+      "size": 2188
+    },
+    {
+      "key": "changes/appends/append-15.parquet",
+      "size": 2222
+    },
+    {
+      "key": "changes/compacted/part-1.parquet",
+      "size": 10216
+    },
+    {
+      "key": "changes/compacted/part-2.parquet",
+      "size": 10226
+    },
+    {
+      "key": "changes/compacted/part-4.parquet",
+      "size": 8786
+    },
+    {
+      "key": "changes/_snapshots.json",
+      "size": 14649
+    }
+  ],
+  "snapshots": {
+    "written": {
+      "live_rows": 800,
+      "sum_amount_cents": 4003150
+    },
+    "copy-on-write": {
+      "live_rows": 799,
+      "sum_amount_cents": 3995263
+    },
+    "merge-on-read-1": {
+      "live_rows": 799,
+      "sum_amount_cents": 3995263
+    },
+    "merge-on-read-2": {
+      "live_rows": 798,
+      "sum_amount_cents": 3993931
+    },
+    "merge-on-read-4": {
+      "live_rows": 796,
+      "sum_amount_cents": 3984800
+    },
+    "merge-on-read-8": {
+      "live_rows": 792,
+      "sum_amount_cents": 3970613
+    },
+    "after-a-day": {
+      "live_rows": 952,
+      "sum_amount_cents": 4742191
+    },
+    "compacted": {
+      "live_rows": 952,
+      "sum_amount_cents": 4742191
+    }
+  }
+}

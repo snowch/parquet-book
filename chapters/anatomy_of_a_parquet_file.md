@@ -469,13 +469,13 @@ here:
 ::::{tab-set}
 :::{tab-item} Python
 :sync: python
-```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/with_a_library.py
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/footer_with_a_library.py
 :language: python
 ```
 :::
 :::{tab-item} Rust
 :sync: rust
-```{literalinclude} ../walkthroughs/libraries/src/bin/with_a_library.rs
+```{literalinclude} ../walkthroughs/libraries/src/bin/footer_with_a_library.rs
 :language: rust
 ```
 :::
@@ -492,7 +492,7 @@ workspace of its own so that the book's reader keeps no dependencies. Run it in 
 a desk:
 
 ```bash
-cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin with_a_library
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin footer_with_a_library
 ```
 
 ## What this cannot tell you

@@ -1216,6 +1216,182 @@ TABLE_QUERIES = [
 ]
 
 
+#: ch15's table: the ch11 orders in four files of 200, then changed. Every file is written by
+#: pyarrow. What a table format would keep about the table, its snapshots, is a JSON file the
+#: generator writes beside them: which data files and delete files make up each version.
+CHANGES_DIR = "changes"
+CHANGES_SNAPSHOTS = "_snapshots.json"
+CHANGES_OPTIONS = {
+    "compression": "snappy",
+    "use_dictionary": True,
+    "row_group_size": 100,
+    "max_rows_per_page": 20,
+    "write_page_index": True,
+    "write_statistics": True,
+}
+#: The orders deleted, one transaction each, in the order they happened.
+CHANGES_DELETED = [250, 450, 280, 480, 310, 510, 340, 540]
+#: New orders arrive ten at a time, each batch its own file.
+CHANGES_APPENDS = 16
+CHANGES_BATCH = 10
+
+#: The schema of a position delete file, as Apache Iceberg defines one: the data file a row is
+#: in, and its position there, counting from 0. The field ids are the ones Iceberg reserves.
+DELETE_SCHEMA = pa.schema(
+    [
+        pa.field("file_path", pa.string(), nullable=False, metadata={"PARQUET:field_id": "2147483546"}),
+        pa.field("pos", pa.int64(), nullable=False, metadata={"PARQUET:field_id": "2147483545"}),
+    ]
+)
+
+
+def _write(table: pa.Table, **options) -> bytes:
+    sink = io.BytesIO()
+    pq.write_table(table, sink, **options)
+    return sink.getvalue()
+
+
+def changes_files() -> tuple[dict[str, bytes], list[dict]]:
+    """The table's files, by key under ``changes/``, and its snapshots, oldest first."""
+    rows = _writing_rows(800 + CHANGES_APPENDS * CHANGES_BATCH)
+    files: dict[str, bytes] = {}
+    info: dict[str, dict] = {}
+
+    def data(key: str, part: list[dict]) -> dict:
+        files[key] = _write(pa.Table.from_pylist(part, schema=WRITING_SCHEMA), **CHANGES_OPTIONS)
+        ids = [r["order_id"] for r in part]
+        info[key] = {
+            "path": key,
+            "record_count": len(part),
+            "file_size": len(files[key]),
+            "order_id": [min(ids), max(ids)],
+        }
+        return info[key]
+
+    base = {f"data/part-{i}.parquet": rows[200 * i : 200 * (i + 1)] for i in range(4)}
+    for key, part in base.items():
+        data(key, part)
+
+    def holder(order_id: int) -> str:
+        return next(k for k, part in base.items() if any(r["order_id"] == order_id for r in part))
+
+    # Deleting the first order by rewriting its file without it: copy-on-write.
+    first = CHANGES_DELETED[0]
+    data("data/part-1-rewritten.parquet", [r for r in base[holder(first)] if r["order_id"] != first])
+
+    # Deleting each order by writing a position delete file that names it: merge-on-read.
+    deletes = []
+    for n, order_id in enumerate(CHANGES_DELETED):
+        key = f"deletes/delete-{n:02d}.parquet"
+        target = holder(order_id)
+        pos = [r["order_id"] for r in base[target]].index(order_id)
+        files[key] = _write(
+            pa.table({"file_path": [target], "pos": [pos]}, schema=DELETE_SCHEMA), **CHANGES_OPTIONS
+        )
+        deletes.append({"path": key, "record_count": 1, "file_size": len(files[key]), "data_file": target})
+
+    appends = [
+        data(f"appends/append-{n:02d}.parquet", rows[800 + CHANGES_BATCH * n : 800 + CHANGES_BATCH * (n + 1)])
+        for n in range(CHANGES_APPENDS)
+    ]
+
+    # Compaction: each file with deletes rewritten without its deleted rows, and the appends
+    # merged into one file. ch15's planner must arrive at these same groups on its own.
+    gone = set(CHANGES_DELETED)
+    compacted = [
+        data(
+            "compacted/part-1.parquet", [r for r in base["data/part-1.parquet"] if r["order_id"] not in gone]
+        ),
+        data(
+            "compacted/part-2.parquet", [r for r in base["data/part-2.parquet"] if r["order_id"] not in gone]
+        ),
+        data("compacted/part-4.parquet", rows[800:]),
+    ]
+
+    written = [info[k] for k in base]
+    snapshots = [
+        {"id": "written", "summary": "four files of 200 orders", "data_files": written, "delete_files": []},
+        {
+            "id": "copy-on-write",
+            "summary": f"order {first} deleted by rewriting its file",
+            "data_files": [
+                info["data/part-1-rewritten.parquet"] if f["path"] == holder(first) else f for f in written
+            ],
+            "delete_files": [],
+        },
+    ]
+    for n in (1, 2, 4, 8):
+        snapshots.append(
+            {
+                "id": f"merge-on-read-{n}",
+                "summary": f"{n} order{'s' if n > 1 else ''} deleted by delete files",
+                "data_files": written,
+                "delete_files": deletes[:n],
+            }
+        )
+    snapshots.append(
+        {
+            "id": "after-a-day",
+            "summary": f"{len(deletes)} deletes and {CHANGES_APPENDS} small appends",
+            "data_files": written + appends,
+            "delete_files": deletes,
+        }
+    )
+    snapshots.append(
+        {
+            "id": "compacted",
+            "summary": "after-a-day, compacted",
+            "data_files": [
+                info["data/part-0.parquet"],
+                compacted[0],
+                compacted[1],
+                info["data/part-3.parquet"],
+                compacted[2],
+            ],
+            "delete_files": [],
+        }
+    )
+    return files, snapshots
+
+
+def changes_outputs() -> dict[Path, bytes]:
+    files, snapshots = changes_files()
+    out = {HERE / CHANGES_DIR / k: v for k, v in files.items()}
+    meta = (json.dumps({"snapshots": snapshots}, indent=2) + "\n").encode()
+    out[HERE / CHANGES_DIR / CHANGES_SNAPSHOTS] = meta
+    objects = [{"key": f"{CHANGES_DIR}/{k}", "size": len(v)} for k, v in files.items()]
+    objects.append({"key": f"{CHANGES_DIR}/{CHANGES_SNAPSHOTS}", "size": len(meta)})
+    # pyarrow's answer for each snapshot: its rows with the deleted positions taken out.
+    answers = {}
+    for snap in snapshots:
+        live, total = 0, 0
+        for f in snap["data_files"]:
+            t = pq.read_table(io.BytesIO(files[f["path"]]))
+            dead = [
+                pq.read_table(io.BytesIO(files[d["path"]]))["pos"].to_pylist()
+                for d in snap["delete_files"]
+                if d["data_file"] == f["path"]
+            ]
+            keep = pc.invert(
+                pc.is_in(pa.array(range(t.num_rows), pa.int64()), pa.array(sum(dead, []), pa.int64()))
+            )
+            t = t.filter(keep)
+            live += t.num_rows
+            total += pc.sum(t["amount_cents"]).as_py()
+        answers[snap["id"]] = {"live_rows": live, "sum_amount_cents": total}
+    listing = {
+        "why": (
+            "ch15's table: the ch11 orders in four files, then changed by copy-on-write, by "
+            "position delete files and by small appends, and compacted."
+        ),
+        "deleted": CHANGES_DELETED,
+        "objects": objects,
+        "snapshots": answers,
+    }
+    out[HERE / "changes.json"] = (json.dumps(listing, indent=2) + "\n").encode()
+    return out
+
+
 def dump_manifest(m: dict) -> str:
     """The manifest as indented JSON, except that each row is on one line: the rows are most of
     a manifest, and one line each keeps them readable and the file small."""
@@ -1240,6 +1416,7 @@ def outputs() -> dict[Path, bytes]:
     files[HERE / "README.md"] = readme(manifests).encode()
     files[HERE / "queries.json"] = query_answers({m["name"]: files[HERE / m["file"]] for m in manifests})
     files.update(table_outputs())
+    files.update(changes_outputs())
     return files
 
 

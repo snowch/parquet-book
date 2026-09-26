@@ -151,9 +151,10 @@ footer starts, then breaks the length to show why a reader must check what it re
   manifest. The prose that follows a step describes what it printed without typing a number.
 - End with an invitation to change something, and say what to try.
 
-**Ask a library** is a walkthrough step too, named `with_a_library` (or `with_a_library_<what>`
-when a chapter needs more than one): `walkthroughs/python/<slug>/<step>.py` using pyarrow, and its
-Rust twin in `walkthroughs/libraries/src/bin/<step>.rs` using the `parquet` crate. That crate is a
+**Ask a library** is a walkthrough step too, named `<what>_with_a_library` (`footer_with_a_library`,
+`deletes_with_a_library`), since each step's name is a binary and must be unique:
+`walkthroughs/python/<slug>/<step>.py` using pyarrow, and its Rust twin in
+`walkthroughs/libraries/src/bin/<step>.rs` using the `parquet` crate. That crate is a
 workspace of its own, the repository's only dependency, kept out of the root workspace so the
 reader stays dependency-free; `scripts/ci-check.sh` formats and lints it. Print the same facts the
 hand-written steps and the reader found, and add them to `tests/test_walkthroughs.py` from the

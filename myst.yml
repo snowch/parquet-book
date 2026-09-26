@@ -59,6 +59,7 @@ project:
       children:
         - file: chapters/modular_encryption.md
         - file: chapters/lakehouse_and_beyond.md
+        - file: chapters/changing_a_table.md
     - title: Appendices
       children:
         - file: appendices/running_the_lab.md

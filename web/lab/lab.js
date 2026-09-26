@@ -31,6 +31,7 @@ import { mountWriting } from "./writing.js";
 import { mountEngine } from "./engine.js";
 import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
+import { mountChanges } from "./changes.js";
 import { openEditor, openRustEditor } from "./editor.js";
 import { mountWorkbench } from "./workbench.js";
 import { mountCommands } from "./commands.js";
@@ -45,6 +46,7 @@ const EXPERIMENTS = {
   engine: mountEngine,
   encryption: mountEncryption,
   table: mountTable,
+  changes: mountChanges,
 };
 
 class Fixtures {

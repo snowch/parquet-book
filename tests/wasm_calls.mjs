@@ -39,6 +39,7 @@ const out = calls.map((c) => {
     case "encodings": return lab.encodings(id(c.file), c.column);
     case "pages": return lab.pages(id(c.file), c.column);
     case "table": return lab.table(c.keys.map((k) => { if (!ids.has(k)) ids.set(k, lab.load(k, readFileSync(`fixtures/${k}`))); return ids.get(k); }), c.sql, c.discovery, 4);
+    case "changes": return lab.changes(c.keys.map((k) => { if (!ids.has(k)) ids.set(k, lab.load(k, readFileSync(`fixtures/${k}`))); return ids.get(k); }), c.snapshot, c.op, c.options);
     case "encryption": return lab.encryption(id(c.file));
     case "query": return lab.query(id(c.file), c.sql);
     case "scan": return lab.scan(id(c.file), c.columns, c.where, c.strategy);

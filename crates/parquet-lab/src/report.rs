@@ -2688,3 +2688,291 @@ pub fn table(
         ),
     ])
 }
+
+/// ch15's experiment: an operation on snapshot `id` of the changing table under `changes/`.
+/// Every file of the snapshot is listed, with whether the operation read it and why.
+pub fn changes(
+    objects: Vec<(String, Vec<u8>)>,
+    id: &str,
+    op: crate::changes::Operation,
+    prefetch: u64,
+    connections: usize,
+    model: NetworkModel,
+) -> Json {
+    use crate::changes::{self, Operation};
+    let mut store = MemoryStore::new();
+    for (k, v) in objects {
+        store.put(&k, v);
+    }
+    let prefix = "changes/";
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let file = |path: &str, kind: &str, size: u64, rows: i64, read: bool, why: String| {
+        obj([
+            ("path", path.into()),
+            ("kind", kind.into()),
+            ("size", size.into()),
+            ("rows", rows.into()),
+            ("read", read.into()),
+            ("why", why.into()),
+        ])
+    };
+    let totals = |requests: &[Request], elapsed: u64, bytes: u64, rows: u64| {
+        let mut phases: Vec<usize> = requests.iter().map(|r| r.phase).collect();
+        phases.dedup();
+        obj([
+            ("requests", requests.len().into()),
+            ("round_trips", phases.len().into()),
+            ("bytes_fetched", bytes.into()),
+            ("elapsed_us", elapsed.into()),
+            ("rows_decoded", rows.into()),
+        ])
+    };
+    let head = |s: &changes::Snapshot, name: &str| {
+        obj([
+            ("ok", true.into()),
+            ("operation", name.into()),
+            (
+                "snapshot",
+                obj([
+                    ("id", s.id.clone().into()),
+                    ("summary", s.summary.clone().into()),
+                ]),
+            ),
+        ])
+    };
+    let join = |a: Json, rest: Vec<(&str, Json)>| match a {
+        Json::Obj(mut kv) => {
+            kv.extend(rest.into_iter().map(|(k, v)| (k.to_string(), v)));
+            Json::Obj(kv)
+        }
+        other => other,
+    };
+    match op {
+        Operation::Scan => {
+            let r = match changes::scan_table(store, prefix, id, connections, model) {
+                Ok(r) => r,
+                Err(e) => return fail(e),
+            };
+            let s = &r.snapshot;
+            let mut files: Vec<Json> = s
+                .data_files
+                .iter()
+                .map(|f| {
+                    let n = s.deletes_for(&f.path).len();
+                    let why = match n {
+                        0 => "read: a scan reads every data file".to_string(),
+                        n => format!(
+                            "read: a scan reads every data file; {n} delete file{} name{} it",
+                            if n == 1 { "" } else { "s" },
+                            if n == 1 { "s" } else { "" }
+                        ),
+                    };
+                    file(&f.path, "data", f.file_size, f.record_count, true, why)
+                })
+                .collect();
+            files.extend(s.delete_files.iter().map(|d| {
+                file(
+                    &d.path,
+                    "delete",
+                    d.file_size,
+                    d.record_count,
+                    true,
+                    format!("read: it names rows of {}", d.data_file),
+                )
+            }));
+            join(
+                head(s, "scan"),
+                vec![
+                    ("files", Json::Arr(files)),
+                    ("requests", requests_json(&r.requests)),
+                    (
+                        "totals",
+                        totals(
+                            &r.requests,
+                            r.elapsed_us,
+                            r.bytes_fetched,
+                            r.rows_decoded as u64,
+                        ),
+                    ),
+                    (
+                        "answer",
+                        obj([
+                            ("live_rows", r.live_rows.into()),
+                            ("sum_amount_cents", r.sum_amount_cents.into()),
+                        ]),
+                    ),
+                ],
+            )
+        }
+        Operation::Lookup(key) => {
+            let r = match changes::lookup(store, prefix, id, key, prefetch, connections, model) {
+                Ok(r) => r,
+                Err(e) => return fail(e),
+            };
+            let s = &r.snapshot;
+            let mut files: Vec<Json> = s
+                .data_files
+                .iter()
+                .map(|f| {
+                    let read = r.data_files.contains(&f.path);
+                    let why = format!(
+                        "{}: its {} runs from {} to {}",
+                        if read { "opened" } else { "skipped" },
+                        changes::KEY,
+                        f.min_key,
+                        f.max_key
+                    );
+                    file(&f.path, "data", f.file_size, f.record_count, read, why)
+                })
+                .collect();
+            files.extend(s.delete_files.iter().map(|d| {
+                let read = r.delete_files.contains(&d.path);
+                let why = if read {
+                    format!(
+                        "read: it names rows of {}, which may hold the key",
+                        d.data_file
+                    )
+                } else {
+                    format!("skipped: it names rows of {}", d.data_file)
+                };
+                file(&d.path, "delete", d.file_size, d.record_count, read, why)
+            }));
+            // A key-value store's answer: one request for one row's bytes, taken as the share of
+            // its file that one row occupies.
+            let share = r
+                .found
+                .as_ref()
+                .and_then(|(p, _)| s.data_files.iter().find(|f| &f.path == p))
+                .or_else(|| s.data_files.iter().find(|f| r.data_files.contains(&f.path)))
+                .map(|f| f.file_size.div_ceil(f.record_count.max(1) as u64))
+                .unwrap_or(0);
+            join(
+                head(s, "lookup"),
+                vec![
+                    ("key", key.into()),
+                    ("files", Json::Arr(files)),
+                    ("requests", requests_json(&r.requests)),
+                    (
+                        "totals",
+                        totals(&r.requests, r.elapsed_us, r.bytes_fetched, r.rows_decoded),
+                    ),
+                    (
+                        "found",
+                        match &r.found {
+                            Some((path, pos)) => {
+                                obj([("path", path.clone().into()), ("position", (*pos).into())])
+                            }
+                            None => Json::Null,
+                        },
+                    ),
+                    ("deleted_by", r.deleted_by.clone().into()),
+                    (
+                        "row",
+                        Json::Arr(
+                            r.row
+                                .iter()
+                                .map(|(c, v)| {
+                                    obj([("column", c.clone().into()), ("value", v.clone())])
+                                })
+                                .collect(),
+                        ),
+                    ),
+                    (
+                        "key_value",
+                        obj([
+                            ("bytes", share.into()),
+                            ("elapsed_us", model.cost_us(share).into()),
+                        ]),
+                    ),
+                ],
+            )
+        }
+        Operation::Compact {
+            target_rows,
+            small_rows,
+        } => {
+            let mut t = TracingStore::with_connections(store, model, connections);
+            let s = match changes::open(&mut t, prefix, id) {
+                Ok(s) => s,
+                Err(e) => return fail(e),
+            };
+            let plan = changes::plan_compaction(&s, target_rows, small_rows);
+            let group_of = |p: &str| {
+                plan.iter()
+                    .position(|g| g.data_files.iter().chain(&g.delete_files).any(|x| x == p))
+            };
+            let mut files: Vec<Json> = s
+                .data_files
+                .iter()
+                .map(|f| {
+                    let live = s.live_rows(f);
+                    let why = match group_of(&f.path) {
+                        Some(g) => format!("rewritten in group {}: {live} live rows", g + 1),
+                        None => format!("kept: {live} live rows, no deletes"),
+                    };
+                    file(
+                        &f.path,
+                        "data",
+                        f.file_size,
+                        f.record_count,
+                        group_of(&f.path).is_some(),
+                        why,
+                    )
+                })
+                .collect();
+            files.extend(s.delete_files.iter().map(|d| {
+                let why = match group_of(&d.path) {
+                    Some(g) => format!("read by group {}, then no longer needed", g + 1),
+                    None => "kept".to_string(),
+                };
+                file(
+                    &d.path,
+                    "delete",
+                    d.file_size,
+                    d.record_count,
+                    group_of(&d.path).is_some(),
+                    why,
+                )
+            }));
+            let groups = Json::Arr(
+                plan.iter()
+                    .map(|g| {
+                        obj([
+                            (
+                                "data_files",
+                                Json::Arr(g.data_files.iter().map(|p| p.clone().into()).collect()),
+                            ),
+                            (
+                                "delete_files",
+                                Json::Arr(
+                                    g.delete_files.iter().map(|p| p.clone().into()).collect(),
+                                ),
+                            ),
+                            ("rows_in", g.rows_in.into()),
+                            ("rows_out", g.rows_out.into()),
+                            ("bytes_in", g.bytes_in.into()),
+                        ])
+                    })
+                    .collect(),
+            );
+            join(
+                head(&s, "compact"),
+                vec![
+                    ("target_rows", target_rows.into()),
+                    ("small_rows", small_rows.into()),
+                    ("files", Json::Arr(files)),
+                    ("requests", requests_json(&t.requests)),
+                    (
+                        "totals",
+                        totals(&t.requests, t.elapsed_us(), t.bytes_returned(), 0),
+                    ),
+                    ("groups", groups),
+                    (
+                        "bytes_in",
+                        plan.iter().map(|g| g.bytes_in).sum::<u64>().into(),
+                    ),
+                ],
+            )
+        }
+    }
+}

@@ -99,6 +99,16 @@ def main() -> None:
     t.add_argument("sql")
     t.add_argument("--discovery", choices=("list", "prune", "log"), default="log")
     t.add_argument("--connections", type=int, default=4)
+    c = sub.add_parser("changes", help="a changing table: scan, look up, or plan a compaction (ch15)")
+    c.add_argument("listing", type=Path, help="the table's listing, such as fixtures/changes.json")
+    c.add_argument("--snapshot", default="written")
+    how = c.add_mutually_exclusive_group()
+    how.add_argument("--lookup", type=int, metavar="ORDER_ID")
+    how.add_argument("--compact", action="store_true")
+    c.add_argument("--target-rows", type=int, default=200)
+    c.add_argument("--small-rows", type=int, default=100)
+    c.add_argument("--prefetch", type=int, default=0)
+    c.add_argument("--connections", type=int, default=4)
     inspect = sub.add_parser("interpret", help="every reading of the bytes at an offset")
     inspect.add_argument("file", type=Path)
     inspect.add_argument("offset", type=int)
@@ -149,6 +159,16 @@ def main() -> None:
             a.discovery
         ]
         out = report.table(objects, a.sql, discovery, a.connections, NetworkModel())
+    elif a.command == "changes":
+        listing = json.loads(a.listing.read_text())
+        objects = [(o["key"], (a.listing.parent / o["key"]).read_bytes()) for o in listing["objects"]]
+        if a.lookup is not None:
+            op = ("lookup", a.lookup)
+        elif a.compact:
+            op = ("compact", a.target_rows, a.small_rows)
+        else:
+            op = ("scan",)
+        out = report.changes(objects, a.snapshot, op, a.prefetch, a.connections, NetworkModel())
     elif a.command == "interpret":
         out = report.interpret(a.file.read_bytes(), a.offset)
     else:

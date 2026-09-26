@@ -369,7 +369,8 @@ def build(out: Path) -> None:
     for f in sorted((ROOT / "fixtures").glob("*")):
         if f.suffix in (".parquet", ".json"):
             shutil.copy(f, out / "fixtures" / f.name)
-    shutil.copytree(ROOT / "fixtures" / "table", out / "fixtures" / "table")
+    for table in ("table", "changes"):
+        shutil.copytree(ROOT / "fixtures" / table, out / "fixtures" / table)
     fixtures = sorted(
         str(f.relative_to(out / "fixtures")) for f in (out / "fixtures").rglob("*") if f.is_file()
     )

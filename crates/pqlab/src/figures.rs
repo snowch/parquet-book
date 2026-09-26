@@ -199,6 +199,26 @@ const FIGURES: &[Figure] = &[
         render: table_discovery,
     },
     Figure {
+        file: "changes-snapshots.md",
+        render: changes_snapshot_list,
+    },
+    Figure {
+        file: "changes-scans.md",
+        render: changes_scans,
+    },
+    Figure {
+        file: "changes-lookup.md",
+        render: changes_lookup,
+    },
+    Figure {
+        file: "changes-writes.md",
+        render: changes_writes,
+    },
+    Figure {
+        file: "changes-compaction.md",
+        render: changes_compaction,
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -2399,5 +2419,327 @@ fn table_discovery(root: &Path) -> Result<String, String> {
         rows.join("\n"),
         model.latency_us / 1000,
         model.bandwidth_bytes_per_sec / 1_000_000
+    ))
+}
+
+// ---- ch15: a changing table ---------------------------------------------------------------
+
+fn changes_store(root: &Path) -> Result<MemoryStore, String> {
+    let text = std::fs::read_to_string(root.join("fixtures/changes.json"))
+        .map_err(|e| format!("cannot read changes.json: {e}"))?;
+    let listing = Json::parse(&text).map_err(|e| e.to_string())?;
+    let mut store = MemoryStore::new();
+    for o in arr(listing.get("objects")) {
+        let key = o
+            .get("key")
+            .and_then(Json::as_str)
+            .ok_or("an object with no key")?;
+        store.put(key, fixture(root, key)?);
+    }
+    Ok(store)
+}
+
+fn changes_snapshots(root: &Path) -> Result<Vec<parquet_lab::changes::Snapshot>, String> {
+    let bytes = fixture(root, "changes/_snapshots.json")?;
+    parquet_lab::changes::read_snapshots(&String::from_utf8_lossy(&bytes))
+}
+
+fn changes_note(connections: usize) -> String {
+    let m = NetworkModel::default();
+    format!(
+        "*Computed by the reader over `fixtures/changes/`, through the simulated store with {} \
+         connection{}, {} before each request's first byte and {} after it.*\n",
+        match connections {
+            1 => "one".to_string(),
+            4 => "four".to_string(),
+            n => n.to_string(),
+        },
+        if connections == 1 { "" } else { "s" },
+        ms(m.latency_us),
+        rate(m.bandwidth_bytes_per_sec)
+    )
+}
+
+/// The rounds of requests a trace took: each phase waits for the one before.
+fn round_trips(requests: &[parquet_lab::object_store::Request]) -> usize {
+    let mut phases: Vec<usize> = requests.iter().map(|r| r.phase).collect();
+    phases.dedup();
+    phases.len()
+}
+
+fn changes_snapshot_list(root: &Path) -> Result<String, String> {
+    let mut rows = vec![
+        "| Snapshot | What changed | Data files | Delete files | Rows, as the snapshot counts them |"
+            .to_string(),
+        "|---|---|--:|--:|--:|".to_string(),
+    ];
+    let snapshots = changes_snapshots(root)?;
+    for s in &snapshots {
+        rows.push(format!(
+            "| `{}` | {} | {} | {} | {} |",
+            s.id,
+            s.summary,
+            s.data_files.len(),
+            s.delete_files.len(),
+            s.data_files.iter().map(|f| s.live_rows(f)).sum::<i64>()
+        ));
+    }
+    let bytes = fixture(root, "changes/_snapshots.json")?;
+    Ok(format!(
+        "{HEADER}{}\n\n*Every snapshot in `fixtures/changes/_snapshots.json` ({} bytes), as the \
+         reader's `changes::read_snapshots` reads it. Rows are each data file's rows, less the \
+         rows its delete files name.*\n",
+        rows.join("\n"),
+        thousands(bytes.len() as u64)
+    ))
+}
+
+fn changes_scans(root: &Path) -> Result<String, String> {
+    use parquet_lab::changes::scan_table;
+    let mut rows = vec![
+        "| Snapshot | Data files | Delete files | Requests | Bytes fetched | Time | Rows decoded | Rows in the table |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    for id in [
+        "written",
+        "merge-on-read-1",
+        "merge-on-read-2",
+        "merge-on-read-4",
+        "merge-on-read-8",
+        "after-a-day",
+        "compacted",
+    ] {
+        let r = scan_table(
+            changes_store(root)?,
+            "changes/",
+            id,
+            4,
+            NetworkModel::default(),
+        )?;
+        rows.push(format!(
+            "| `{id}` | {} | {} | {} | {} | {} | {} | {} |",
+            r.snapshot.data_files.len(),
+            r.snapshot.delete_files.len(),
+            r.requests.len(),
+            thousands(r.bytes_fetched),
+            ms_of(r.elapsed_us),
+            r.rows_decoded,
+            r.live_rows
+        ));
+    }
+    Ok(format!(
+        "{HEADER}{}\n\n{}",
+        rows.join("\n"),
+        changes_note(4)
+    ))
+}
+
+fn changes_lookup(root: &Path) -> Result<String, String> {
+    use parquet_lab::changes::lookup;
+    let model = NetworkModel::default();
+    let mut rows = vec![
+        "| Snapshot | `order_id` | Tail read first | Requests | Round trips | Bytes fetched | Time | Found |"
+            .to_string(),
+        "|---|--:|--:|--:|--:|--:|--:|---|".to_string(),
+    ];
+    let mut kv = (0, 0);
+    for (id, key, prefetch) in [
+        ("written", 300, 0),
+        ("written", 300, 64 * 1024),
+        ("after-a-day", 300, 0),
+        ("after-a-day", 250, 0),
+        ("compacted", 300, 0),
+    ] {
+        let r = lookup(
+            changes_store(root)?,
+            "changes/",
+            id,
+            key,
+            prefetch,
+            4,
+            model,
+        )?;
+        if kv.0 == 0 {
+            let f = &r.snapshot.data_files[1];
+            let share = f.file_size.div_ceil(f.record_count as u64);
+            kv = (share, model.cost_us(share));
+        }
+        let found = match (&r.found, &r.deleted_by) {
+            (Some(_), Some(by)) => format!("deleted by `{by}`"),
+            (Some((path, pos)), None) => format!("`{path}`, row {pos}"),
+            (None, _) => "no".to_string(),
+        };
+        rows.push(format!(
+            "| `{id}` | {key} | {} | {} | {} | {} | {} | {found} |",
+            if prefetch == 0 {
+                "the trailer".to_string()
+            } else {
+                format!("{} KiB", prefetch / 1024)
+            },
+            r.requests.len(),
+            round_trips(&r.requests),
+            thousands(r.bytes_fetched),
+            ms_of(r.elapsed_us),
+        ));
+    }
+    rows.push(format!(
+        "| a key-value store | 300 | · | 1 | 1 | {} | {} | the row |",
+        thousands(kv.0),
+        ms_of(kv.1)
+    ));
+    Ok(format!(
+        "{HEADER}{}\n\n{} The key-value store's row is the share of `data/part-1.parquet` one row \
+         takes up: its size divided by its rows.*\n",
+        rows.join("\n"),
+        changes_note(4).trim_end().trim_end_matches('*')
+    ))
+}
+
+fn changes_writes(root: &Path) -> Result<String, String> {
+    use parquet_lab::changes::{lookup, scan_table};
+    let model = NetworkModel::default();
+    let snapshots = changes_snapshots(root)?;
+    let find = |id: &str| {
+        snapshots
+            .iter()
+            .find(|s| s.id == id)
+            .ok_or(format!("no snapshot {id}"))
+    };
+    let (written, cow, mor) = (
+        find("written")?,
+        find("copy-on-write")?,
+        find("merge-on-read-1")?,
+    );
+    let old = &written.data_files[1];
+    let new = cow
+        .data_files
+        .iter()
+        .find(|f| !written.data_files.contains(f))
+        .ok_or("copy-on-write changed no file")?;
+    let delete = &mor.delete_files[0];
+    let row = old.file_size.div_ceil(old.record_count as u64);
+    // Either way, the writer first finds the row: a lookup in the snapshot before.
+    let find_it = lookup(
+        changes_store(root)?,
+        "changes/",
+        "written",
+        250,
+        0,
+        4,
+        model,
+    )?;
+    let scan = |id: &str| scan_table(changes_store(root)?, "changes/", id, 4, model);
+    let base = scan("written")?;
+    let mut rows = vec![
+        "| Deleting one order by | Reads, to write it | Writes | Writes per byte of the row | Each later scan |".to_string(),
+        "|---|--:|--:|--:|---|".to_string(),
+    ];
+    for (label, reads, writes, id) in [
+        (
+            "copy-on-write: its file, rewritten",
+            find_it.bytes_fetched + old.file_size,
+            new.file_size,
+            "copy-on-write",
+        ),
+        (
+            "merge-on-read: a position delete file",
+            find_it.bytes_fetched,
+            delete.file_size,
+            "merge-on-read-1",
+        ),
+    ] {
+        let after = scan(id)?;
+        let later = format!(
+            "{:+} request{}, {}{} bytes, {:+.1} ms",
+            after.requests.len() as i64 - base.requests.len() as i64,
+            if after.requests.len().abs_diff(base.requests.len()) == 1 {
+                ""
+            } else {
+                "s"
+            },
+            if after.bytes_fetched < base.bytes_fetched {
+                "−"
+            } else {
+                "+"
+            },
+            thousands(after.bytes_fetched.abs_diff(base.bytes_fetched)),
+            (after.elapsed_us as f64 - base.elapsed_us as f64) / 1000.0
+        );
+        rows.push(format!(
+            "| {label} | {} | {} | {} | {later} |",
+            thousands(reads),
+            thousands(writes),
+            writes.div_ceil(row),
+        ));
+    }
+    Ok(format!(
+        "{HEADER}{}\n\n{} The order is 250, in `{}` ({} bytes, {} rows, so about {row} bytes a \
+         row). Reads count the lookup that finds the row, and for copy-on-write the whole file. \
+         Each later scan is compared with a scan of `written`.*\n",
+        rows.join("\n"),
+        changes_note(4).trim_end().trim_end_matches('*'),
+        old.path,
+        thousands(old.file_size),
+        old.record_count,
+    ))
+}
+
+fn changes_compaction(root: &Path) -> Result<String, String> {
+    use parquet_lab::changes::{compaction_cost, plan_compaction, scan_table};
+    let model = NetworkModel::default();
+    let snapshots = changes_snapshots(root)?;
+    let find = |id: &str| {
+        snapshots
+            .iter()
+            .find(|s| s.id == id)
+            .ok_or(format!("no snapshot {id}"))
+    };
+    let (before, after) = (find("after-a-day")?, find("compacted")?);
+    let (target, small) = (200, 100);
+    let plan = plan_compaction(before, target, small);
+    let cost = compaction_cost(before, after, &plan, model)?;
+    let name = |files: &[String]| match files {
+        [] => "none".to_string(),
+        [one] => format!("`{one}`"),
+        [first, .., last] => format!("{} files, `{first}` to `{last}`", files.len()),
+    };
+    let mut rows = vec![
+        "| Group | Data files | Delete files | Rows in | Rows out | Bytes read |".to_string(),
+        "|--:|---|---|--:|--:|--:|".to_string(),
+    ];
+    for (i, g) in plan.iter().enumerate() {
+        rows.push(format!(
+            "| {} | {} | {} | {} | {} | {} |",
+            i + 1,
+            name(&g.data_files),
+            name(&g.delete_files),
+            g.rows_in,
+            g.rows_out,
+            thousands(g.bytes_in)
+        ));
+    }
+    let scan = |id: &str| scan_table(changes_store(root)?, "changes/", id, 4, model);
+    let (slow, fast) = (scan("after-a-day")?, scan("compacted")?);
+    let saving = slow.elapsed_us.saturating_sub(fast.elapsed_us).max(1);
+    Ok(format!(
+        "{HEADER}{}\n\n| Compacting `after-a-day` | |\n|---|--:|\n\
+         | Bytes read | {} |\n| Bytes written, in {} files | {} |\n\
+         | Time, one file at a time | {} |\n| Time saved by each later scan | {} |\n\
+         | Scans until it has paid for itself | {} |\n\n\
+         *Planned by the reader's `plan_compaction`, with a target of {target} rows a file and \
+         files under {small} live rows counted as small. The files written are the ones pyarrow \
+         wrote for the `compacted` snapshot, which the reader checks against the plan. Simulated \
+         network: {} before each request's first byte and {} after it; a write is priced as a \
+         read of the same size.*\n",
+        rows.join("\n"),
+        thousands(cost.bytes_read),
+        cost.outputs.len(),
+        thousands(cost.bytes_written),
+        ms_of(cost.elapsed_us),
+        ms_of(saving),
+        cost.elapsed_us.div_ceil(saving),
+        ms(model.latency_us),
+        rate(model.bandwidth_bytes_per_sec)
     ))
 }

@@ -130,15 +130,23 @@ def scan(obj: bytes, key: str, query: Query, strategy: Strategy, model: NetworkM
     inner = MemoryStore()
     inner.put(key, obj)
     store = TracingStore(inner, model, strategy.connections)
+    return scan_in(store, obj, key, query, strategy)
+
+
+def scan_in(store: TracingStore, obj: bytes, key: str, query: Query, strategy: Strategy) -> ScanResult:
+    """:func:`scan`, in a store that other requests share: a table's reader opens one of its
+    files (ch15). ``obj`` is the file's bytes, which the store holds under ``key``; the result's
+    requests and totals are the whole store's."""
     have = Fetched(len(obj))
 
     # Phase 1: the footer. Every byte the footer read returned is now the reader's.
+    before = len(store.requests)
     try:
         footer = read_footer(store, key, strategy.footer)
     except Exception as e:  # a store error or a format error, reported as text
         raise ScanError(str(e)) from e
-    for r in store.requests:
-        if r.returned is not None:
+    for r in store.requests[before:]:
+        if r.key == key and r.returned is not None:
             have.add(r.returned, obj[r.returned.start : r.returned.end])
     md = footer.metadata
     flat = [leaf for leaf in leaves(build(md.schema)) if leaf.max_repetition_level == 0]
@@ -274,7 +282,7 @@ def scan(obj: bytes, key: str, query: Query, strategy: Strategy, model: NetworkM
                     if len(rows) < 20:
                         rows.append([by_column[c].get(row, (None, None))[1] for c in query.columns])
     return ScanResult(
-        requests=store.requests,
+        requests=list(store.requests),
         elapsed_us=store.elapsed_us(),
         bytes_fetched=store.bytes_returned(),
         bytes_planned=planned,

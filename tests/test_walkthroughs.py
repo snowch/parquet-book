@@ -62,7 +62,7 @@ def facts(chapter: str, step: str) -> list[str]:
             data[start : start + 8].hex(" "),
         ],
         ("anatomy_of_a_parquet_file", "damaged_length"): [str(damaged_length), str(n - 8 - damaged_length)],
-        ("anatomy_of_a_parquet_file", "with_a_library"): [
+        ("anatomy_of_a_parquet_file", "footer_with_a_library"): [
             f"footer length: {length}",
             f"rows: {manifest['num_rows']} in {manifest['num_row_groups']} row group",
             *(
@@ -72,8 +72,49 @@ def facts(chapter: str, step: str) -> list[str]:
             ),
         ],
     }
+    known.update(changes_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     return known[(chapter, step)]
+
+
+def changes_facts() -> dict:
+    """What ch15's steps must print, from the snapshots the generator wrote and pyarrow's reading
+    of the files."""
+    import pyarrow.parquet as pq
+
+    table = ROOT / "fixtures" / "changes"
+    snapshots = json.loads((table / "_snapshots.json").read_text())["snapshots"]
+    day = next(s for s in snapshots if s["id"] == "after-a-day")
+    deleted = json.loads((ROOT / "fixtures" / "changes.json").read_text())["deleted"]
+    part = next(f for f in day["data_files"] if f["order_id"][0] <= 300 <= f["order_id"][1])
+    names = [d for d in day["delete_files"] if d["data_file"] == part["path"]]
+    first = pq.read_table(table / day["delete_files"][0]["path"]).to_pylist()[0]
+    ids = pq.read_table(table / first["file_path"])["order_id"].to_pylist()
+    gone = [p for d in names for p in pq.read_table(table / d["path"])["pos"].to_pylist()]
+    amounts = pq.read_table(table / part["path"])["amount_cents"].to_pylist()
+    live = [a for i, a in enumerate(amounts) if i not in gone]
+    return {
+        ("changing_a_table", "table_files"): [
+            f"{len(day['data_files'])} data files and {len(day['delete_files'])} delete files",
+            *(
+                f"{f['path']}: {f['record_count']} rows in {f['file_size']} bytes, "
+                f"{f['file_size'] // f['record_count']} bytes a row"
+                for f in day["data_files"]
+            ),
+        ],
+        ("changing_a_table", "find_the_file"): [
+            f"order 300 can only be in {part['path']}",
+            "may remove it: " + ", ".join(d["path"] for d in names),
+        ],
+        ("changing_a_table", "read_a_delete_file"): [
+            f"row {first['pos']} of {first['file_path']} is deleted: order {ids[first['pos']]}",
+            f"order {deleted[0]}",
+        ],
+        ("changing_a_table", "deletes_with_a_library"): [
+            f"{part['path']} holds {len(amounts)} rows; {len(gone)} are deleted; {len(live)} are live",
+            f"their amounts sum to {sum(live)}",
+        ],
+    }
 
 
 @pytest.fixture(scope="module")

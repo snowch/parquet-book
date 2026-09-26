@@ -78,7 +78,7 @@ make problems                                           # the chapter exercises 
 
 ## Status
 
-Every chapter is written, from ch01 (row and column layouts) to ch14 (lakehouse and beyond),
+Every chapter is written, from ch01 (row and column layouts) to ch15 (changing a table),
 in Python and in Rust, with working experiments and, from ch02, graded problems. The chapters are
 being revised to the code-first method, by hand, then the reader, then a library, that ch02
 follows. See `PLAN.md` for the plan and `NEXT_STEPS.md` for

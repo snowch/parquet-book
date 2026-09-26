@@ -89,6 +89,23 @@ export class Lab {
     return this.#result(this.exports.pl_table(idPtr, ids.length, sqlPtr, text.length, d, connections, latencyUs, bandwidth));
   }
 
+  /**
+   * An operation on a snapshot of a changing table (ch15): `ids` are loaded files named by their
+   * object keys. `op` is "scan", "lookup" (of `key`) or "compact" (with `targetRows` and
+   * `smallRows`).
+   */
+  changes(ids, snapshot, op = "scan", { key = 0, targetRows = 200, smallRows = 100, prefetch = 0, connections = 4, latencyUs = 20000, bandwidth = 100000000 } = {}) {
+    const idBytes = new Uint8Array(ids.length * 4);
+    const view = new DataView(idBytes.buffer);
+    ids.forEach((id, i) => view.setUint32(i * 4, id, true));
+    const idPtr = this.#copyIn(idBytes);
+    const text = encoder.encode(snapshot);
+    const snapPtr = this.#copyIn(text);
+    const o = { scan: 0, lookup: 1, compact: 2 }[op] ?? 0;
+    return this.#result(this.exports.pl_changes(idPtr, ids.length, snapPtr, text.length, o, key, targetRows, smallRows,
+      prefetch, connections, latencyUs, bandwidth));
+  }
+
   encryption(id) {
     return this.#result(this.exports.pl_encryption(id));
   }

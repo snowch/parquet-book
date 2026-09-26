@@ -19,7 +19,7 @@ const MODULE = {
   layouts: "layout.py", footer: "reader.py", anatomy: "metadata.py", schema: "schema.py",
   levels: "column.py", encodings: "decode.py", pages: "pages.py", compression: "compress.py",
   statistics: "stats.py", skipping: "prune.py", scan: "scan.py", writing: "prune.py",
-  engine: "engine.py", encryption: "crypto.py", table: "table.py",
+  engine: "engine.py", encryption: "crypto.py", table: "table.py", changes: "changes.py",
 };
 
 let panel = null;

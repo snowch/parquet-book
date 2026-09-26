@@ -6,3 +6,7 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 publish = false
+
+# The book's own reader, for the steps of chapters that come after it is built.
+[dependencies]
+parquet-lab = { path = "../crates/parquet-lab" }

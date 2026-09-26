@@ -1296,3 +1296,146 @@ fn the_log_lists_exactly_the_files_a_listing_finds() {
         assert_eq!(f.partition, parquet_lab::table::partition_values(&f.key));
     }
 }
+
+// ---- ch15: a changing table ---------------------------------------------------------------
+
+fn changes() -> (Json, MemoryStore) {
+    let listing =
+        Json::parse(&std::fs::read_to_string(root().join("fixtures/changes.json")).unwrap())
+            .unwrap();
+    let mut store = MemoryStore::new();
+    for o in listing.get("objects").and_then(Json::as_array).unwrap() {
+        let key = o.get("key").and_then(Json::as_str).unwrap();
+        store.put(
+            key,
+            std::fs::read(root().join("fixtures").join(key)).unwrap(),
+        );
+    }
+    (listing, store)
+}
+
+#[test]
+fn every_snapshot_scans_to_what_pyarrow_counts() {
+    // pyarrow read each snapshot's data files and took out the positions its delete files name.
+    let (listing, store) = changes();
+    let answers = listing.get("snapshots").unwrap();
+    let Json::Obj(answers) = answers else {
+        panic!("no answers")
+    };
+    for (id, expected) in answers {
+        let s = parquet_lab::changes::scan_table(
+            store.clone(),
+            "changes/",
+            id,
+            4,
+            NetworkModel::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            s.live_rows,
+            expected.get("live_rows").and_then(Json::as_i64).unwrap(),
+            "{id}"
+        );
+        assert_eq!(
+            s.sum_amount_cents,
+            expected
+                .get("sum_amount_cents")
+                .and_then(Json::as_i64)
+                .unwrap(),
+            "{id}"
+        );
+        let files = s.snapshot.data_files.len() + s.snapshot.delete_files.len();
+        assert_eq!(
+            s.requests.len(),
+            files + 1,
+            "{id}: the snapshots, then each file once"
+        );
+    }
+}
+
+#[test]
+fn a_lookup_finds_every_live_order_and_no_deleted_one() {
+    let (listing, store) = changes();
+    let deleted: Vec<i64> = listing
+        .get("deleted")
+        .and_then(Json::as_array)
+        .unwrap()
+        .iter()
+        .map(|j| j.as_i64().unwrap())
+        .collect();
+    for (id, gone) in [
+        ("written", &deleted[..0]),
+        ("copy-on-write", &deleted[..1]),
+        ("merge-on-read-2", &deleted[..2]),
+        ("after-a-day", &deleted[..]),
+        ("compacted", &deleted[..]),
+    ] {
+        let last = if id == "after-a-day" || id == "compacted" {
+            960
+        } else {
+            800
+        };
+        for key in (1..=last + 1).step_by(7).chain(deleted.iter().copied()) {
+            let l = parquet_lab::changes::lookup(
+                store.clone(),
+                "changes/",
+                id,
+                key,
+                0,
+                1,
+                NetworkModel::default(),
+            )
+            .unwrap_or_else(|e| panic!("{id} {key}: {e}"));
+            let live = key <= last && !gone.contains(&key);
+            assert_eq!(!l.row.is_empty(), live, "{id} {key}");
+            if live {
+                assert_eq!(l.row[0], ("order_id".to_string(), Json::Int(key)), "{id}");
+            }
+            // A merge-on-read snapshot still holds the row; a delete file takes it out.
+            if gone.contains(&key) && id.starts_with("merge")
+                || id == "after-a-day" && gone.contains(&key)
+            {
+                assert!(l.found.is_some() && l.deleted_by.is_some(), "{id} {key}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_compaction_planner_rewrites_what_the_compacted_snapshot_replaced() {
+    use parquet_lab::changes::{compaction_cost, plan_compaction, read_snapshots};
+    let text = std::fs::read_to_string(root().join("fixtures/changes/_snapshots.json")).unwrap();
+    let snapshots = read_snapshots(&text).unwrap();
+    let find = |id: &str| snapshots.iter().find(|s| s.id == id).unwrap();
+    let plan = plan_compaction(find("after-a-day"), 200, 100);
+    assert_eq!(plan.len(), 3);
+    let cost = compaction_cost(
+        find("after-a-day"),
+        find("compacted"),
+        &plan,
+        NetworkModel::default(),
+    )
+    .unwrap();
+    assert_eq!(cost.outputs.len(), 3);
+    // Nothing is left to plan once the table is compacted.
+    assert!(plan_compaction(find("compacted"), 200, 100).is_empty());
+}
+
+#[test]
+fn a_position_delete_file_names_the_order_it_deletes() {
+    let (listing, _) = changes();
+    let deleted = listing.get("deleted").and_then(Json::as_array).unwrap();
+    for (n, order) in deleted.iter().enumerate() {
+        let bytes =
+            std::fs::read(root().join(format!("fixtures/changes/deletes/delete-{n:02}.parquet")))
+                .unwrap();
+        let rows = parquet_lab::changes::read_position_deletes(&bytes).unwrap();
+        assert_eq!(rows.len(), 1);
+        let (path, pos) = &rows[0];
+        let data = std::fs::read(root().join("fixtures/changes").join(path)).unwrap();
+        let ids = parquet_lab::engine::run(&data, "SELECT order_id FROM orders")
+            .unwrap()
+            .rows;
+        assert_eq!(ids[*pos as usize][0].to_json().as_i64(), order.as_i64());
+    }
+}

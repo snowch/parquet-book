@@ -175,10 +175,25 @@ the structure by hand, build it into the reader, then ask a library (PLAN.md, se
 - ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): no *Building it*, no coding problems,
   two questions to reason about. It keeps its layouts lab and ends on the same eight orders as
   a Parquet file pyarrow wrote (`eight-orders.parquet`), with the reader's map of its regions.
-- ch02 ends *Building it* with "Ask a library": `with_a_library`, pyarrow's `read_metadata` in
+- ch02 ends *Building it* with "Ask a library": `footer_with_a_library`, pyarrow's `read_metadata` in
   Python (run in the page, pyarrow loaded under Pyodide on first run) and the `parquet` crate in
   Rust (`walkthroughs/libraries`, a workspace of its own). The test checks both against the
   manifest; the browser test runs the pyarrow step in the page.
+
+## Done: ch15, changing a table
+
+Written in the new shape from the start. `fixtures/changes/` is a pyarrow-written table with
+snapshots: written, deleted from by copy-on-write and by Iceberg-shaped position delete files,
+appended to in small batches, and compacted. The reader's `changes` module scans a snapshot
+applying its deletes, looks up one order through the snapshots, trailer, footer, page index and
+pages (ch10's `scan_in` on a shared store), plans a compaction, and checks the plan against the
+`compacted` snapshot. Figures measure a lookup against a key-value store's one request, the write
+and read amplification of the two ways to delete, scans as deletes and small files pile up, and
+how many scans a compaction takes to pay for itself. Walkthroughs read the snapshots and a delete
+file by hand; the library step applies the deletes with pyarrow and the `parquet` crate.
+
+Could follow: equality deletes and deletion vectors beside position deletes; snapshot expiry and
+what it frees; two writers racing a compaction, with one commit retried.
 
 ## Now: every chapter in the new shape
 
@@ -186,18 +201,14 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. **Changing a table** (new, after lakehouse_and_beyond), written in the new shape from the
-   start: where Parquet works badly (a point lookup's cost floor, updates by copy-on-write, merge-on-read
-   delete files and the read cost they add, many small files) and the costs of the fixes
-   (compaction's writes, snapshot expiry, concurrent writers), each measured.
-2. ch03: decode a few Thrift fields of the footer by hand; `ParquetFile.schema`, `schema_arrow`,
+1. ch03: decode a few Thrift fields of the footer by hand; `ParquetFile.schema`, `schema_arrow`,
    and the crate's `SchemaDescriptor`.
-3. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
-4. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
+2. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
+3. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
    `encodings`, `compression` and sizes from both libraries.
-5. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
+4. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
    `pq.read_table` compared with the reader's plan.
-6. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+5. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

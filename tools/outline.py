@@ -266,6 +266,15 @@ _CHAPTERS = (
         ("table",),
         ("table.json",),
     ),
+    (
+        "changing_a_table",
+        "Changing a table",
+        "beyond_one_file",
+        "What does it cost to find one row, or change one, in a table of Parquet files?",
+        "A table read through its snapshots: lookups, position delete files applied in a scan, and a compaction planner.",
+        ("changes",),
+        ("changes.json",),
+    ),
 )
 
 CHAPTERS = tuple(
@@ -309,4 +318,5 @@ EXPERIMENTS = (
     "engine",
     "encryption",
     "table",
+    "changes",
 )

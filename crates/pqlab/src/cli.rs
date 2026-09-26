@@ -26,6 +26,7 @@ pub const USAGE: &str = "usage:
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
   pqlab table LISTING SQL [--discovery list|prune|log] [--connections N]
+  pqlab changes LISTING [--snapshot ID] [--lookup ORDER_ID | --compact [--target-rows N] [--small-rows N]] [--prefetch BYTES] [--connections N]
   pqlab encryption FILE
   pqlab query FILE SQL
   pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N] [--connections N] [--gap BYTES] [--chunks] [--use statistics,bloom,page-index] [--latency-us N] [--bandwidth N]
@@ -35,6 +36,30 @@ pub const USAGE: &str = "usage:
   pqlab interpret FILE OFFSET
   pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
   pqlab figures [--out DIR] [--check]";
+
+/// Every object a table's listing names (ch14, ch15), read from beside the listing, by key.
+fn listed(
+    listing: &str,
+    read: &dyn Fn(&str) -> Result<Vec<u8>, String>,
+) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let path = PathBuf::from(listing);
+    let json = Json::parse(&String::from_utf8_lossy(&read(listing)?))
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    let mut objects = Vec::new();
+    for o in json
+        .get("objects")
+        .and_then(Json::as_array)
+        .ok_or("the listing has no objects")?
+    {
+        let key = o
+            .get("key")
+            .and_then(Json::as_str)
+            .ok_or("an object with no key")?;
+        objects.push((key.to_string(), read(&dir.join(key).display().to_string())?));
+    }
+    Ok(objects)
+}
 
 fn flag<'a>(args: &'a [String], name: &str) -> Option<&'a str> {
     args.iter()
@@ -66,24 +91,7 @@ pub fn run(
     match command {
         "table" => {
             use parquet_lab::table::Discovery;
-            let listing_path = PathBuf::from(file()?);
-            let listing = Json::parse(&String::from_utf8_lossy(&read(
-                &listing_path.display().to_string(),
-            )?))
-            .map_err(|e| format!("{}: {e}", listing_path.display()))?;
-            let dir = listing_path.parent().unwrap_or(Path::new("."));
-            let mut objects = Vec::new();
-            for o in listing
-                .get("objects")
-                .and_then(Json::as_array)
-                .ok_or("the listing has no objects")?
-            {
-                let key = o
-                    .get("key")
-                    .and_then(Json::as_str)
-                    .ok_or("an object with no key")?;
-                objects.push((key.to_string(), read(&dir.join(key).display().to_string())?));
-            }
+            let objects = listed(file()?, read)?;
             let sql = args.get(2).ok_or("table needs SQL, in quotes")?;
             let (mut discovery, mut connections) = (Discovery::Log, 4);
             let mut i = 3;
@@ -115,6 +123,38 @@ pub fn run(
                     sql,
                     discovery,
                     connections,
+                    NetworkModel::default()
+                )
+                .to_json_pretty()
+            );
+        }
+        "changes" => {
+            use parquet_lab::changes::Operation;
+            let objects = listed(file()?, read)?;
+            let op = match (
+                flag(args, "--lookup"),
+                args.iter().any(|a| a == "--compact"),
+            ) {
+                (Some(k), false) => Operation::Lookup(
+                    k.parse()
+                        .map_err(|_| format!("--lookup wants an order_id, not {k:?}"))?,
+                ),
+                (None, true) => Operation::Compact {
+                    target_rows: number(args, "--target-rows", 200)? as i64,
+                    small_rows: number(args, "--small-rows", 100)? as i64,
+                },
+                (None, false) => Operation::Scan,
+                (Some(_), true) => return Err("--lookup or --compact, not both".into()),
+            };
+            out!(
+                out,
+                "{}",
+                report::changes(
+                    objects,
+                    flag(args, "--snapshot").unwrap_or("written"),
+                    op,
+                    number(args, "--prefetch", 0)?,
+                    number(args, "--connections", 4)? as usize,
                     NetworkModel::default()
                 )
                 .to_json_pretty()

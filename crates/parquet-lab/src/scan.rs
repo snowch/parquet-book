@@ -159,14 +159,28 @@ pub fn scan(
     let mut inner = MemoryStore::new();
     inner.put(key, object.to_vec());
     let mut store = TracingStore::with_connections(inner, model, strategy.connections);
+    scan_in(&mut store, object, key, query, strategy)
+}
+
+/// [`scan`], in a store that other requests share: a table's reader opens one of its files
+/// (ch15). `object` is the file's bytes, which the store holds under `key`; the result's
+/// requests and totals are the whole store's.
+pub fn scan_in(
+    store: &mut TracingStore<MemoryStore>,
+    object: &[u8],
+    key: &str,
+    query: &Query,
+    strategy: Strategy,
+) -> Result<ScanResult, String> {
     let mut have = Fetched {
         bytes: vec![0; object.len()],
         have: Vec::new(),
     };
 
     // Phase 1: the footer. Every byte the footer read returned is now the reader's.
-    let footer = read_footer(&mut store, key, strategy.footer).map_err(|e| e.to_string())?;
-    for r in &store.requests {
+    let before = store.requests.len();
+    let footer = read_footer(store, key, strategy.footer).map_err(|e| e.to_string())?;
+    for r in store.requests[before..].iter().filter(|r| r.key == key) {
         if let Some(span) = r.returned {
             let s = span.start as usize..span.end as usize;
             have.add(span, &object[s]);
@@ -235,7 +249,7 @@ pub fn scan(
             }
         }
         planned += fetch(
-            &mut store,
+            store,
             key,
             &mut have,
             wanted,
@@ -288,7 +302,7 @@ pub fn scan(
     };
     let wanted: Vec<Span> = groups.iter().flat_map(|g| g.2.clone()).collect();
     planned += fetch(
-        &mut store,
+        store,
         key,
         &mut have,
         wanted,
@@ -414,7 +428,7 @@ pub fn scan(
         elapsed_us: store.elapsed_us(),
         bytes_fetched: store.bytes_returned(),
         bytes_planned: planned,
-        requests: store.requests,
+        requests: store.requests.clone(),
         rows_decoded,
         matches,
         rows,

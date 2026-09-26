@@ -173,6 +173,24 @@ def cases():
         for discovery, flag in (("list", "list"), ("prune", "prune"), ("log", "log")):
             calls.append({"call": "table", "keys": keys, "sql": q["sql"], "discovery": discovery})
             native.append(("table", "fixtures/table.json", q["sql"], "--discovery", flag))
+    listing = json.loads((ROOT / "fixtures" / "changes.json").read_text())
+    keys = [o["key"] for o in listing["objects"]]
+    for snapshot in listing["snapshots"]:
+        calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "op": "scan", "options": {}})
+        native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot))
+        for key in (250, 300, 805):
+            calls.append(
+                {
+                    "call": "changes",
+                    "keys": keys,
+                    "snapshot": snapshot,
+                    "op": "lookup",
+                    "options": {"key": key},
+                }
+            )
+            native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--lookup", str(key)))
+        calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "op": "compact", "options": {}})
+        native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--compact"))
     calls.append({"call": "query", "file": "fixtures/tiny.parquet", "sql": "SELECT nonsense FROM"})
     native.append(("query", "fixtures/tiny.parquet", "SELECT nonsense FROM"))
     for columns, row in (([2, 3], -1), ([3], -1), ([0, 1, 2, 3, 4], 3), ([0, 4], -1), ([], -1)):
@@ -231,6 +249,7 @@ CLI = [
         "prune",
     ],
     ["scan", "fixtures/writing-baseline.parquet", "--where", "0", "=", "431"],
+    ["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"],
     ["levels", "fixtures/nested.parquet"],
     ["no-such-command"],
 ]
