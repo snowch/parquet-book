@@ -26,6 +26,12 @@ Edit a file there and run the command in its terminal; `make && make serve` show
 every lab on your edited reader. The configuration is in `.devcontainer/`, and works in any editor
 that supports dev containers.
 
+A Codespace runs on your own GitHub account, not the book's. Personal accounts get a free
+allowance of use each month; past it, GitHub blocks further use unless you have set up billing,
+and then charges you. [GitHub's billing page](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces)
+has the current terms. Stop or delete a Codespace when you are done with it: a stopped one still
+counts against the storage allowance.
+
 ## What you need
 
 At a desk, to read and run the book's reader in Python, Python 3.11 or later is enough: the

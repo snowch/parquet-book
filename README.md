@@ -42,6 +42,13 @@ including a headless-browser test of the experiments if Playwright is installed.
   `make problems` and `make serve` then work as they do at a desk. The same configuration
   (`.devcontainer/`) works in any editor that supports dev containers.
 
+  A Codespace runs on your own GitHub account, not the book's. Personal accounts get a free
+  allowance of use each month; past it, GitHub blocks further use unless you have set up billing,
+  and then charges you. See
+  [GitHub's Codespaces billing](https://docs.github.com/en/billing/concepts/product-billing/github-codespaces),
+  and stop or delete a Codespace when you are done with it. The dev container asks for the
+  smallest machine, which uses the allowance slowest.
+
 ## Use the reader
 
 ```bash

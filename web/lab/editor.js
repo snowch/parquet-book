@@ -12,7 +12,7 @@
 
 import { KEYS, codeArea } from "./code.js";
 import { saveEdits } from "./python.js";
-import { CODESPACES } from "./workbench.js";
+import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 
 /** The module each lab's chapter builds, which the editor opens first. */
 const MODULE = {
@@ -52,6 +52,7 @@ export function openRustEditor(labEl, usePython) {
         every lab runs your edited reader. <code>cargo test -p parquet-lab</code> checks your edit
         against what pyarrow wrote.</li>
     </ol>
+    <p class="workbench-note">${CODESPACES_COST}</p>
     <div class="workbench-bar"><button type="button" class="primary" data-act="python">Edit the Python reader here instead</button></div>`;
   el.onclick = (e) => {
     const act = e.target.closest("button[data-act]")?.dataset.act;
@@ -91,7 +92,7 @@ function build(lab, remount) {
     <pre class="editor-error" hidden></pre>
     <p class="workbench-note">${KEYS}. Every lab on this page runs on the edited reader until you
       restore it. To edit and run the Rust reader online, open the repository in
-      <a href="${CODESPACES}" target="_blank" rel="noopener">GitHub Codespaces</a>.</p>`;
+      <a href="${CODESPACES}" target="_blank" rel="noopener">GitHub Codespaces</a>. ${CODESPACES_COST}</p>`;
   const select = el.querySelector("select");
   const status = el.querySelector(".status");
   const error = el.querySelector(".editor-error");

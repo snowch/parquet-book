@@ -15,6 +15,17 @@ import { fetchText } from "./pyodide.js";
 import { runPython, savedAnswers, stopPython } from "./runner.js";
 
 export const CODESPACES = "https://codespaces.new/snowch/parquet-book?quickstart=1";
+const BILLING = "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces";
+
+/**
+ * What a Codespace costs, said wherever the page offers one: it runs on the reader's own GitHub
+ * account, not the book's. The allowance and prices are GitHub's to change, so the note links to
+ * them rather than quoting them.
+ */
+export const CODESPACES_COST = "A Codespace runs on your own GitHub account. Personal accounts get a free " +
+  "allowance of use each month; past it, GitHub blocks further use unless you have set up billing, and " +
+  `then charges you (<a href="${BILLING}" target="_blank" rel="noopener">GitHub's terms</a>). Stop or ` +
+  "delete the Codespace when you are done, since a stopped one still uses its storage allowance.";
 
 const key = (chapter) => `problems:${chapter}`;
 
@@ -56,7 +67,7 @@ export async function mountWorkbench(el) {
       Solving in Rust instead? Open the repository in
       <a href="${CODESPACES}" target="_blank" rel="noopener">GitHub Codespaces</a>, an editor and the
       Rust toolchain in your browser, and run
-      <code>cargo test -p exercises --test ${escape(chapter)} -- --ignored</code>.</p>`;
+      <code>cargo test -p exercises --test ${escape(chapter)} -- --ignored</code>. ${CODESPACES_COST}</p>`;
   const status = el.querySelector(".status");
   const results = el.querySelector(".results");
   const output = el.querySelector(".output");

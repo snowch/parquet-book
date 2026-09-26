@@ -11,6 +11,9 @@
     "ghcr.io/devcontainers/features/python:1": { "version": "3.11" },
     "ghcr.io/devcontainers/features/node:1": { "version": "22" }
   },
+  // The smallest machine: a Codespace runs on the reader's own GitHub account, and a larger one
+  // uses its free monthly allowance faster.
+  "hostRequirements": { "cpus": 2 },
   "postCreateCommand": "rustup show && make install && npm install -g playwright@1.56.1 && playwright install --with-deps chromium && cargo build --workspace",
   "forwardPorts": [8000],
   "portsAttributes": {

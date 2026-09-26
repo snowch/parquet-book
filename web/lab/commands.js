@@ -21,7 +21,7 @@
 import { Lab } from "./wasm.js";
 import { packageList } from "./pyodide.js";
 import { runPython, stopPython } from "./runner.js";
-import { CODESPACES } from "./workbench.js";
+import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 
 /** A shell line as words: quotes group, a backslash escapes the next character. */
 function words(line) {
@@ -194,7 +194,8 @@ function mountCodespace(pre, lines) {
   box.dataset.codespace = "true";
   const open = button(box, "Open in Codespaces",
     "Rust needs a compiler, which a page does not have. A Codespace is the repository with its " +
-    "toolchains and an editor, in your browser: edit the code and run this there.");
+    "toolchains and an editor, in your browser: edit the code and run this there. It runs on your own " +
+    "GitHub account, within its free monthly allowance or at GitHub's charges past it.");
   const note = document.createElement("p");
   note.className = "run-note";
   note.hidden = true;
@@ -210,9 +211,9 @@ function mountCodespace(pre, lines) {
     note.hidden = false;
     const then = "edit any file first to run it on your change. The first start takes a few minutes, " +
       "while it installs the toolchains.";
-    note.textContent = copied
+    note.innerHTML = (copied
       ? `Copied the command. When the Codespace has started, paste it into its terminal; ${then}`
-      : `When the Codespace has started, run this command in its terminal; ${then}`;
+      : `When the Codespace has started, run this command in its terminal; ${then}`) + ` ${CODESPACES_COST}`;
   });
 }
 
