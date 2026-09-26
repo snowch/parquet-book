@@ -138,7 +138,9 @@ def _problems(node: dict) -> str:
 
 def _code(node: dict) -> str:
     lang = node.get("lang") or ""
-    code = str(node.get("value", ""))
+    # One blank line at most: an excerpt that spans two definitions keeps the two blank lines the
+    # formatter puts between them in the source, and on a phone every line counts.
+    code = re.sub(r"\n(?:[ \t]*\n){2,}", "\n\n", str(node.get("value", "")))
     body = highlight(code, lang)
     cls = f' class="language-{html.escape(lang)}"' if lang else ""
     return f"<pre><code{cls}>{body}</code></pre>"

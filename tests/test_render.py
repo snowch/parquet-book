@@ -57,3 +57,8 @@ def test_highlighting_colours_rust_and_escapes_it():
 
 def test_an_unknown_language_is_shown_uncoloured():
     assert highlight("a < b", "brainfuck") == "a &lt; b"
+
+
+def test_code_shows_one_blank_line_at_most():
+    out = render({"type": "code", "lang": "", "value": "def a():\n    pass\n\n\ndef b():\n    pass"})
+    assert "pass\n\ndef b" in out and "\n\n\n" not in out
