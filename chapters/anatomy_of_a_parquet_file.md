@@ -88,6 +88,17 @@ byte first, which is what *little-endian* means:
 
 That number is the length of the footer: the file's map of everything else in it.
 
+:::{note} Why little-endian?
+Some byte order had to be fixed, so that a file written on one machine reads the same on any
+other. The specification states the order and gives no reason, but the likely one is the
+hardware. Parquet was designed in 2013 for Hadoop clusters of x86 servers, and x86 processors are
+little-endian, as nearly every server, laptop and phone processor is today. A number stored in
+the processor's own order can be copied from the file into memory and used as it is: a page of
+plain integers becomes an array in one copy, with no bytes to swap. The other order, big-endian,
+is what network protocols use, and would make every reader on common hardware reverse every
+value it reads. Apache Arrow, which Parquet is often read into, made the same choice.
+:::
+
 **Where the footer is.** The footer ends where the last eight bytes begin, and it is as long as
 they say, so it starts that many bytes earlier:
 
