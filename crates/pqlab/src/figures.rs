@@ -31,8 +31,12 @@ const FIGURES: &[Figure] = &[
         render: layouts_costs,
     },
     Figure {
+        file: "eight-orders-regions.md",
+        render: |root| regions(root, "eight-orders.parquet"),
+    },
+    Figure {
         file: "tiny-regions.md",
-        render: tiny_regions,
+        render: |root| regions(root, "tiny.parquet"),
     },
     Figure {
         file: "tiny-trailer.md",
@@ -310,8 +314,8 @@ fn metadata(bytes: &[u8]) -> Result<FileMetaData, String> {
     open_bytes(bytes)
 }
 
-fn tiny_regions(root: &Path) -> Result<String, String> {
-    let name = "tiny.parquet";
+/// Every region of a file, in order: the magic, each row group and its column chunks, the footer.
+fn regions(root: &Path, name: &str) -> Result<String, String> {
     let bytes = fixture(root, name)?;
     let size = bytes.len() as u64;
     let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();

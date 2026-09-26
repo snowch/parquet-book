@@ -377,7 +377,33 @@ ORDERS = _orders(256)
 CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
 
 
+#: ch01's eight orders, as a pipeline would hold them before writing them out. The same rows as
+#: the layouts lab's table (``Table.sales()``); python/tests/test_fixtures.py holds them equal.
+#: pyarrow infers a nullable schema, and the lab's table has no nulls, so every column is then
+#: made required, as in tiny.parquet.
+EIGHT_ORDERS = pa.table(
+    {
+        "order_id": pa.array([1, 2, 3, 4, 5, 6, 7, 8], pa.int64()),
+        "customer_id": pa.array([501, 502, 501, 503, 504, 502, 505, 501], pa.int64()),
+        "country": pa.array(["UK", "SE", "UK", "PL", "US", "SE", "UK", "UK"]),
+        "amount_cents": pa.array([1999, 500, 4210, 1250, 875, 3000, 640, 2275], pa.int64()),
+        "order_date": pa.array([datetime.date(2026, 1, d) for d in (3, 3, 4, 4, 5, 5, 6, 6)]),
+    }
+)
+EIGHT_ORDERS = EIGHT_ORDERS.cast(pa.schema([f.with_nullable(False) for f in EIGHT_ORDERS.schema]))
+
+
 FIXTURES = (
+    Fixture(
+        name="eight-orders",
+        why=(
+            "ch01's table: the eight orders its layouts lab stores by rows and by columns, "
+            "written as Parquet with the same settings as tiny.parquet. Each column lands in "
+            "the file as one contiguous chunk, which is the column layout, and ch01 ends by "
+            "showing where."
+        ),
+        table=EIGHT_ORDERS,
+    ),
     Fixture(
         name="tiny",
         why=(

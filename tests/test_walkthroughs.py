@@ -1,7 +1,9 @@
 """A chapter's walkthrough steps (walkthroughs/) run, in both languages, and say what is true.
 
 A walkthrough is a few lines the chapter asks you to run and change before it builds the reader:
-reading a file's bytes by hand. Each Python step has a Rust twin of the same name. Both run
+reading a file's bytes by hand, and then reading the same facts with a library (pyarrow, and the
+``parquet`` crate in ``walkthroughs/libraries``, a workspace of its own so that the book's reader
+keeps no dependencies). Each Python step has a Rust twin of the same name. Both run
 from the repository's root, and both must print what pyarrow's manifest says about the fixture.
 They print in their own language's idiom (``b'PAR1'`` and ``"PAR1"``), so the check is on the
 facts in the output, derived here from the manifest, never on the text.
@@ -20,6 +22,20 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 PYTHON = ROOT / "walkthroughs" / "python"
 RUST = ROOT / "walkthroughs" / "src" / "bin"
+LIBRARIES = ROOT / "walkthroughs" / "libraries"
+
+
+def rust_step(step: str) -> Path:
+    """A Rust step's source: the walkthroughs crate's, or the library workspace's."""
+    by_hand = RUST / f"{step}.rs"
+    return by_hand if by_hand.exists() else LIBRARIES / "src" / "bin" / f"{step}.rs"
+
+
+def rust_binary(step: str) -> Path:
+    target = ROOT if (RUST / f"{step}.rs").exists() else LIBRARIES
+    return target / "target" / "debug" / step
+
+
 STEPS = sorted((p.parent.name, p.stem) for p in PYTHON.glob("*/*.py"))
 
 
@@ -46,6 +62,15 @@ def facts(chapter: str, step: str) -> list[str]:
             data[start : start + 8].hex(" "),
         ],
         ("anatomy_of_a_parquet_file", "damaged_length"): [str(damaged_length), str(n - 8 - damaged_length)],
+        ("anatomy_of_a_parquet_file", "with_a_library"): [
+            f"footer length: {length}",
+            f"rows: {manifest['num_rows']} in {manifest['num_row_groups']} row group",
+            *(
+                f"column chunk {c['path']}: bytes {start} to {start + c['total_compressed_size']}"
+                for c in manifest["row_groups"][0]["columns"]
+                for start in [c["dictionary_page_offset"] or c["data_page_offset"]]
+            ),
+        ],
     }
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     return known[(chapter, step)]
@@ -54,11 +79,12 @@ def facts(chapter: str, step: str) -> list[str]:
 @pytest.fixture(scope="module")
 def built():
     subprocess.run(["cargo", "build", "--quiet", "-p", "walkthroughs"], cwd=ROOT, check=True)
+    subprocess.run(["cargo", "build", "--quiet"], cwd=LIBRARIES, check=True)
 
 
 def test_every_step_has_a_twin():
     python = {step for _, step in STEPS}
-    rust = {p.stem for p in RUST.glob("*.rs")}
+    rust = {p.stem for p in [*RUST.glob("*.rs"), *(LIBRARIES / "src" / "bin").glob("*.rs")]}
     assert python == rust, f"only in Python: {python - rust}; only in Rust: {rust - python}"
 
 
@@ -71,9 +97,7 @@ def test_a_step_prints_the_same_facts_in_both_languages(built, chapter, step):
         text=True,
         check=True,
     ).stdout
-    rs = subprocess.run(
-        [str(ROOT / "target" / "debug" / step)], cwd=ROOT, capture_output=True, text=True, check=True
-    ).stdout
+    rs = subprocess.run([str(rust_binary(step))], cwd=ROOT, capture_output=True, text=True, check=True).stdout
     for fact in facts(chapter, step):
         assert fact in py.replace("True", "true"), f"Python {step} should print {fact!r}:\n{py}"
         assert fact in rs, f"Rust {step} should print {fact!r}:\n{rs}"
@@ -83,7 +107,7 @@ def test_a_step_prints_the_same_facts_in_both_languages(built, chapter, step):
 def test_a_step_is_in_its_chapter_in_both_languages(chapter, step):
     text = (ROOT / "chapters" / f"{chapter}.md").read_text()
     python = f"```{{literalinclude}} ../walkthroughs/python/{chapter}/{step}.py"
-    rust = f"```{{literalinclude}} ../walkthroughs/src/bin/{step}.rs"
+    rust = f"```{{literalinclude}} ../{rust_step(step).relative_to(ROOT)}"
     assert python in text and rust in text, f"quote {step} in both languages in chapters/{chapter}.md"
     # The two sit in one tab set, Python first.
     between = text[text.index(python) : text.index(rust)]

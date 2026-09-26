@@ -1,0 +1,20 @@
+# The walkthrough steps that use a library: the same facts the hand-written steps and the book's
+# reader find, from the Rust implementation of Parquet (the `parquet` crate). It is a workspace of
+# its own so that the book's reader, and everything built with it, keeps no dependencies: nothing
+# here is compiled by `cargo test --workspace` at the root, or into the page.
+#
+#     cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin <step>
+
+[package]
+name = "walkthroughs-libraries"
+description = "Walkthrough steps that read Parquet with a library, beside the steps that read it by hand."
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+# The format only, without Arrow, async or compression codecs: these steps read a footer.
+parquet = { version = "60", default-features = false }
+
+[workspace]

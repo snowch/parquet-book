@@ -225,8 +225,9 @@ function mountCodespace(pre, lines) {
 /**
  * A chapter's walkthrough steps: short programs quoted from walkthroughs/ that ask you to run them
  * and change them. A Python step can be edited in place and run in the page's Python worker, from
- * the repository's root, where the fixtures are; a Rust step opens a Codespace with its
- * `cargo run` command copied, since the page cannot compile Rust.
+ * the repository's root, where the fixtures are (a step that imports pyarrow loads it then); a
+ * Rust step opens a Codespace with its `cargo run` command copied, since the page cannot
+ * compile Rust.
  */
 function mountWalkthroughs(root) {
   for (const figure of root.querySelectorAll("figure.walkthrough[data-file]")) {
@@ -235,7 +236,11 @@ function mountWalkthroughs(root) {
     if (!pre || pre.parentElement.classList.contains("runnable")) continue;
     if (file.endsWith(".rs")) {
       const bin = file.split("/").pop().replace(/\.rs$/, "");
-      mountCodespace(pre, [`cargo run -q -p walkthroughs --bin ${bin}`]);
+      // A step that uses a library is in walkthroughs/libraries, a workspace of its own.
+      const crate = file.startsWith("walkthroughs/libraries/")
+        ? "--manifest-path walkthroughs/libraries/Cargo.toml"
+        : "-p walkthroughs";
+      mountCodespace(pre, [`cargo run -q ${crate} --bin ${bin}`]);
       continue;
     }
     const original = pre.textContent.replace(/\n$/, "");

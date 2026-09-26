@@ -30,6 +30,12 @@ CHAPTER_SHAPE = (
     "Where to go next",
 )
 
+#: Chapters that build nothing: they set up the question the book answers, before there is a
+#: Parquet file to open. An introduction has every heading but *Building it*, its problems are
+#: questions to reason about rather than tests, and its labs still run on both engines. The
+#: book's method (by hand, then the reader, then a library) starts with the first real file.
+INTRODUCTIONS = frozenset({"why_parquet_exists"})
+
 #: What a page carries until it is written. Everything that reports progress keys off it.
 UNWRITTEN = "[To write"
 
@@ -64,6 +70,15 @@ class Chapter:
     @property
     def anchor(self) -> str:
         return self.slug.replace("_", "-")
+
+    @property
+    def introduction(self) -> bool:
+        return self.slug in INTRODUCTIONS
+
+    @property
+    def shape(self) -> tuple[str, ...]:
+        """The chapter's headings, in order: CHAPTER_SHAPE, less *Building it* for an introduction."""
+        return tuple(h for h in CHAPTER_SHAPE if not (self.introduction and h == "Building it"))
 
     @property
     def label(self) -> str:
@@ -115,7 +130,7 @@ _CHAPTERS = (
         "Why store a table one column at a time, when every program thinks in rows?",
         "A tiny table stored both ways, and a count of the bytes each query must touch.",
         ("layouts",),
-        (),
+        ("eight-orders.parquet",),
     ),
     (
         "anatomy_of_a_parquet_file",

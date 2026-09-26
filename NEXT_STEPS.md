@@ -165,9 +165,40 @@ reader's numbers too.
 ch02's experiment now opens with "Read the bytes yourself": five steps, in Python and Rust
 (`walkthroughs/`), that read the magic at both ends, the footer length and where the footer
 starts, then damage the length. In the page each Python step can be edited and run; each Rust
-step opens a Codespace. Candidates for the same treatment, once ch02 has been tried on a phone:
-ch03 (decode a few Thrift fields of the footer by hand), ch04 (levels from a page by hand), ch05
-(a PLAIN page, then a dictionary page, by hand).
+step opens a Codespace.
+
+## Done: code first, for data engineers (ch01, ch02)
+
+The book's readers are data engineers, and code is their interface, so the method is now: read
+the structure by hand, build it into the reader, then ask a library (PLAN.md, section 1).
+
+- ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): no *Building it*, no coding problems,
+  two questions to reason about. It keeps its layouts lab and ends on the same eight orders as
+  a Parquet file pyarrow wrote (`eight-orders.parquet`), with the reader's map of its regions.
+- ch02 ends *Building it* with "Ask a library": `with_a_library`, pyarrow's `read_metadata` in
+  Python (run in the page, pyarrow loaded under Pyodide on first run) and the `parquet` crate in
+  Rust (`walkthroughs/libraries`, a workspace of its own). The test checks both against the
+  manifest; the browser test runs the pyarrow step in the page.
+
+## Now: every chapter in the new shape
+
+In order, each a walkthrough by hand at the start of the experiment and an "Ask a library" step
+at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
+where a picture beats printed output, and trimmed or cut elsewhere:
+
+1. **Changing a table** (new, after lakehouse_and_beyond), written in the new shape from the
+   start: where Parquet works badly (a point lookup's cost floor, updates by copy-on-write, merge-on-read
+   delete files and the read cost they add, many small files) and the costs of the fixes
+   (compaction's writes, snapshot expiry, concurrent writers), each measured.
+2. ch03: decode a few Thrift fields of the footer by hand; `ParquetFile.schema`, `schema_arrow`,
+   and the crate's `SchemaDescriptor`.
+3. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
+4. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
+   `encodings`, `compression` and sizes from both libraries.
+5. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
+   `pq.read_table` compared with the reader's plan.
+6. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+   it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page
 

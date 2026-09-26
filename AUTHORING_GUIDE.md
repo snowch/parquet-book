@@ -43,17 +43,27 @@ Writing the prose first produces a chapter that explains what you meant to build
 `tools/outline.CHAPTER_SHAPE`, and not negotiable; `tests/test_book.py` fails a chapter that adds or
 loses one. A section the chapter needs and the shape lacks is a `###` inside one of them.
 
+An introduction (`tools/outline.INTRODUCTIONS`, ch01 alone) drops *Building it*: it comes before
+there is a file to open, quotes no reader code, and its problems are questions with no tests,
+each saying what a good answer contains. Keep it light. Do not add an introduction to dodge
+building something.
+
 **The question** is one question in one sentence, then a paragraph on why the previous chapter
 leaves it open. The outline holds the question; the page expands it.
 
-**The experiment** opens on a `lab` block, then a numbered list of things to try, each saying what
+**The experiment** opens with a walkthrough (below): the reader reads the chapter's structure out
+of a fixture by hand, in a few lines of code they run and change. The audience is data engineers,
+and code is their interface; lead with it. Then show the reader's view of the same bytes:
+generated tables, and a `lab` block where a picture beats printed output (a byte map, a request
+timeline, row groups lit by a predicate), with a numbered list of things to try, each saying what
 to click and what to look for. Write it so a reader who does each step in order discovers the
-chapter's point before being told it. Follow it with the generated tables that record what the
-experiment shows, and short sections that name what was seen.
+chapter's point before being told it. Finish with short sections that name what was seen.
 
 **Building it** quotes the code the experiment ran, in the order it ran. Each quote gets a
 paragraph before it saying what to look for and, where useful, one after it saying what follows.
-End with the command that tests the code against the fixtures.
+End with the command that tests the code against the fixtures, and then `### Ask a library`: a
+walkthrough step that gets the same facts from pyarrow and from the `parquet` crate, so the
+reader leaves knowing the call that does this at work. ch02 is the model.
 
 **What this cannot tell you** is the easiest section to skip and the one that makes the others
 believable. Name what the simulation leaves out, what the fixtures do not contain, and what the
@@ -140,6 +150,16 @@ footer starts, then breaks the length to show why a reader must check what it re
 - Add what each step must print to `tests/test_walkthroughs.py`, derived from the fixture and its
   manifest. The prose that follows a step describes what it printed without typing a number.
 - End with an invitation to change something, and say what to try.
+
+**Ask a library** is a walkthrough step too, named `with_a_library` (or `with_a_library_<what>`
+when a chapter needs more than one): `walkthroughs/python/<slug>/<step>.py` using pyarrow, and its
+Rust twin in `walkthroughs/libraries/src/bin/<step>.rs` using the `parquet` crate. That crate is a
+workspace of its own, the repository's only dependency, kept out of the root workspace so the
+reader stays dependency-free; `scripts/ci-check.sh` formats and lints it. Print the same facts the
+hand-written steps and the reader found, and add them to `tests/test_walkthroughs.py` from the
+manifest. Use the library's metadata API, not a whole-table read, unless the chapter is about
+values. In the page, the first Python run loads pyarrow under Pyodide, which is a large download;
+say so in the prose. The Rust step opens in a Codespace.
 
 ## Problems
 

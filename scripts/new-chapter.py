@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.outline import BY_SLUG, CHAPTER_SHAPE, CHAPTERS, UNWRITTEN  # noqa: E402
+from tools.outline import BY_SLUG, CHAPTERS, UNWRITTEN  # noqa: E402
 
 
 def skeleton(slug: str) -> str:
@@ -38,7 +38,7 @@ def skeleton(slug: str) -> str:
         ),
         "Where to go next": f"{UNWRITTEN}: primary sources.]",
     }
-    sections = "\n\n".join(f"## {h}\n\n{body[h]}" for h in CHAPTER_SHAPE)
+    sections = "\n\n".join(f"## {h}\n\n{body[h]}" for h in c.shape)
     return f"""---
 title: {c.title}
 ---

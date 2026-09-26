@@ -10,6 +10,8 @@
 [workspace]
 resolver = "2"
 members = ["crates/parquet-lab", "crates/parquet-lab-wasm", "crates/pqlab", "exercises", "walkthroughs"]
+# A workspace of its own, with the one dependency in the repository: see its Cargo.toml.
+exclude = ["walkthroughs/libraries"]
 
 [workspace.package]
 version = "0.1.0"

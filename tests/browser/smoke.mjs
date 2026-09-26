@@ -165,7 +165,9 @@ check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.ge
   "a two-column scan: one range per row by rows, one range by columns");
 if (shots) await layouts.screenshot({ path: path.join(shots, "layouts-lab.png") });
 
-// The code tabs: Python first, one choice for every excerpt, remembered across pages.
+// The code tabs: Python first, one choice for every excerpt, remembered across pages. (ch01 is
+// an introduction and quotes no reader code, so this starts on ch03.)
+await page.goto(base + "the-type-system.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "python", "code is shown in Python by default");
 const visible = () => page.locator(".tab-panel").evaluateAll((els) =>
   els.filter((e) => e.offsetParent !== null).map((e) => e.dataset.code));
@@ -530,9 +532,9 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
   check(rust.trim() === deskRust.trim(), "Run on `cargo run -p pqlab` prints, in the page, what the binary prints");
 }
 
-// ch02's walkthrough: short programs that read the file's bytes by hand. A Python step runs in
-// the page and prints the footer length the native reader decodes; an edited step runs the
-// edit; a Rust step offers a Codespace.
+// ch02's walkthrough: short programs that read the file's bytes by hand, then with a library. A
+// Python step runs in the page and prints the footer length the native reader decodes; an edited
+// step runs the edit; the library step runs pyarrow; a Rust step offers a Codespace.
 {
   await page.goto(base + "anatomy-of-a-parquet-file.html");
   const native = JSON.parse(execFileSync("target/debug/pqlab", ["footer", "fixtures/tiny.parquet", "--json"], { encoding: "utf8" }));
@@ -554,6 +556,10 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
   const edited = await runStep(first);
   check(edited.includes("PAR1") && (await first.locator(".status").innerText()).includes("your edited version"),
     "an edited walkthrough step runs the edit");
+  // The step that asks a library loads pyarrow into the page on its first run.
+  const library = await runStep(page.locator('figure.walkthrough[data-file$="with_a_library.py"]'));
+  check(library.includes(`footer length: ${native.trailer.footer_length}`),
+    `the library step runs pyarrow in the page, and it reports the footer length the reader decodes: ${library.split("\n")[0]}`);
   check(await page.locator('figure.walkthrough[data-file$=".rs"] .runnable[data-codespace]').count()
     === await page.locator('figure.walkthrough[data-file$=".py"]').count(),
     "every Rust walkthrough step offers a Codespace");

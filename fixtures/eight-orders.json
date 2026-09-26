@@ -1,0 +1,207 @@
+{
+  "name": "eight-orders",
+  "file": "eight-orders.parquet",
+  "why": "ch01's table: the eight orders its layouts lab stores by rows and by columns, written as Parquet with the same settings as tiny.parquet. Each column lands in the file as one contiguous chunk, which is the column layout, and ch01 ends by showing where.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false
+    }
+  },
+  "file_size": 1155,
+  "sha256": "1064ead40112c949d57fbe6dd9286a83813774e7dc6cf77e01ac53d798fe6c58",
+  "footer_length": 598,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 8,
+  "num_columns": 5,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "customer_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "order_date",
+      "type": "date32[day]",
+      "nullable": false
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "customer_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount_cents",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "order_date",
+      "physical_type": "INT32",
+      "logical_type": "Date",
+      "converted_type": "DATE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {"order_id": 1, "customer_id": 501, "country": "UK", "amount_cents": 1999, "order_date": "2026-01-03"},
+    {"order_id": 2, "customer_id": 502, "country": "SE", "amount_cents": 500, "order_date": "2026-01-03"},
+    {"order_id": 3, "customer_id": 501, "country": "UK", "amount_cents": 4210, "order_date": "2026-01-04"},
+    {"order_id": 4, "customer_id": 503, "country": "PL", "amount_cents": 1250, "order_date": "2026-01-04"},
+    {"order_id": 5, "customer_id": 504, "country": "US", "amount_cents": 875, "order_date": "2026-01-05"},
+    {"order_id": 6, "customer_id": 502, "country": "SE", "amount_cents": 3000, "order_date": "2026-01-05"},
+    {"order_id": 7, "customer_id": 505, "country": "UK", "amount_cents": 640, "order_date": "2026-01-06"},
+    {"order_id": 8, "customer_id": 501, "country": "UK", "amount_cents": 2275, "order_date": "2026-01-06"}
+  ],
+  "row_groups": [
+    {
+      "num_rows": 8,
+      "total_byte_size": 545,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 8,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 129,
+          "total_uncompressed_size": 129,
+          "statistics": {
+            "min": 1,
+            "max": 8,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "customer_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 8,
+          "data_page_offset": 133,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 129,
+          "total_uncompressed_size": 129,
+          "statistics": {
+            "min": 501,
+            "max": 505,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 8,
+          "data_page_offset": 262,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": "PL",
+            "max": "US",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 8,
+          "data_page_offset": 341,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 129,
+          "total_uncompressed_size": 129,
+          "statistics": {
+            "min": 500,
+            "max": 4210,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "order_date",
+          "physical_type": "INT32",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 8,
+          "data_page_offset": 470,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 79,
+          "total_uncompressed_size": 79,
+          "statistics": {
+            "min": "2026-01-03",
+            "max": "2026-01-06",
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

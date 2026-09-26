@@ -14,8 +14,10 @@ and the pages of most transactional databases all keep each row's values togethe
 is the unit those programs work in. Analytical queries work differently. They read a few columns
 of a great many rows, and a layout built for whole rows makes them read everything.
 
-This chapter stores one small table both ways and counts what a query costs against each. The
-counting is done by code, and the code is the first piece of the reader this book builds.
+This chapter stores one small table both ways and counts what a query costs against each, then
+finds the same idea in a Parquet file that pyarrow wrote. It is the one chapter with no code for
+you to write. From the next chapter on, each one reads the bytes of a real file by hand, builds
+what it read into a reader, and checks the result against a library you already use.
 
 ## The experiment
 
@@ -93,62 +95,39 @@ The cost is the third query in the table. Fetching one row means visiting every 
 changing one value means rewriting encoded, compressed blocks. Parquet accepts that: it is a
 format for data written once and read many times.
 
-## Building it
+The panel and the table are computed by the book's reader, in its `layout` module
+(`python/parquet_lab/layout.py`, or `crates/parquet-lab/src/layout.rs`). The book does not walk
+through that module, because it is not Parquet. The rest of the reader is.
 
-The book's reader exists in Python and in Rust, and the two are tested to give the same answers.
-The tabs above each excerpt switch between them, and every page remembers your choice. The layouts
-are the `layout` module: `python/parquet_lab/layout.py`, or `crates/parquet-lab/src/layout.rs`.
-Encoding a table is one loop over rows and columns, in an order that depends on the layout,
-recording where each value lands:
+### The same table as a Parquet file
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../python/parquet_lab/layout.py
+If you have written a Parquet file, you have written a column layout. The book's fixtures are
+written by pyarrow, as the files of many pipelines are, and one of them holds these eight orders:
+
+```{literalinclude} ../fixtures/generate.py
 :language: python
-:start-at: def encode(table: Table, layout: Layout)
-:end-before: @dataclass
+:start-at: EIGHT_ORDERS = pa.table(
+:end-before: EIGHT_ORDERS = EIGHT_ORDERS.cast(
 ```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../crates/parquet-lab/src/layout.rs
-:language: rust
-:start-at: pub fn encode(table: &Table, layout: Layout)
-:end-before: /// What a query needs
+
+`pyarrow.parquet.write_table` stores it with the options every fixture starts from: no
+compression and no dictionary, which keep a file small enough to read byte by byte. The book's
+reader finds these regions in the result:
+
+```{include} _generated/eight-orders-regions.md
 ```
-:::
-::::
 
-A query becomes reads in two steps: collect the span of every value it needs, then merge spans
-that touch, since one request can cover them all:
+Each column is one contiguous chunk, in the schema's order: the column layout from the panel, with
+a header before it and a footer after it. The two columns of the default query, `country` and
+`amount_cents`, sit side by side, so one range covers both. Parquet adds the rest of its
+structure around that layout. It splits a table into row groups, so that a writer never holds a
+whole table in memory. It keeps types, encodings and the position of every chunk in the footer. It
+compresses each column separately. In a file this small the footer is the largest region, and a
+reader must read it before it can find anything else.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../python/parquet_lab/layout.py
-:language: python
-:start-at: def ranges(enc: Encoded, q: Query)
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../crates/parquet-lab/src/layout.rs
-:language: rust
-:start-at: pub fn ranges(enc: &Encoded, q: &Query)
-:end-before: #[cfg(test)]
-```
-:::
-::::
-
-The experiment then asks the object store for each range and records the cost. That is the same
-traced store that [ch02](#anatomy-of-a-parquet-file) uses to open a Parquet file, so the costs
-here and in [ch02](#anatomy-of-a-parquet-file) are measured the same way.
-
-Parquet itself is more than this toy. It divides a column into row groups so that a writer never
-holds a whole table in memory, stores types and encodings in a footer, and compresses each column
-separately. The next chapter opens a real Parquet file and finds each of those structures in its
-bytes.
+[ch02](#anatomy-of-a-parquet-file) opens this kind of file from its last byte and finds each
+region for itself: first by hand, in a few lines of Python or Rust, then with the book's reader,
+then with pyarrow.
 
 ## What this cannot tell you
 
@@ -182,38 +161,22 @@ number of columns. That difference is what the table shows, and it holds at any 
 
 ## Problems
 
-Two, in `exercises/python/why_parquet_exists.py`, or in Rust in
-`exercises/src/why_parquet_exists.rs`. The first has a test that fails until you solve it. The
-second has no test.
+Two, both for reasoning. No test grades them: there is no code to write until the next chapter.
 
-**1.1 From values to reads.** Write the function that turns the byte ranges of the values a query
-needs into the reads it must make. The test runs it on every combination of columns and rows of
-the sales table, in both layouts, and compares with the book's own planner.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_why_parquet_exists.py --problems
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test why_parquet_exists -- --ignored
-```
-:::
-::::
+**1.1 A wider table.** No test. Imagine the sales table with hundreds of columns and millions of
+rows, and a query that reads three of its columns for every row. For each layout, say how many
+separate ranges the query needs, and how the bytes it moves compare with the size of the table,
+both when it fetches range by range and when it fetches the whole object. Check the shape of
+your answer against the panel by picking columns. A good answer says that the row layout needs a
+range per row, or else the whole object, while the column layout needs at most one range per
+column. It also says that the column layout moves about three columns' worth of bytes, however
+many rows there are.
 
 **1.2 Your own queries.** No test: the workload is yours. Take a table you query often and list the
 five most frequent queries against it. For each, write down how many of the table's columns it
 reads and what fraction of the rows. A good answer sorts the queries into scans and lookups and
 says which layout suits the mix. If most of them are lookups of whole rows, a columnar format is
 the wrong tool for that table, and the answer should say so.
-
-```problems
-chapter: why_parquet_exists
-```
 
 ## Where to go next
 

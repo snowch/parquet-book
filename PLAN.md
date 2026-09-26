@@ -16,15 +16,31 @@ file?*, *which bytes does this predicate let it skip?*, *why is this file slow t
 answered by looking at bytes and requests, so the book shows bytes and requests, and makes the
 reader write the code that produces them.
 
-The method in every chapter is the same:
+The audience is data engineers: people who write Parquet every day through pyarrow, Spark or a
+warehouse, and read code more readily than diagrams. So the book's interface is code. The reader
+inspects a file by running code that prints its structure, not by clicking through a viewer.
+(`sizing-and-tco`, whose architecture this book copies, needed an interactive viewer because its
+readers explore a model; these readers want to hold the file in their own code.)
+
+The method in every chapter that builds something is the same:
 
 ```
-question -> experiment -> observe bytes -> implement a piece -> run its test
-         -> inspect the result -> explain why it works -> extend
+question -> read the bytes by hand -> the reader does it -> a library agrees
+         -> run the tests -> explain why it works -> extend
 ```
+
+1. **By hand.** A walkthrough: a few lines of Python and Rust (`walkthroughs/`) that open a
+   fixture and print the structure the chapter is about, runnable and editable in the page.
+2. **In the reader.** Those lines, grown into a piece of `parquet_lab`, quoted in both languages.
+3. **With a library.** The same facts from pyarrow and from the Rust `parquet` crate, so the reader
+   knows where each fact lives in the tools they use, and a test checks all three against the
+   fixture's manifest.
+
+Labs stay where a picture beats printed output: a map of a file's bytes, a timeline of requests, a
+row group lit up by a predicate. Elsewhere the printed output is the experiment.
 
 The implementation is the teaching instrument. A chapter should leave the reader with something
-concrete that works.
+concrete that works, and with the library call that does the same at work.
 
 ## 2. The reader, built in phases
 
@@ -99,7 +115,9 @@ only when chosen. Every chapter's excerpts, problems and labs exist in both.
 
 **No dependencies in the reader.** Not for Thrift, not for JSON, not for WASM bindings. Each is
 small enough to write in the open, which is the point of the book, and `cargo build --offline`
-works on a fresh clone. The WASM interface is a hand-written C ABI of numbers and byte buffers,
+works on a fresh clone. The one crate with a dependency is `walkthroughs/libraries`, the
+walkthrough steps that ask the `parquet` crate: it is a workspace of its own, outside the root
+workspace, so nothing the reader builds, tests or ships to the page depends on it. The WASM interface is a hand-written C ABI of numbers and byte buffers,
 because a generated binding would be the one part of the system the reader could not read.
 
 **MyST parses, the repository renders.** As in `sizing-and-tco`: `myst build --strict` resolves
@@ -147,14 +165,24 @@ Every chapter has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
 `tests/test_book.py`:
 
 1. **The question**: one question, and why the previous chapter leaves it open.
-2. **The experiment**: a `lab` panel on a real fixture, a numbered list of things to try, and
-   generated tables that record what the experiment shows.
+2. **The experiment**: a walkthrough that reads a real fixture by hand, then the reader's view of
+   the same bytes: generated tables, and a `lab` panel where a picture helps, with a numbered list
+   of things to try.
 3. **Building it**: the code the experiment ran, quoted from the reader in Python and in Rust, in
-   the order it ran, and the command that tests it.
+   the order it ran, and the command that tests it; then *Ask a library*, the same facts from
+   pyarrow and the `parquet` crate.
 4. **What this cannot tell you**: the limits of the experiment, of the simulation, and of the code.
 5. **Key takeaways**: claims already made and shown above, each in bold with its reason.
 6. **Problems**: stubs with tests, and one problem about the reader's own files.
 7. **Where to go next**: primary sources, and the next chapter.
+
+ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): it asks why columns at all, before
+there is a Parquet file to open, so it has no *Building it*, and its problems are questions to
+reason about rather than tests. It ends on the same table as a Parquet file pyarrow wrote, and
+hands over to ch02, where the method starts.
+
+ch02 is the model for the method; ch03 to ch14 predate it and are being revised to it
+(NEXT_STEPS.md).
 
 The experiment comes before the code on purpose. A reader who has watched the requests happen
 reads the function that made them as an explanation, not as an abstraction.

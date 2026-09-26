@@ -128,3 +128,18 @@ def test_a_large_enough_prefetch_saves_a_request(name, data, manifest):
 def test_the_structure_view_and_the_footer_lab_report_success(name, data, manifest):
     assert report.structure(data)["ok"]
     assert report.footer_lab(data, name, FooterOptions(), NetworkModel())["ok"]
+
+
+def test_the_eight_orders_file_holds_the_layouts_table():
+    """ch01 stores Table.sales() by hand, then shows pyarrow's Parquet file of the same orders."""
+    from parquet_lab.layout import Table, show_cell
+
+    table = Table.sales()
+    manifest = json.loads((ROOT / "fixtures" / "eight-orders.json").read_text())
+    names = [name for name, _ in table.columns]
+    assert [leaf["path"] for leaf in manifest["leaves"]] == names
+    expected = [
+        {name: show_cell(v, kind) for (name, kind), v in zip(table.columns, row, strict=True)}
+        for row in table.rows
+    ]
+    assert [{k: str(v) for k, v in r.items()} for r in manifest["rows"]] == expected

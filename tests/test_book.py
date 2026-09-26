@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tools.outline import APPENDICES, CHAPTER_SHAPE, CHAPTERS, EXPERIMENTS, PARTS, UNWRITTEN
+from tools.outline import APPENDICES, CHAPTERS, EXPERIMENTS, PARTS, UNWRITTEN
 from tools.render import LabBlockError, parse_lab_block
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -27,8 +27,10 @@ DOCS = [
     ROOT / n for n in ("README.md", "CLAUDE.md", "PLAN.md", "AUTHORING_GUIDE.md", "STYLE.md", "NEXT_STEPS.md")
 ]
 WRITTEN = [c for c in CHAPTERS if UNWRITTEN not in (ROOT / c.path).read_text()]
+#: Written chapters that build a piece of the reader; the others are introductions.
+BUILDING = [c for c in WRITTEN if not c.introduction]
 #: Chapters the Python reader covers: their problems exist in Python as well as Rust.
-PORTED = [c for c in WRITTEN if (ROOT / "exercises" / "python" / f"{c.slug}.py").exists()]
+PORTED = [c for c in BUILDING if (ROOT / "exercises" / "python" / f"{c.slug}.py").exists()]
 
 
 def fences(text: str):
@@ -65,7 +67,7 @@ def test_the_table_of_contents_is_the_outline():
 @pytest.mark.parametrize("chapter", CHAPTERS, ids=lambda c: c.slug)
 def test_every_chapter_has_the_seven_part_shape(chapter):
     text = (ROOT / chapter.path).read_text()
-    assert headings(text, 2) == list(CHAPTER_SHAPE)
+    assert headings(text, 2) == list(chapter.shape)
     assert f"({chapter.anchor})=" in text, "the chapter's label is its slug"
     assert f"\ntitle: {chapter.title}\n" in text
     assert f"\n# {chapter.title}\n" in text, "the heading repeats the title, so MyST drops it"
@@ -138,7 +140,22 @@ def test_every_mounted_experiment_has_a_module():
         assert re.search(rf"\b{e}: mount", js), f"web/lab/lab.js does not mount {e}"
 
 
-@pytest.mark.parametrize("chapter", WRITTEN, ids=lambda c: c.slug)
+@pytest.mark.parametrize("chapter", [c for c in WRITTEN if c.introduction], ids=lambda c: c.slug)
+def test_an_introductions_problems_are_questions(chapter):
+    """An introduction builds nothing, so its problems are for reasoning, with no stubs to fill."""
+    for path in (
+        ROOT / "exercises" / "src" / f"{chapter.slug}.rs",
+        ROOT / "exercises" / "python" / f"{chapter.slug}.py",
+    ):
+        assert not path.exists(), f"{path.relative_to(ROOT)}: an introduction has no coding problems"
+    text = (ROOT / chapter.path).read_text()
+    section = text.split("\n## Problems\n", 1)[1].split("\n## Where to go next\n", 1)[0]
+    assert "```problems" not in section and not [b for lang, b in fences(section) if lang == "bash"]
+    assert "A good answer" in section, "say what a good answer contains"
+    assert "{literalinclude} ../crates/parquet-lab/" not in text, "an introduction quotes no reader code"
+
+
+@pytest.mark.parametrize("chapter", BUILDING, ids=lambda c: c.slug)
 def test_a_written_chapters_problems_are_tests(chapter):
     """Problems are stubs in the exercises crate, graded by tests marked #[ignore]."""
     stubs = ROOT / "exercises" / "src" / f"{chapter.slug}.rs"
@@ -210,7 +227,7 @@ def test_the_number_check_catches_a_typed_number(tmp_path):
 
 def test_every_chapter_is_in_both_readers():
     """The book is written in Python and in Rust throughout; a chapter in one only is unfinished."""
-    assert [c.slug for c in PORTED] == [c.slug for c in WRITTEN]
+    assert [c.slug for c in PORTED] == [c.slug for c in BUILDING]
 
 
 @pytest.mark.parametrize("chapter", PORTED, ids=lambda c: c.slug)
@@ -230,7 +247,10 @@ def test_a_ported_chapter_quotes_both_readers(chapter):
 
 
 def test_the_python_engine_runs_exactly_the_ported_chapters_labs():
-    """The labs offer the Python engine for a chapter once its reader is ported, and not before."""
+    """The labs offer the Python engine for a chapter once its reader is ported, and not before.
+
+    An introduction's labs run on both engines from the start: the reader code behind them is
+    in both readers, though the page does not quote it."""
     import ast
 
     tree = ast.parse((ROOT / "python" / "parquet_lab" / "browser.py").read_text())
@@ -239,4 +259,5 @@ def test_the_python_engine_runs_exactly_the_ported_chapters_labs():
         for n in tree.body
         if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
     )
-    assert set(engine) == {e for c in PORTED for e in c.experiments}
+    covered = PORTED + [c for c in WRITTEN if c.introduction]
+    assert set(engine) == {e for c in covered for e in c.experiments}

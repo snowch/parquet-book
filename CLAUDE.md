@@ -4,10 +4,12 @@ Project instructions for anyone, human or AI, working on this book. They are bin
 
 ## What this is
 
-*Parquet, byte by byte*: an interactive technical book about Apache Parquet in which the reader
-builds a working Parquet reader while reading. Each chapter asks a question, answers it with an
-experiment on the bytes of a real Parquet file, and builds the piece of the reader the experiment
-needed. The reader exists twice, in Python and in Rust, held to identical answers by tests; the
+*Parquet, byte by byte*: an interactive technical book about Apache Parquet, for data engineers,
+in which the reader builds a working Parquet reader while reading. Code is the interface. Each
+chapter asks a question, reads the answer out of a real Parquet file by hand, builds that into
+the reader, and then asks a library (pyarrow, the `parquet` crate) the same question. Labs draw
+pictures only where a picture beats printed output. ch01 is the one introduction, and builds
+nothing. The reader exists twice, in Python and in Rust, held to identical answers by tests; the
 page shows both, and the labs run either in the browser (Rust through WebAssembly, Python through
 Pyodide).
 
@@ -52,7 +54,7 @@ Either way the page runs the code the tests run.
 | `crates/parquet-lab-wasm/` | The reader behind a numbers-only C ABI, compiled to `wasm32-unknown-unknown`. |
 | `crates/pqlab/` | The reader on the command line (its commands in `cli.rs`, a library the WASM crate runs too), and `pqlab figures`, which writes every generated fragment. |
 | `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`); in Python, `python/<slug>.py` and `python/tests/test_<slug>.py`, run with `--problems`. |
-| `walkthroughs/` | Short programs a chapter asks you to run and change before it builds the reader, reading bytes by hand: `python/<slug>/<step>.py` and a Rust twin in `src/bin/<step>.rs` (`cargo run -p walkthroughs --bin <step>`). `tests/test_walkthroughs.py` runs both and checks what they print against pyarrow's manifest. |
+| `walkthroughs/` | Short programs a chapter asks you to run and change before it builds the reader, reading bytes by hand: `python/<slug>/<step>.py` and a Rust twin in `src/bin/<step>.rs` (`cargo run -p walkthroughs --bin <step>`). A chapter's *Ask a library* step reads the same facts with pyarrow and, in `libraries/`, the `parquet` crate: a workspace of its own, the one dependency in the repository. `tests/test_walkthroughs.py` runs both languages and checks what they print against pyarrow's manifest. |
 | `fixtures/` | Parquet files written by pyarrow, each with a manifest (`.json`) pyarrow wrote about it. |
 | `chapters/`, `parts/`, `appendices/`, `index.md` | The book, in MyST markdown. |
 | `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
@@ -196,7 +198,8 @@ markdown ending with its conditions line, run `make figures`, and `{include}` th
 
 ## Coding conventions
 
-- **Rust:** zero dependencies in every crate. Readable before fast: this code is quoted in a book.
+- **Rust:** zero dependencies in every crate of the root workspace (`walkthroughs/libraries`,
+  outside it, uses the `parquet` crate and nothing else). Readable before fast: this code is quoted in a book.
   Every read reports a `Span` of absolute file offsets. Errors are values with offsets, never
   panics on bad input. `cargo fmt`, clippy clean with `-D warnings`. Module docs say what the
   module teaches and which chapter uses it.
@@ -213,7 +216,8 @@ markdown ending with its conditions line, run `make figures`, and `{include}` th
 
 British English, direct, active voice, short sentences, the reader as *you*. No em dashes. No
 "In this chapter". No *simply*, *just*, *obviously*, *basically*: `tests/test_book.py` enforces
-the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE`. STYLE.md is the
+the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE` (an introduction,
+`INTRODUCTIONS`, has six: no *Building it*). STYLE.md is the
 checklist; run both of its passes over a page before finishing it.
 
 Product and implementation names are allowed where the book describes a specific implementation's

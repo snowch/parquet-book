@@ -15,6 +15,10 @@ python3 -m ruff format --check "${PY_PATHS[@]}"
 echo "== Rust: format and lint =="
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --quiet -- -D warnings
+# The walkthrough steps that use the `parquet` crate: a workspace of their own, so that the reader
+# stays free of dependencies. This is the one stage that needs crates.io.
+cargo fmt --check --manifest-path walkthroughs/libraries/Cargo.toml
+cargo clippy --manifest-path walkthroughs/libraries/Cargo.toml --all-targets --quiet -- -D warnings
 
 echo "== Rust: the reader's tests (the reader's problems are #[ignore]d) =="
 # The problems in exercises/ fail until a reader solves them, which is their purpose; a suite

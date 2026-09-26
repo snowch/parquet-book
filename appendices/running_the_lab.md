@@ -7,7 +7,7 @@ title: Running the lab
 
 ## In your browser
 
-Nothing to install. Every chapter ends its problems with a workbench, where you edit the Python
+Nothing to install. Every chapter from ch02 on ends its problems with a workbench, where you edit the Python
 problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
 runs. A Python command in these pages that runs the reader's tests, a problem's tests or the
 reader's command line has a **Run** button, which runs it in the page and shows what it printed;

@@ -8,6 +8,40 @@ Every fixture is written by pyarrow, a production Parquet implementation, and ne
 this repository's own code. The `.json` beside each file is pyarrow's own description of
 it, and the Rust tests use it as an oracle.
 
+## `eight-orders.parquet`
+
+ch01's table: the eight orders its layouts lab stores by rows and by columns, written as Parquet with the same settings as tiny.parquet. Each column lands in the file as one contiguous chunk, which is the column layout, and ch01 ends by showing where.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 1155 bytes |
+| Rows | 8 |
+| Row groups | 1 |
+| Footer length | 598 bytes |
+| SHA-256 | `1064ead40112c949…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `customer_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `order_date` | INT32 | Date | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
 ## `tiny.parquet`
 
 The smallest useful file: four rows of a sales table, one row group, no compression, no dictionary, every column required so no levels are stored. Small enough to read completely by eye. The footer laboratory starts here.

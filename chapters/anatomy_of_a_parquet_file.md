@@ -459,6 +459,42 @@ fixture and on damaged copies of one, must return the same JSON from both.
 python3 -m pytest tests/test_python.py
 ```
 
+### Ask a library
+
+You will rarely open a file with the book's reader. At work you ask a library, and every library
+opens a file the way you have: it reads the trailer, then the footer, and hands you what the
+footer says. pyarrow's `read_metadata` and the `parquet` crate's `ParquetMetaDataReader` do that
+here:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+The footer length and the bytes of each column chunk are the ones you found by hand at the start
+of the chapter, and the ones in the table of regions. The test that runs these steps checks both
+against pyarrow's manifest. From here on a chapter that builds something ends by asking a library
+the same question, so that you know where each fact lives in the tools you already use.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, which lives in `walkthroughs/libraries`, a
+workspace of its own so that the book's reader keeps no dependencies. Run it in a Codespace, or at
+a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin with_a_library
+```
+
 ## What this cannot tell you
 
 **How a real network behaves.** The simulated store charges a fixed latency and a fixed
@@ -492,6 +528,8 @@ goes further.
   enough of the tail to hold the footer too.
 - **A file is row groups of column chunks of pages.** Each column chunk is contiguous, so reading
   one column of one row group is one range request.
+- **A library opens a file the same way.** pyarrow's `read_metadata` and the `parquet` crate read
+  the trailer and then the footer, and report the offsets you can find by hand.
 :::
 
 ## Problems

@@ -5,7 +5,8 @@
 // It lays out the repository as a desk has it (the reader and its tests, the problems and their
 // graders, every fixture and its manifest, and pyproject.toml), changes to its root, and runs
 // the command there: `python3 -m pytest …` through pytest.main, `python3 -m parquet_lab …`
-// through runpy, and a chapter's walkthrough step (`python3 walkthroughs/…`) as its source. The
+// through runpy, and a chapter's walkthrough step (`python3 walkthroughs/…`) as its source, with
+// any package it imports that Pyodide provides (pyarrow, for a step that asks a library). The
 // files are the ones the repository's tests run; nothing about them is changed for the page.
 // They use the book's reader as it ships, not any edits you made to it in the labs.
 //
@@ -116,13 +117,32 @@ async function setup() {
     .map(([name, text]) => [name.replace(/\.py$/, ""), text]));
   pyodide.globals.set("STUBS_JSON", JSON.stringify(stubs));
   pyodide.runPython(RUNNER);
-  return pyodide.globals.get("run");
+  return { pyodide, run: pyodide.globals.get("run") };
+}
+
+/**
+ * The packages a walkthrough step imports that Pyodide has but has not loaded: pyarrow, for a step
+ * that asks a library. They load on the first run that needs them, never before, because pyarrow
+ * and what it needs are a much larger download than the book's own code.
+ */
+async function loadImports(pyodide, source) {
+  try {
+    await pyodide.loadPackagesFromImports(source, {
+      messageCallback: (message) => {
+        const m = /^Loading (.+)$/.exec(message);
+        if (m) postMessage({ type: "status", text: `Loading ${m[1]} into your browser (a large download, the first time only)…` });
+      },
+    });
+  } catch {
+    // A source that does not parse imports nothing; running it reports the error.
+  }
 }
 
 onmessage = async ({ data }) => {
   try {
     ready ||= setup();
-    const run = await ready;
+    const { pyodide, run } = await ready;
+    if (data.argv[0] === "python") await loadImports(pyodide, data.argv[1]);
     postMessage({ type: "status", text: "Running…" });
     postMessage({ type: "result", result: JSON.parse(run(JSON.stringify(data.argv), JSON.stringify(data.answers))) });
   } catch (error) {
