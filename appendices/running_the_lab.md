@@ -9,7 +9,9 @@ title: Running the lab
 
 Nothing to install. Every chapter ends its problems with a workbench, where you edit the Python
 problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
-runs. On any lab, choose **Python**, then **Edit the code**, and you can change any file of the
+runs. A Python command in these pages that runs the reader's tests, a problem's tests or the
+reader's command line has a **Run** button, which runs it in the page and shows what it printed;
+a problem's tests run on your answers from its chapter's workbench. On any lab, choose **Python**, then **Edit the code**, and you can change any file of the
 Python reader and run the page's labs on your edit. Your edits stay in your browser until you
 restore them.
 

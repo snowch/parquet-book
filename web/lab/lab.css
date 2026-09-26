@@ -471,3 +471,35 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .code-area { font-size: 12px; padding: .6rem .7rem; }
   .workbench-bar, .workbench-note, .results li { padding-left: .7rem; padding-right: .7rem; }
 }
+
+/* A command the page can run itself: a Run button on the block, and what it printed below. */
+.runnable { position: relative; }
+.runnable > pre { margin-bottom: 0; }
+.run-button { position: absolute; top: .45rem; right: .45rem; font: 12.5px var(--chrome); color: var(--on-accent);
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: .15rem .6rem;
+  cursor: pointer; opacity: .9; }
+.run-button:hover { opacity: 1; }
+.runnable[data-state="running"] .run-button { background: var(--bg); color: var(--stop); border-color: var(--stop); }
+.run-result { margin: 0 0 1.2rem; border: 1px solid var(--edge); border-top: 0; border-radius: 0 0 6px 6px;
+  background: var(--bg); font: 13px/1.5 var(--chrome); }
+.run-head { padding: .35rem .8rem; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums; }
+.run-output { margin: 0; padding: .6rem .8rem; max-height: 26rem; overflow: auto; background: var(--code);
+  font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 0 6px 6px; }
+.run-output:empty { display: none; }
+
+/* A command the page can run itself: a Run button on the block, and what it printed below. */
+.runnable { position: relative; }
+.runnable > pre { margin-bottom: 0; }
+.run-button { position: absolute; top: .45rem; right: .45rem; font: 12.5px var(--chrome); color: var(--on-accent);
+  background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: .15rem .6rem;
+  cursor: pointer; opacity: .9; }
+.run-button:hover { opacity: 1; }
+.runnable[data-state="running"] .run-button { background: var(--bg); color: var(--stop); border-color: var(--stop); }
+.run-result { margin: 0 0 1.2rem; border: 1px solid var(--edge); border-top: 0; border-radius: 0 0 6px 6px;
+  background: var(--bg); font: 13px/1.5 var(--chrome); }
+.run-head { padding: .35rem .8rem; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums; }
+.run-output { margin: 0; padding: .6rem .8rem; max-height: 26rem; overflow: auto; background: var(--code);
+  font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 0 6px 6px; }
+.run-output:empty { display: none; }

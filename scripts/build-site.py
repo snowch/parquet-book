@@ -312,7 +312,11 @@ def build(out: Path) -> None:
         mdast = parse[p["source"]]["mdast"]
         normalise_headings(mdast)
         body = renderer.render_page(mdast)
-        has_lab = 'class="lab"' in body or 'class="workbench"' in body
+        # The lab script also puts Run buttons on the Python commands a page prints.
+        has_lab = any(
+            m in body
+            for m in ('class="lab"', 'class="workbench"', "python3 -m pytest", "python3 -m parquet_lab")
+        )
         text = page_html(
             p,
             body,
@@ -355,6 +359,13 @@ def build(out: Path) -> None:
     for name in problems:
         (out / "lab" / "py" / "exercises" / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(exercises / name, out / "lab" / "py" / "exercises" / name)
+    # The Python reader's own tests, and the pytest configuration, for the Run buttons on
+    # `python3 -m pytest python/tests …`.
+    tests = sorted(f.name for f in (ROOT / "python" / "tests").glob("*.py"))
+    (out / "lab" / "py" / "tests").mkdir()
+    for name in tests:
+        shutil.copy(ROOT / "python" / "tests" / name, out / "lab" / "py" / "tests" / name)
+    shutil.copy(ROOT / "pyproject.toml", out / "lab" / "py" / "pyproject.toml")
     # Every fixture, with the manifest pyarrow wrote about it: the graders read both. ch14's
     # table keeps its directories.
     for f in sorted((ROOT / "fixtures").glob("*")):
@@ -370,6 +381,7 @@ def build(out: Path) -> None:
                 "modules": modules,
                 "experiments": list(experiments),
                 "exercises": problems,
+                "tests": tests,
                 "fixtures": fixtures,
             }
         )

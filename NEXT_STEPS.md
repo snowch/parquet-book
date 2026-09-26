@@ -152,6 +152,9 @@ reader's numbers too.
   problems, as at a desk.
 - On the Python engine, "Edit the code" opens any module of the Python reader; running puts the
   edits in place and remounts every lab. A broken edit shows Python's traceback in the labs.
+- Every Python command a page prints that the page can run (the reader's tests, a problem's
+  tests, the reader's command line) has a Run button, which runs it in the same worker and shows
+  its output. The whole of `python/tests` runs in the page in about fifteen seconds.
 - `.devcontainer/` makes the repository a Codespace, for the Rust reader and its problems.
 - The browser test runs a workbench against native pytest and checks an edit and its restore.
 

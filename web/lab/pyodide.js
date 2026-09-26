@@ -1,5 +1,6 @@
 // Pyodide, and the book's Python files inside it: shared by the labs' Python engine (python.js),
-// the reader editor (editor.js) and the problems workbench (workbench-worker.js).
+// the reader editor (editor.js), and the worker that runs the workbenches' tests and the Run
+// buttons' commands (python-worker.js).
 //
 // Pyodide is CPython compiled to WebAssembly. It is several megabytes, so it is fetched only when
 // a reader asks for Python, from a pinned release on a public CDN. The book's own Python files

@@ -143,6 +143,9 @@ A problem is a stub and a test that passes only when the stub is right.
 - The chapter shows the command for each tested problem, in a tab set of two `bash` blocks:
   `python3 -m pytest exercises/python/tests/test_<slug>.py --problems -k problem_N_M` and
   `cargo test -p exercises --test <slug> problem_N_M -- --ignored`. `tests/test_book.py` checks it.
+- The Python commands get Run buttons in the page (`web/lab/commands.js`): `python3 -m pytest`
+  on `python/tests` or `exercises/python`, and `PYTHONPATH=python python3 -m parquet_lab`. Write a
+  block of those alone, so it stays runnable; a block with any other command gets no button.
 - The section ends with the chapter's workbench, a fenced block in the language `problems` holding
   `chapter: <slug>`. It lets a reader edit the Python stub and run its tests in the page, under
   Pyodide, with the same graders. Keep the Python graders to a few seconds: the page runs them

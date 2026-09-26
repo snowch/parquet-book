@@ -119,12 +119,15 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
 
 **Code runs where the reader is.** Every chapter's Problems section ends with a ```` ```problems ````
 block (`chapter: <slug>`): a workbench (`web/lab/workbench.js`) where the reader edits the Python
-stub and runs its graders with pytest under Pyodide, in a worker (`workbench-worker.js`), on the
-repository's own files laid out as a desk has them. On the Python engine, **Edit the code**
+stub and runs its graders with pytest under Pyodide, in a worker (`python-worker.js`, shared
+through `runner.js`), on the repository's own files laid out as a desk has them. A `bash` block
+whose every command is `python3 -m pytest` on `python/tests` or `exercises/python`, or
+`PYTHONPATH=python python3 -m parquet_lab`, gets a Run button (`web/lab/commands.js`) that runs it
+in the same worker and shows what it printed; a command the page cannot run gets none. On the Python engine, **Edit the code**
 (`web/lab/editor.js`) swaps the reader's edits into the Python reader and remounts every lab.
 Edits live in the browser's storage, never on the server. Rust cannot compile in a page, so
 `.devcontainer/` gives a Codespace with the pinned toolchain instead. The browser test runs a
-workbench and an edit.
+workbench, two Run buttons against the same commands at a desk, and an edit.
 
 ## The invariants
 

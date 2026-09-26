@@ -3,14 +3,16 @@
 // A chapter marks it with a fenced block in the language `problems`; tools/render.py turns that
 // into <div class="workbench" data-chapter=…>. The text area starts as the chapter's stub, from
 // exercises/python/<chapter>.py, and keeps your edits in this browser. "Run the tests" hands it
-// to workbench-worker.js, which runs the chapter's pytest graders under Pyodide, exactly as
-// `pytest --problems` runs them at a desk, and the list below shows what pytest reported.
+// to the page's Python worker (runner.js), which runs the chapter's pytest graders under Pyodide,
+// exactly as `pytest --problems` runs them at a desk, and the list below shows what pytest
+// reported.
 //
 // Rust cannot compile in a page at reasonable cost, so the Rust problems are one click away in a
 // GitHub Codespace instead: the repository, its toolchain and an editor, in the browser.
 
 import { KEYS, codeArea } from "./code.js";
 import { fetchText } from "./pyodide.js";
+import { runPython, savedAnswers, stopPython } from "./runner.js";
 
 export const CODESPACES = "https://codespaces.new/snowch/parquet-book?quickstart=1";
 
@@ -24,18 +26,6 @@ function saved(chapter) {
   }
 }
 
-/** Every chapter's saved answers, by chapter: one chapter's problems can use another's. */
-function answers() {
-  const out = {};
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k.startsWith("problems:")) out[k.slice("problems:".length)] = localStorage.getItem(k);
-    }
-  } catch {}
-  return out;
-}
-
 function save(chapter, text, stub) {
   try {
     if (text === stub) localStorage.removeItem(key(chapter));
@@ -44,9 +34,6 @@ function save(chapter, text, stub) {
 }
 
 const escape = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-
-let worker = null;
-let busy = null; // the workbench whose tests are running: one run at a time per page
 
 export async function mountWorkbench(el) {
   const chapter = el.dataset.chapter;
@@ -83,7 +70,6 @@ export async function mountWorkbench(el) {
   el.querySelector(".workbench-bar").before(area);
 
   const idle = (text) => {
-    busy = null;
     button("run").disabled = false;
     button("stop").hidden = true;
     status.textContent = text;
@@ -106,36 +92,21 @@ export async function mountWorkbench(el) {
   }
 
   function run() {
-    if (busy) {
-      status.textContent = busy === el ? status.textContent : "Another workbench on this page is running its tests.";
-      return;
-    }
-    busy = el;
+    if (el.dataset.state === "running") return;
     el.dataset.state = "running";
     button("run").disabled = true;
     button("stop").hidden = false;
     results.innerHTML = "";
-    status.textContent = "Starting…";
-    worker ||= new Worker(new URL("workbench-worker.js", import.meta.url), { type: "module" });
-    worker.onmessage = ({ data }) => {
-      if (data.type === "status") status.textContent = data.text;
-      else if (data.type === "result") show(data.result);
-      else idle(`The tests could not run: ${data.message}`);
-    };
-    worker.onerror = (e) => idle(`The tests could not run: ${e.message || "the worker failed"}`);
-    worker.postMessage({ chapter, answers: { ...answers(), [chapter]: area.value } });
+    status.textContent = "Waiting for the page's other Python runs…";
+    const argv = ["pytest", `exercises/python/tests/test_${chapter}.py`, "--problems", "-q", "--tb=short"];
+    runPython(argv, { answers: { ...savedAnswers(), [chapter]: area.value }, onStatus: (t) => { status.textContent = t; } })
+      .then(show, (error) => idle(error.message === "Stopped." ? "Stopped." : `The tests could not run: ${error.message}`));
   }
 
   el.addEventListener("click", (e) => {
     const act = e.target.closest("button[data-act]")?.dataset.act;
     if (act === "run") run();
-    if (act === "stop" && busy === el) {
-      // A run cannot be interrupted from outside, so the worker goes, and the next run starts a
-      // fresh one.
-      worker.terminate();
-      worker = null;
-      idle("Stopped.");
-    }
+    if (act === "stop" && el.dataset.state === "running") stopPython();
     if (act === "restore" && confirm("Replace your answers with the stub? Your edits here are lost.")) {
       area.value = stub;
       save(chapter, stub, stub);

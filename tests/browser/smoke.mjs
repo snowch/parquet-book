@@ -491,6 +491,33 @@ if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") }
   check(first.includes("NotImplementedError: problem 7.1"), "and says which problem is unsolved");
 }
 
+// Run buttons: a command the page prints in a Python tab runs in the page, and prints what it
+// prints at a desk. The reader's command line prints the same JSON; pytest selects and passes the
+// same tests.
+{
+  const runBlock = async (file, text) => {
+    await page.goto(base + file);
+    const box = page.locator(".runnable", { hasText: text }).first();
+    await box.locator(".run-button").click();
+    await box.and(page.locator('[data-state="running"]')).waitFor({ timeout: 10000 }).catch(() => {});
+    await box.and(page.locator('[data-state="idle"]')).waitFor({ timeout: 300000 });
+    return box.locator("xpath=following-sibling::div[1]").locator(".run-output").innerText();
+  };
+  const cli = await runBlock("lakehouse-and-beyond.html", "SELECT country FROM orders");
+  const desk = spawnSync("python3", ["-m", "parquet_lab", "query", "fixtures/table/country=UK/part-0.parquet",
+    "SELECT country FROM orders"], { encoding: "utf8", env: { ...process.env, PYTHONPATH: "python" } }).stdout;
+  check(JSON.stringify(JSON.parse(cli)) === JSON.stringify(JSON.parse(desk)),
+    "Run on ch14's `python3 -m parquet_lab query` prints the JSON it prints at a desk");
+  const summary = (text) => (text.trim().split("\n").at(-1).match(/(\d+ passed, \d+ deselected)/) || [])[1];
+  const tests = await runBlock("encodings.html", "records_rebuilt");
+  const deskTests = spawnSync("python3", ["-m", "pytest", "python/tests", "-k", "records_rebuilt", "-p", "no:cacheprovider"],
+    { encoding: "utf8" }).stdout;
+  check(summary(tests) && summary(tests) === summary(deskTests),
+    `Run on \`pytest python/tests -k records_rebuilt\` selects and passes what it does at a desk: ${summary(tests)}`);
+  check(await page.locator(".tab-panel[data-code=rust] .run-button").count() === 0,
+    "no Run button on a command the page cannot run");
+}
+
 // The reader editor: an edit to the Python reader reaches every lab on the page, and restoring
 // the book's version brings back the reader's answer.
 {

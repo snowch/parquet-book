@@ -12,7 +12,8 @@
 // Python reader can run, which the build reads from its EXPERIMENTS list. On Python, a reader can
 // edit the reader's code and run the labs on the edit (editor.js).
 //
-// A chapter's problems workbench (workbench.js) mounts here too.
+// A chapter's problems workbench (workbench.js) mounts here too, and so do the Run buttons on
+// the Python commands a page prints (commands.js).
 
 import { Lab } from "./wasm.js";
 import { PyLab } from "./python.js";
@@ -32,6 +33,7 @@ import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
 import { openEditor } from "./editor.js";
 import { mountWorkbench } from "./workbench.js";
+import { mountCommands } from "./commands.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
@@ -170,3 +172,4 @@ for (const el of document.querySelectorAll(".workbench[data-chapter]")) {
     el.dataset.ready = "error";
   });
 }
+mountCommands();
