@@ -146,7 +146,9 @@ footer starts, then breaks the length to show why a reader must check what it re
   `walkthroughs/src/bin/<step>.rs`, self-contained, run from the repository's root. Name steps by
   what they do; no numbers in names. Quote both in a tab set, whole, like the reader's code.
 - Keep them short enough to read in one glance, and idiomatic: they are for changing, not for
-  reuse. Print facts in both languages' own idiom; do not bend them to print identical text.
+  reuse. Keep them compact on a phone's screen: imports on one line, single blank lines,
+  a small helper class without blank lines inside it. `walkthroughs/` is outside ruff's paths for
+  this reason. Print facts in both languages' own idiom; do not bend them to print identical text.
 - Add what each step must print to `tests/test_walkthroughs.py`, derived from the fixture and its
   manifest. The prose that follows a step describes what it printed without typing a number.
 - End with an invitation to change something, and say what to try.

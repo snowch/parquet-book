@@ -1,9 +1,6 @@
 # The same deletes applied with pyarrow, which reads Parquet files but not tables: you apply them.
 from pathlib import Path
-
-import pyarrow as pa
-import pyarrow.compute as pc
-import pyarrow.parquet as pq
+import pyarrow as pa, pyarrow.compute as pc, pyarrow.parquet as pq
 
 path = "data/part-1.parquet"
 rows = pq.read_table(f"fixtures/changes/{path}")
