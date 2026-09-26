@@ -171,6 +171,10 @@ kbd { font-size: .8em; border: 1px solid var(--rule); border-bottom-width: 2px; 
 
 /* Tables are data, not prose: the furniture face and lining figures. */
 .table-wrap { overflow-x: auto; margin: 1.3rem 0; }
+/* The way back to the page the reader was on, at the top of the preface. */
+.resume { margin: .2rem 0 1.4rem; font: 600 14.5px/1.4 var(--chrome); }
+.resume a { display: inline-block; padding: .5rem .8rem; border-radius: 6px; background: var(--wash);
+            color: var(--accent); text-decoration: none; }
 table { border-collapse: collapse; font: 14.5px/1.45 var(--chrome);
         font-variant-numeric: tabular-nums; }
 th, td { text-align: left; padding: .42rem .7rem; border-bottom: 1px solid var(--edge);

@@ -628,6 +628,21 @@ if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png
   await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 }
 
+// Opened from a home screen, the book starts at index.html?resume and goes back to the page the
+// reader was on, as far down as they were; the preface offers the same way back.
+{
+  await page.goto(base + "encodings.html");
+  await page.mouse.wheel(0, 2000);
+  await page.waitForTimeout(1000);
+  const y = await page.evaluate(() => scrollY);
+  await page.goto(base + "index.html?resume");
+  await page.waitForURL(/encodings\.html$/);
+  const back = await page.waitForFunction((want) => Math.abs(scrollY - want) < 5, y, { timeout: 10000 }).then(() => true, () => false);
+  check(back, `the home-screen start goes back to the last page, scrolled to ${y}`);
+  await page.goto(base + "index.html");
+  check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the preface links back to the last page");
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

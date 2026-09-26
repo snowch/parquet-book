@@ -192,6 +192,59 @@ HEAD_SCRIPT = r"""<script>
     });
     document.getElementById("menu").addEventListener("click", () => document.body.classList.toggle("nav-open"));
   });
+  // Where the reader is: the page and how far down it, kept as they read. Opened from a home
+  // screen, the book starts at index.html?resume (manifest.webmanifest) and goes back there; the
+  // preface also offers a link back, however it was reached.
+  const page = location.pathname.split("/").pop() || "index.html";
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem("last-read")); } catch (e) {}
+  const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  const launched = new URLSearchParams(location.search).has("resume") || (standalone && !document.referrer);
+  if (page === "index.html" && launched && last && last.page && last.page !== "index.html") {
+    try { sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {}
+    location.replace(last.page);
+    return;
+  }
+  // The preface is where the book starts anyway, so it is never the place to go back to.
+  const remember = () => {
+    if (page === "index.html") return;
+    try {
+      localStorage.setItem("last-read", JSON.stringify({ page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: Math.round(scrollY) }));
+    } catch (e) {}
+  };
+  let pending = 0;
+  addEventListener("scroll", () => { clearTimeout(pending); pending = setTimeout(remember, 400); }, { passive: true });
+  addEventListener("pagehide", remember);
+  addEventListener("load", () => {
+    let y = null;
+    try { y = sessionStorage.getItem("resume-scroll"); sessionStorage.removeItem("resume-scroll"); } catch (e) {}
+    if (y === null) return remember();
+    // Labs draw after load and push the page down, so the place is kept while the page settles:
+    // for a few seconds, or until the reader scrolls for themselves.
+    const target = Number(y);
+    const until = Date.now() + 3000;
+    let moved = false;
+    for (const kind of ["wheel", "touchstart", "keydown"]) addEventListener(kind, () => { moved = true; }, { once: true, passive: true });
+    const hold = () => { if (!moved && Date.now() < until) scrollTo(0, target); };
+    hold();
+    const watch = new ResizeObserver(hold);
+    watch.observe(document.body);
+    setTimeout(() => watch.disconnect(), 3000);
+  });
+  if (page === "index.html" && last && last.page && last.page !== "index.html") {
+    document.addEventListener("DOMContentLoaded", () => {
+      const h1 = document.querySelector("article.page h1");
+      if (!h1) return;
+      const p = document.createElement("p");
+      p.className = "resume";
+      const a = document.createElement("a");
+      a.href = last.page;
+      a.textContent = `Continue reading: ${last.title || last.page}`;
+      a.addEventListener("click", () => { try { sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {} });
+      p.append(a);
+      h1.after(p);
+    });
+  }
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
     addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   }
@@ -232,6 +285,9 @@ def page_html(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · {TITLE}</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#35648f">
 <link rel="stylesheet" href="book.css">
 {lab}
 {HEAD_SCRIPT}
@@ -266,6 +322,74 @@ FAVICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 <rect x="24" y="7" width="2.5" height="18" rx="1" fill="#fff" opacity=".4"/>
 </svg>
 """
+
+
+def icon_png(size: int) -> bytes:
+    """The favicon's picture as a PNG ``size`` pixels square: home screens want a bitmap. Drawn
+    here, from the same shapes, so the build needs no image library and writes the same bytes
+    every time."""
+    import struct
+    import zlib
+
+    blue = (0x35, 0x64, 0x8F)
+    # (x, y, width, height, corner radius, opacity of white over the blue), in the SVG's 32 units.
+    bars = [(6, 7, 4, 18, 1, 1.0), (12, 7, 4, 18, 1, 0.8), (18, 7, 4, 18, 1, 0.6), (24, 7, 2.5, 18, 1, 0.4)]
+
+    def inside(x: float, y: float, rx: float, ry: float, w: float, h: float, r: float) -> bool:
+        cx = min(max(x, rx + r), rx + w - r)
+        cy = min(max(y, ry + r), ry + h - r)
+        return rx <= x <= rx + w and ry <= y <= ry + h and (x - cx) ** 2 + (y - cy) ** 2 <= r * r
+
+    samples = ((0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75))
+    raw = bytearray()
+    for py in range(size):
+        raw.append(0)  # no filter on this scanline
+        for px in range(size):
+            rgb, alpha = [0.0, 0.0, 0.0], 0.0
+            for sx, sy in samples:
+                x, y = (px + sx) * 32 / size, (py + sy) * 32 / size
+                if not inside(x, y, 0, 0, 32, 32, 6):
+                    continue
+                white = next((o for bx, by, bw, bh, br, o in bars if inside(x, y, bx, by, bw, bh, br)), 0.0)
+                for i in range(3):
+                    rgb[i] += blue[i] * (1 - white) + 255 * white
+                alpha += 1
+            n = len(samples)
+            colour = [round(c / alpha) if alpha else 0 for c in rgb]
+            raw += bytes([*colour, round(255 * alpha / n)])
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+
+    header = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(bytes(raw), 9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def manifest() -> str:
+    """The book as an app on a home screen. It starts at ``index.html?resume``, which the page's
+    script turns into the page the reader was last on (HEAD_SCRIPT)."""
+    return json.dumps(
+        {
+            "name": TITLE,
+            "short_name": "Parquet",
+            "start_url": "index.html?resume",
+            "scope": "./",
+            "display": "standalone",
+            "background_color": "#fdfdfc",
+            "theme_color": "#35648f",
+            "icons": [
+                {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+                {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
+                {"src": "favicon.svg", "sizes": "any", "type": "image/svg+xml"},
+            ],
+        },
+        indent=2,
+    )
 
 
 def service_worker(files: list[str], version: str) -> str:
@@ -329,6 +453,9 @@ def build(out: Path) -> None:
 
     shutil.copy(ROOT / "web" / "book.css", out / "book.css")
     (out / "favicon.svg").write_text(FAVICON)
+    for size in (192, 512):
+        (out / f"icon-{size}.png").write_bytes(icon_png(size))
+    (out / "manifest.webmanifest").write_text(manifest())
     for f in (ROOT / "web" / "lab").iterdir():
         if f.suffix in (".js", ".css"):
             shutil.copy(f, out / "lab" / f.name)
