@@ -127,20 +127,46 @@ three. The last two values in each group are padding, because the page has six s
 The decoder reads a header, decides the run's kind from its low bit, and takes the run's bytes.
 Every run keeps the span of its header and its body, which is how the panel highlights them:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/rle.py
+:language: python
+:start-at: def decode(data: bytes, base: int, width: int, count: int)
+:end-before: def unpack(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/rle.rs
 :language: rust
 :start-at: pub fn decode(
 :end-before: /// The `i`th value
 ```
+:::
+::::
 
 Bit-packed values are read one bit at a time, least significant first, which makes the packing
 order explicit:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/rle.py
+:language: python
+:start-at: def unpack(raw: bytes, i: int, width: int)
+:end-before: def values(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/rle.rs
 :language: rust
 :start-at: fn unpack(raw: &[u8], i: usize, bit_width: u32)
 :end-before: /// All the values of a sequence of runs
 ```
+:::
+::::
 
 ### Splitting a page into levels and values
 
@@ -148,14 +174,27 @@ A data page body holds the repetition levels, then the definition levels, then t
 level stream starts with a four-byte length, and is present only when the column's maximum for
 it is above zero:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: rep_levels = (
+:end-before: present = sum(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: let rep_levels = if leaf.max_repetition_level > 0 {
 :end-before: let present = defs
 ```
+:::
+::::
 
 Only slots whose definition level is the maximum have a value, so the reader counts those, and
-decodes that many PLAIN values after the levels (`crates/parquet-lab/src/plain.rs`).
+decodes that many PLAIN values after the levels (the `plain` module).
 
 ### Rebuilding records
 
@@ -164,11 +203,24 @@ Within a record, a repeated field's triples split into elements wherever `r` is 
 field's repetition level, and a field whose first triple has too low a `d` is null or, for a
 repeated field, empty:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/nested.py
+:language: python
+:start-at: def field_value(i: int, ts: list[Triple])
+:end-before: def element_value(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/nested.rs
 :language: rust
 :start-at: fn field_value(&self, i: usize, triples: &[Triple])
 :end-before: /// One present instance
 ```
+:::
+::::
 
 ### Checking it
 
@@ -176,9 +228,20 @@ The fixture tests read every column of every fixture from its page bytes, rebuil
 and compare them with the rows pyarrow reported when it wrote the file, reduced to that one
 column:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests -k records_rebuilt
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures records_rebuilt
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -215,24 +278,48 @@ standard three-level form only.
 
 ## Problems
 
-Three, in `exercises/src/nested_data.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/nested_data.py`, or in Rust in
+`exercises/src/nested_data.rs`. The first two have tests. The third has none.
 
 **4.1 The hybrid.** Decode an RLE / bit-packing hybrid stream. The test uses every level stream in
 the fixture and a thousand generated streams.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_nested_data.py --problems -k problem_4_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test nested_data problem_4_1 -- --ignored
 ```
+:::
+::::
 
 **4.2 A list from its levels.** Rebuild a list of optional strings from its levels and values. The
 test compares with pyarrow on the fixture and with the reader on generated levels.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_nested_data.py --problems -k problem_4_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test nested_data problem_4_2 -- --ignored
 ```
+:::
+::::
 
 **4.3 Your own nested data.** No test: the data is yours. Take a nested column from your own
-Parquet files and run `cargo run -p pqlab -- levels FILE COLUMN`, where `COLUMN` is its position
+Parquet files and run `PYTHONPATH=python python3 -m parquet_lab levels FILE COLUMN` or
+`cargo run -p pqlab -- levels FILE COLUMN`, where `COLUMN` is its position
 among the leaves. Pick three records and write down, before looking, the levels you expect for
 each value slot. Then compare. A good answer explains every disagreement. If your records never
 reach the column's maximum repetition level, say what the schema allows that the data never uses.

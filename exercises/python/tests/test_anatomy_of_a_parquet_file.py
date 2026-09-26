@@ -4,11 +4,15 @@ python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --pro
 """
 
 import pytest
-from anatomy_of_a_parquet_file import footer_length, footer_range, gets_to_open
 from parquet_lab.object_store import MemoryStore, NetworkModel, TracingStore
 from parquet_lab.reader import FooterOptions, Known, read_footer
 
-from fixtures import fixtures
+from fixtures import fixtures, stub
+
+problems = stub("anatomy_of_a_parquet_file")
+footer_length = problems.footer_length
+footer_range = problems.footer_range
+gets_to_open = problems.gets_to_open
 
 
 def samples() -> list[int]:

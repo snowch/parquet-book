@@ -5,7 +5,11 @@ python3 -m pytest exercises/python/tests/test_why_parquet_exists.py --problems
 
 import pytest
 from parquet_lab.layout import Encoded, Layout, Query, Table, encode, ranges
-from why_parquet_exists import reads_for
+
+from fixtures import stub
+
+problems = stub("why_parquet_exists")
+reads_for = problems.reads_for
 
 
 def every_query() -> list[Query]:

@@ -65,6 +65,23 @@ export class PyLab {
     return this.#json(this.api.schema(id));
   }
 
+  levels(id, column) {
+    return this.#json(this.api.levels(id, column));
+  }
+
+  encodings(id, column) {
+    return this.#json(this.api.encodings(id, column));
+  }
+
+  pages(id, column) {
+    return this.#json(this.api.pages(id, column));
+  }
+
+  /** `page` omitted or null: the first data page. */
+  compression(id, column, page = null) {
+    return this.#json(this.api.compression(id, column, page === null ? 0xffffffff : page));
+  }
+
   interpret(id, offset) {
     return this.#json(this.api.interpret(id, offset));
   }

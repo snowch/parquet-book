@@ -160,11 +160,24 @@ to the other. `LZO` is defined and rarely written.
 The whole decompressor: a varint for the output length, then tagged elements until the input
 ends.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/compress.py
+:language: python
+:start-at: def snappy(data: bytes, base: int)
+:end-before: def lz4_raw(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/compress.rs
 :language: rust
 :start-at: pub fn snappy(
 :end-before: /// An LZ4 block:
 ```
+:::
+::::
 
 The copy is byte by byte because a copy may overlap the bytes it writes: a distance of one
 repeats the last byte. `copy_back` does it, and checks that the distance points into the output.
@@ -173,11 +186,24 @@ repeats the last byte. `copy_back` does it, and checks that the distance points 
 
 The same two operations in a different layout:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/compress.py
+:language: python
+:start-at: def lz4_raw(
+:end-before: def gzip(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/compress.rs
 :language: rust
 :start-at: pub fn lz4_raw(
 :end-before: /// A gzip member:
 ```
+:::
+::::
 
 ### DEFLATE's Huffman codes
 
@@ -186,11 +212,24 @@ consecutive integers, so a decoder can read a code a bit at a time and know, aft
 whether the code is complete. This is the approach of Mark Adler's `puff`, a reference inflater
 written to be read:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/compress.py
+:language: python
+:start-at: class Huffman:
+:end-before: # Lengths 3..258 and distances
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/compress.rs
 :language: rust
 :start-at: /// A canonical Huffman code
 :end-before: /// Lengths 3..258 and distances
 ```
+:::
+::::
 
 The rest of `inflate` reads block headers, builds these tables, and turns length and distance
 codes into the same copies Snappy and LZ4 make. After the stream, the gzip trailer holds the
@@ -201,19 +240,45 @@ output's CRC-32, and the reader checks it with the function from [ch06](#pages).
 Version 1 compresses the whole body, so the reader decompresses it first and reads the levels
 and values from the copy:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: # Version 1 compresses the whole body
+:end-before: r = ByteReader(levels_bytes, levels_base)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: // Version 1 compresses the whole body
 :end-before: let mut r = ByteReader::new(levels_bytes
 ```
+:::
+::::
 
 Version 2 compresses only the values:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: # Version 2 compresses only the values
+:end-before: encoding = page.encoding or
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: // Version 2 compresses only the values
 :end-before: let encoding = page.encoding.clone()
 ```
+:::
+::::
 
 Values decoded from a decompressed copy have no position in the file, so the reader reports the
 compressed bytes that hold them. It can say which compressed page a value came from, but not
@@ -225,9 +290,20 @@ Every page of every Snappy, LZ4 and GZIP fixture decompresses to the uncompresse
 byte for byte, and every column reassembles to pyarrow's rows. A ZSTD or Brotli page is refused
 with a message rather than misread:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -266,22 +342,45 @@ better than these.
 
 ## Problems
 
-Three, in `exercises/src/compression.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/compression.py`, or in Rust in
+`exercises/src/compression.rs`. The first two have tests. The third has none.
 
 **7.1 Snappy.** Decompress a raw Snappy block. The test decompresses every page of
 `codec-snappy.parquet` and compares it, byte for byte, with the same page in
 `codec-none.parquet`.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_compression.py --problems -k problem_7_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test compression problem_7_1 -- --ignored
 ```
+:::
+::::
 
 **7.2 LZ4.** Decompress an LZ4 block. The fixture's pages include a match long enough to need
 several extra length bytes.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_compression.py --problems -k problem_7_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test compression problem_7_2 -- --ignored
 ```
+:::
+::::
 
 **7.3 Your own codec.** No test: the data is yours. Take a Parquet file your systems write and
 rewrite it with each codec your writer supports, keeping everything else the same. Record each

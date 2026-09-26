@@ -1,5 +1,6 @@
 """What the graders share: the fixtures, and a small deterministic generator."""
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -31,3 +32,12 @@ class Rng:
         x ^= (x << 17) & 0xFFFF_FFFF_FFFF_FFFF
         self.state = x
         return x % n
+
+
+def stub(slug: str):
+    """A chapter's problems module, loaded from ``exercises/python/<slug>.py`` by its path."""
+    path = Path(__file__).resolve().parents[1] / f"{slug}.py"
+    spec = importlib.util.spec_from_file_location(f"problems_{slug}", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

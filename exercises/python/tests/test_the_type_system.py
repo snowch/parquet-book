@@ -8,9 +8,13 @@ from parquet_lab import logical, schema
 from parquet_lab.bytes import Span
 from parquet_lab.metadata import PhysicalType, SchemaElement
 from parquet_lab.report import open_bytes
-from the_type_system import decimal_from_bytes, leaf_paths, max_levels
 
-from fixtures import Rng, fixtures
+from fixtures import Rng, fixtures, stub
+
+problems = stub("the_type_system")
+decimal_from_bytes = problems.decimal_from_bytes
+leaf_paths = problems.leaf_paths
+max_levels = problems.max_levels
 
 REPETITIONS = [schema.REQUIRED, schema.OPTIONAL, schema.REPEATED]
 

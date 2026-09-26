@@ -138,51 +138,114 @@ guess.
 The column reader decodes a dictionary page, when the column chunk has one, before any data page,
 and keeps its entries with the bytes each came from:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: if page.page_type == "DICTIONARY_PAGE":
+:end-before: if page.page_type not in (
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: "DICTIONARY_PAGE" => {
 :end-before: other => return err(format!("unexpected page type
 ```
+:::
+::::
 
 A data page's indices are the hybrid from [ch04](#nested-data), with the bit width in the byte
 before them. Each decoded value keeps two spans: its dictionary entry, and the run that held its
 index:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/decode.py
+:language: python
+:start-at: if encoding in ("RLE_DICTIONARY", "PLAIN_DICTIONARY"):
+:end-before: if encoding == "DELTA_BINARY_PACKED":
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/decode.rs
 :language: rust
 :start-at: "RLE_DICTIONARY" | "PLAIN_DICTIONARY" => {
 :end-before: "DELTA_BINARY_PACKED" => {
 ```
+:::
+::::
 
 ### Deltas
 
 The delta decoder reads the header, then block after block until it has the value count. It
 records a step for the header, each block, and each miniblock it reads:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/delta.py
+:language: python
+:start-at: def binary_packed(data: bytes, base: int)
+:end-before: def length_byte_array(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/delta.rs
 :language: rust
 :start-at: pub fn binary_packed(
 :end-before: /// DELTA_LENGTH_BYTE_ARRAY:
 ```
+:::
+::::
 
 `DELTA_BYTE_ARRAY` is two decoders and one loop: the prefix lengths are `DELTA_BINARY_PACKED`,
 the suffixes are `DELTA_LENGTH_BYTE_ARRAY`, and each value is the previous value's prefix
 followed by its suffix:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/delta.py
+:language: python
+:start-at: def byte_array(data: bytes, base: int)
+:end-before: def byte_stream_split(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/delta.rs
 :language: rust
 :start-at: pub fn byte_array(
 :end-before: /// One BYTE_STREAM_SPLIT value
 ```
+:::
+::::
 
 ### Checking it
 
 Every column of both fixtures is decoded from its bytes, reassembled into records, and compared
 with the rows pyarrow reported:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests -k records_rebuilt
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures records_rebuilt
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -221,31 +284,66 @@ only data page version 2 uses; [ch06](#pages) returns to that.
 
 ## Problems
 
-Four, in `exercises/src/encodings.rs`. The first three have tests. The fourth has none.
+Four, in `exercises/python/encodings.py`, or in Rust in
+`exercises/src/encodings.rs`. The first three have tests. The fourth has none.
 
 **5.1 DELTA_BINARY_PACKED.** Decode it. The test uses the fixture's integer columns and hundreds of
 generated encodings with other block sizes, miniblock counts and bit widths.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test encodings problem_5_1 -- --ignored
 ```
+:::
+::::
 
 **5.2 Shared prefixes.** Rebuild `DELTA_BYTE_ARRAY`'s values from their prefix lengths and
 suffixes. The test uses the fixture's URLs and generated sorted strings.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test encodings problem_5_2 -- --ignored
 ```
+:::
+::::
 
 **5.3 Dictionary indices.** Read a dictionary-encoded page's bit width and indices, and return the
 values. You may use your hybrid decoder from problem 4.1.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_3
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test encodings problem_5_3 -- --ignored
 ```
+:::
+::::
 
 **5.4 Your own columns.** No test: the columns are yours. Pick a Parquet file your systems write
-and run `cargo run -p pqlab -- encodings FILE COLUMN` for each column. For each, record the
+and run `PYTHONPATH=python python3 -m parquet_lab encodings FILE COLUMN` or
+`cargo run -p pqlab -- encodings FILE COLUMN` for each column. For each, record the
 encoding the writer chose and the stored size against PLAIN. Then name one column where a
 different encoding would suit the values better, and say what pattern in the values makes you
 think so. A good answer checks the claim by rewriting that column with the other encoding and

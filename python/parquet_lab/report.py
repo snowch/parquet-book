@@ -14,10 +14,13 @@ import struct
 
 from . import bloom, crypto, logical, page_index
 from .bytes import ByteReader, Span, le_terms, zigzag_decode
+from .column import first_rows, read_column
+from .compress import decompress, supported
 from .encoding import hex, plain_scalar, quote
 from .format import MIN_FILE_LEN, TRAILER_LEN, check_header, footer_span, parse_trailer
 from .layout import Layout, Query, Table, encode, ranges, show_cell
 from .metadata import ColumnChunk, FileMetaData, decode_file_metadata
+from .nested import assemble, explain, path_fields
 from .object_store import Bounded, MemoryStore, NetworkModel, Request, StoreError, TracingStore
 from .pages import walk_pages
 from .parquet_thrift import Kind, enum_value_name, field_def
@@ -664,4 +667,391 @@ def schema(file: bytes) -> dict:
         "tree": tree(root),
         "text": to_text(root),
         "leaves": out_leaves,
+    }
+
+
+def _leaf(file: bytes, column: int):
+    """The metadata, the schema tree, its leaves and the chosen leaf, or an error report."""
+    md = _open(file)
+    if isinstance(md, str):
+        return {"ok": False, "error": md}
+    try:
+        root = build(md.schema)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    found = leaves(root)
+    if not 0 <= column < len(found):
+        return {"ok": False, "error": f"the file has no column {column}"}
+    return md, root, found, found[column]
+
+
+def _runs(stream) -> dict | None:
+    if stream is None:
+        return None
+    span, runs = stream
+    return {
+        "span": span,
+        "runs": [{"kind": r.kind, "header": r.header, "body": r.body, "values": r.values} for r in runs],
+    }
+
+
+def levels(file: bytes, column: int) -> dict:
+    """Ch04's experiment: one column's levels and values, what each triple means, and the
+    records rebuilt from them."""
+    md = _open(file)
+    if isinstance(md, str):
+        return {"ok": False, "error": md}
+    try:
+        root = build(md.schema)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    found = leaves(root)
+    columns = []
+    for leaf in found:
+        fields = path_fields(root, leaf)
+        columns.append(
+            {
+                "column": leaf.column,
+                "path": leaf.dotted_path(),
+                "label": fields[-1].label if fields else "",
+                "max_definition_level": leaf.max_definition_level,
+                "max_repetition_level": leaf.max_repetition_level,
+            }
+        )
+    if not 0 <= column < len(found):
+        return {"ok": False, "error": f"the file has no column {column}"}
+    leaf = found[column]
+    fields = path_fields(root, leaf)
+    pages, triples = [], []
+    for g, rg in enumerate(md.row_groups):
+        try:
+            data = read_column(file, rg.columns[leaf.column], leaf)
+        except ValueError as e:
+            return {"ok": False, "error": str(e), "columns": columns}
+        for p in data.pages:
+            pages.append(
+                {
+                    "row_group": g,
+                    "span": p.page.span(),
+                    "header": p.page.header_span,
+                    "repetition_levels": _runs(p.rep_levels),
+                    "definition_levels": _runs(p.def_levels),
+                    "values": p.values,
+                }
+            )
+        triples += data.triples
+    records = assemble(fields, leaf, triples)
+    return {
+        "ok": True,
+        "columns": columns,
+        "column": column,
+        "path": leaf.dotted_path(),
+        "fields": [
+            {
+                "name": f.name,
+                "label": f.label,
+                "repetition": f.repetition,
+                "definition_level": f.definition,
+                "repetition_level": f.rep,
+                "list": f.is_list,
+            }
+            for f in fields
+        ],
+        "max_definition_level": leaf.max_definition_level,
+        "max_repetition_level": leaf.max_repetition_level,
+        "pages": pages,
+        "triples": [
+            {
+                "rep": t.rep,
+                "def": t.definition,
+                "value": None
+                if t.value is None
+                else logical.value_json(leaf.physical_type, leaf.logical_type, t.value),
+                "value_span": t.value_span,
+                "explain": explain(fields, t),
+            }
+            for t in triples
+        ],
+        "records": records,
+    }
+
+
+def _plain_size(physical: int, type_length: int | None, values: list) -> int:
+    """What ``values`` would take as PLAIN: the size an encoding is saving against."""
+    n = len(values)
+    sizes = {0: (n + 7) // 8, 1: 4 * n, 4: 4 * n, 2: 8 * n, 5: 8 * n, 3: 12 * n}
+    if physical in sizes:
+        return sizes[physical]
+    if physical == 7:
+        return max(type_length or 0, 0) * n
+    return sum(4 + len(v) for v in values if isinstance(v, bytes))
+
+
+def encodings(file: bytes, column: int) -> dict:
+    """Ch05's experiment: how one column's values are encoded, step by step, and what the
+    encoding saves against PLAIN."""
+    found = _leaf(file, column)
+    if isinstance(found, dict):
+        return found
+    md, _, all_leaves, leaf = found
+    first = md.row_groups[0] if md.row_groups else None
+    columns = [
+        {
+            "column": other.column,
+            "path": other.dotted_path(),
+            "encodings": first.columns[i].encodings if first and i < len(first.columns) else None,
+        }
+        for i, other in enumerate(all_leaves)
+    ]
+
+    def show(v):
+        return logical.value_json(leaf.physical_type, leaf.logical_type, v)
+
+    data_all = []
+    for rg in md.row_groups:
+        try:
+            data_all.append(read_column(file, rg.columns[leaf.column], leaf))
+        except ValueError as e:
+            return {"ok": False, "error": str(e), "columns": columns}
+    pages, values, plain_values = [], [], []
+    dictionary = None
+    encoded = 0
+    for data in data_all:
+        if data.dictionary is not None:
+            d = data.dictionary
+            encoded += d.page.body_span.length
+            dictionary = {
+                "page": d.page.span(),
+                "header": d.page.header_span,
+                "body": d.page.body_span,
+                "entries": [{"index": i, "value": show(v), "span": s} for i, (v, s) in enumerate(d.entries)],
+            }
+        for p in data.pages:
+            encoded += p.values.length
+            pages.append(
+                {
+                    "span": p.page.span(),
+                    "encoding": p.encoding,
+                    "values": p.values,
+                    "steps": [{"label": s.label, "span": s.span, "detail": s.detail} for s in p.steps],
+                }
+            )
+        for t in data.triples:
+            if t.value is not None:
+                plain_values.append(t.value)
+                values.append({"value": show(t.value), "span": t.value_span, "extra": t.extra_spans})
+    return {
+        "ok": True,
+        "columns": columns,
+        "column": column,
+        "path": leaf.dotted_path(),
+        "physical_type": leaf.physical_type.name,
+        "logical_type": str(leaf.logical_type) if leaf.logical_type else None,
+        "dictionary": dictionary,
+        "pages": pages,
+        "values": values,
+        "sizes": {
+            "encoded": encoded,
+            "plain": _plain_size(leaf.physical_type, leaf.type_length, plain_values),
+            "count": len(plain_values),
+        },
+    }
+
+
+def pages(file: bytes, column: int) -> dict:
+    """Ch06's experiment: every page of one column chunk, what its header says, where its parts
+    are, and which rows it holds."""
+    found = _leaf(file, column)
+    if isinstance(found, dict):
+        return found
+    md, _, all_leaves, leaf = found
+    columns = [{"column": other.column, "path": other.dotted_path()} for other in all_leaves]
+
+    def stat(c: ColumnChunk, b: bytes | None):
+        if b is None:
+            return None
+        shown = logical.interpret(c.physical_type, leaf.logical_type, b) if leaf.logical_type else None
+        return shown or plain_scalar(c.physical_type, b) or hex(b)
+
+    out = []
+    row = 0
+    for g, rg in enumerate(md.row_groups):
+        chunk = rg.columns[leaf.column]
+        r = chunk.byte_range()
+        if r.end > len(file):
+            return {"ok": False, "error": f"column chunk {r} is past the end of the file"}
+        try:
+            walked = walk_pages(file[r.start : r.end], r.start)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        # Rows per page come from the decoded levels: a row starts wherever r is 0.
+        try:
+            decoded = read_column(file, chunk, leaf)
+        except ValueError:
+            decoded = None
+        per_page = [
+            [t.rep for t in decoded.triples if t.page == i] if decoded else [] for i in range(len(walked))
+        ]
+        firsts = first_rows(per_page)
+        group_start = row
+        for i, p in enumerate(walked):
+            starts = sum(1 for x in per_page[i] if x == 0) if decoded else None
+            data_page = (
+                next((d for d in decoded.pages if d.page.header_span == p.header_span), None)
+                if decoded
+                else None
+            )
+            first_row = group_start + firsts[i]
+            row += starts or 0
+            s = p.statistics
+            v = p.v2
+            not_dictionary = p.page_type != "DICTIONARY_PAGE"
+            out.append(
+                {
+                    "row_group": g,
+                    "index": i,
+                    "type": p.page_type,
+                    "span": p.span(),
+                    "header": p.header_span,
+                    "body": p.body_span,
+                    "compressed_page_size": p.compressed_page_size,
+                    "uncompressed_page_size": p.uncompressed_page_size,
+                    "num_values": p.num_values,
+                    "encoding": p.encoding,
+                    "statistics": {
+                        "min": stat(chunk, s.min_value),
+                        "max": stat(chunk, s.max_value),
+                        "null_count": s.null_count,
+                    }
+                    if s
+                    else None,
+                    "crc": p.crc,
+                    "crc_ok": p.crc_ok,
+                    "v2": {
+                        "num_nulls": v.num_nulls,
+                        "num_rows": v.num_rows,
+                        "definition_levels_byte_length": v.definition_levels_byte_length,
+                        "repetition_levels_byte_length": v.repetition_levels_byte_length,
+                        "is_compressed": v.is_compressed,
+                    }
+                    if v
+                    else None,
+                    "repetition_levels": data_page.rep_levels[0]
+                    if data_page and data_page.rep_levels
+                    else None,
+                    "definition_levels": data_page.def_levels[0]
+                    if data_page and data_page.def_levels
+                    else None,
+                    "values": data_page.values if data_page else None,
+                    "first_row": first_row if starts is not None and not_dictionary else None,
+                    "rows_started": starts if not_dictionary else None,
+                }
+            )
+    return {"ok": True, "columns": columns, "column": column, "path": leaf.dotted_path(), "pages": out}
+
+
+def compression(file: bytes, column: int, page: int | None) -> dict:
+    """Ch07's experiment: what compression did to every column chunk, and how one page of one
+    column was decompressed, token by token.
+
+    The sizes come from the footer, so they are reported for every codec. The tokens need a
+    decoder, so a page compressed with a codec :mod:`parquet_lab.compress` does not decode
+    reports why instead of tokens.
+    """
+    found = _leaf(file, column)
+    if isinstance(found, dict):
+        return found
+    md, _, all_leaves, leaf = found
+    # Every column chunk's two sizes, summed over the row groups.
+    chunks = []
+    for other in all_leaves:
+        cs = [rg.columns[other.column] for rg in md.row_groups]
+        chunks.append(
+            {
+                "column": other.column,
+                "path": other.dotted_path(),
+                "codec": cs[0].codec if cs else None,
+                "uncompressed": sum(c.total_uncompressed_size for c in cs),
+                "compressed": sum(c.total_compressed_size for c in cs),
+            }
+        )
+    if not md.row_groups:
+        return {"ok": False, "error": "the file has no row groups"}
+    chunk = md.row_groups[0].columns[leaf.column]
+    r = chunk.byte_range()
+    if r.end > len(file):
+        return {"ok": False, "error": f"column chunk {r} is past the end of the file"}
+    try:
+        walked = walk_pages(file[r.start : r.end], r.start)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    # What the codec was given: the whole body, or in a version 2 data page only the values, and
+    # only when the header says they are compressed.
+    sections = []
+    for p in walked:
+        if p.v2:
+            levels_len = p.v2.repetition_levels_byte_length + p.v2.definition_levels_byte_length
+            levels_len = min(max(levels_len, 0), p.body_span.length)
+            sections.append(
+                (
+                    Span(p.body_span.start + levels_len, p.body_span.end),
+                    p.uncompressed_page_size - levels_len,
+                    p.v2.is_compressed,
+                )
+            )
+        else:
+            sections.append((p.body_span, p.uncompressed_page_size, True))
+    if page is None:
+        page = next((i for i, p in enumerate(walked) if p.page_type != "DICTIONARY_PAGE"), 0)
+    listed = [
+        {
+            "index": i,
+            "type": p.page_type,
+            "span": p.span(),
+            "header": p.header_span,
+            "compressed_section": section,
+            "section_compressed": is_compressed,
+            "compressed_page_size": p.compressed_page_size,
+            "uncompressed_page_size": p.uncompressed_page_size,
+            "section_uncompressed_size": size,
+            "encoding": p.encoding,
+        }
+        for i, (p, (section, size, is_compressed)) in enumerate(zip(walked, sections, strict=True))
+    ]
+    if 0 <= page < len(walked):
+        section, size, is_compressed = sections[page]
+        codec = chunk.codec if is_compressed else "UNCOMPRESSED"
+        try:
+            d = decompress(codec, file[section.start : section.end], section.start, max(size, 0))
+            decoded = {
+                "ok": True,
+                "codec": codec,
+                "bytes": hex(d.data),
+                "tokens": [
+                    {
+                        "kind": t.kind,
+                        "label": t.label,
+                        "input": t.input,
+                        "output": t.output,
+                        "distance": t.distance,
+                        "detail": t.detail,
+                    }
+                    for t in d.tokens
+                ],
+            }
+        except ValueError as e:
+            decoded = {"ok": False, "codec": codec, "error": str(e)}
+    else:
+        decoded = {"ok": False, "error": f"the column chunk has no page {page}"}
+    return {
+        "ok": True,
+        "file_size": len(file),
+        "chunks": chunks,
+        "column": column,
+        "path": leaf.dotted_path(),
+        "codec": chunk.codec,
+        "supported": supported(chunk.codec),
+        "pages": listed,
+        "page": page,
+        "decompressed": decoded,
     }

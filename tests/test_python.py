@@ -108,6 +108,25 @@ def test_the_schema_lab_matches(tmp_path):
         assert python(report.schema(path.read_bytes())) == rust("schema", path), path.name
 
 
+@pytest.mark.parametrize("name", ["levels", "encodings", "pages", "compression"])
+def test_the_column_labs_match(tmp_path, name):
+    """ch04 to ch07: every column of every fixture, and the damaged copies."""
+    call = getattr(report, name)
+    for path in files(tmp_path):
+        data = path.read_bytes()
+        for column in range(12):
+            mine = python(call(data, column, None) if name == "compression" else call(data, column))
+            assert mine == rust(name, path, column), f"{name} {path.name} column {column}"
+
+
+def test_the_compression_lab_matches_on_every_page(tmp_path):
+    for path in files(tmp_path):
+        data = path.read_bytes()
+        for page in range(4):
+            mine = python(report.compression(data, 1, page))
+            assert mine == rust("compression", path, 1, page), f"{path.name} page {page}"
+
+
 def test_the_byte_inspector_matches(tmp_path):
     for path in files(tmp_path):
         data = path.read_bytes()

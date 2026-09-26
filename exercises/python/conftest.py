@@ -13,8 +13,11 @@ from pathlib import Path
 import pytest
 
 HERE = Path(__file__).resolve().parent
-# The stubs, and the book's Python reader, which the tests compare your answers with.
-sys.path[:0] = [str(HERE), str(HERE.parent.parent / "python")]
+# The book's Python reader, which the tests compare your answers with. The graders load each stub
+# by its file (tests/fixtures.py), because a chapter's name can be a standard module's too
+# (`encodings`); this directory goes last on the path, so one stub can still import another.
+sys.path.insert(0, str(HERE.parent.parent / "python"))
+sys.path.append(str(HERE))
 
 
 def pytest_addoption(parser):

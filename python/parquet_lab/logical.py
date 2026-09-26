@@ -238,3 +238,31 @@ def int96_timestamp(data: bytes) -> str | None:
     # Julian day 2440588 is 1970-01-01.
     days = julian - 2_440_588
     return timestamp(days * 86_400 * 1_000_000_000 + nanos, "NANOS", False)
+
+
+def value_json(physical: int, logical: LogicalType | None, value: object) -> object:
+    """A decoded value as JSON, read through its logical type when it has one.
+
+    Numbers without a logical type stay numbers. A value a logical type changes (a date, a
+    timestamp, a decimal, an unsigned integer) becomes the string :func:`interpret` produces.
+    """
+    from . import plain
+
+    if physical == 1 and type(value) is int:
+        raw = struct.pack("<i", (value + 2**31) % 2**32 - 2**31)
+    elif physical == 2 and type(value) is int:
+        raw = struct.pack("<q", value)
+    elif isinstance(value, bytes):
+        raw = value
+    else:
+        return plain.to_json(value)
+    if logical is None or logical.name in ("STRING", "ENUM", "JSON"):
+        return plain.to_json(value)
+    if logical.name == "INTEGER" and logical.signed:
+        return plain.to_json(value)
+    shown = interpret(physical, logical, raw)
+    if shown is None:
+        return plain.to_json(value)
+    if logical.name == "INTEGER":
+        return int(shown) if shown.isdigit() else shown
+    return shown

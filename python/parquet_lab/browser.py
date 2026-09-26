@@ -13,7 +13,7 @@ from .reader import FooterOptions, Head, Known, SuffixRange
 
 FILES: list[tuple[str, bytearray]] = []
 
-EXPERIMENTS = ("layouts", "footer", "anatomy", "schema")
+EXPERIMENTS = ("layouts", "footer", "anatomy", "schema", "levels", "encodings", "pages", "compression")
 """The labs this engine can run so far. The rest arrive as their chapters are ported."""
 
 
@@ -73,3 +73,27 @@ def layouts(column_mask: int, row: int, latency_us: int, bandwidth: int) -> str:
 def schema(id: int) -> str:
     data = _file(id)
     return _no_such_file(id) if data is None else report.dumps(report.schema(data))
+
+
+def _per_column(report_fn):
+    def call(id: int, column: int, *rest) -> str:
+        data = _file(id)
+        if data is None:
+            return _no_such_file(id)
+        return report.dumps(report_fn(data, int(column), *rest))
+
+    return call
+
+
+levels = _per_column(report.levels)
+encodings = _per_column(report.encodings)
+pages = _per_column(report.pages)
+
+
+def compression(id: int, column: int, page: int) -> str:
+    """``page`` above 2^32 - 2 means the first data page, as in the Rust export."""
+    data = _file(id)
+    if data is None:
+        return _no_such_file(id)
+    chosen = None if page >= 0xFFFF_FFFF else int(page)
+    return report.dumps(report.compression(data, int(column), chosen))

@@ -122,39 +122,88 @@ The walker reads a header, reads the body it describes, and repeats until the co
 A body that would run past the end of the chunk is an error: the chunk's size in the footer and
 the sizes in its headers must agree.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/pages.py
+:language: python
+:start-at: def walk_pages(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/pages.rs
 :language: rust
 :start-at: pub fn walk_pages(
 ```
+:::
+::::
 
 ### Version 2 bodies
 
 The only change the column reader needs for version 2 is where the level lengths come from:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: # Version 2 moves the level lengths
+:end-before: rep_levels = (
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: // Version 2 moves the level lengths
 :end-before: let rep_levels = if leaf.max_repetition_level
 ```
+:::
+::::
 
 ### The checksum
 
 CRC-32, computed a bit at a time, which is slow and short enough to read in full:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/bytes.py
+:language: python
+:start-at: def crc32(data: bytes)
+:end-before: class ByteReader:
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/bytes.rs
 :language: rust
 :start-at: pub fn crc32(
 :end-before: /// A cursor over a slice of bytes
 ```
+:::
+::::
 
 ### Checking it
 
 Both page fixtures decode to pyarrow's rows, and every stored checksum verifies and fails after a
 flipped bit:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -190,23 +239,47 @@ one as unexpected rather than guessing at it.
 
 ## Problems
 
-Three, in `exercises/src/pages.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/pages.py`, or in Rust in
+`exercises/src/pages.rs`. The first two have tests. The third has none.
 
 **6.1 Walk a column chunk.** Return the offset of every page, using the book's Thrift decoder for
 the headers. The test walks every column chunk of every fixture.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_pages.py --problems -k problem_6_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test pages problem_6_1 -- --ignored
 ```
+:::
+::::
 
 **6.2 Check a checksum.** Write CRC-32 yourself, and check the fixture's page checksums with it.
 The test also damages the pages and expects your check to fail.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_pages.py --problems -k problem_6_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test pages problem_6_2 -- --ignored
 ```
+:::
+::::
 
 **6.3 Your own pages.** No test: the files are yours. Run
+`PYTHONPATH=python python3 -m parquet_lab pages FILE COLUMN` or
 `cargo run -p pqlab -- pages FILE COLUMN` on a column of a file your systems write. Record how
 many pages its first column chunk holds, their sizes, and whether they are version 1 or 2. Then
 find the writer's page-size setting in its configuration or documentation, and compare. A good

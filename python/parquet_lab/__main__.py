@@ -34,6 +34,17 @@ def main() -> None:
     layouts.add_argument("--row", type=int)
     sub.add_parser("structure", help="every region of a file").add_argument("file", type=Path)
     sub.add_parser("schema", help="the schema, flat and as a tree (ch03)").add_argument("file", type=Path)
+    for name, what in (
+        ("levels", "a column's levels, values and records (ch04)"),
+        ("encodings", "how a column's values are encoded, step by step (ch05)"),
+        ("pages", "every page of a column chunk (ch06)"),
+        ("compression", "a column's pages decompressed, token by token (ch07)"),
+    ):
+        p = sub.add_parser(name, help=what)
+        p.add_argument("file", type=Path)
+        p.add_argument("column", type=int)
+        if name == "compression":
+            p.add_argument("page", type=int, nargs="?")
     inspect = sub.add_parser("interpret", help="every reading of the bytes at an offset")
     inspect.add_argument("file", type=Path)
     inspect.add_argument("offset", type=int)
@@ -48,6 +59,10 @@ def main() -> None:
         out = report.structure(a.file.read_bytes())
     elif a.command == "schema":
         out = report.schema(a.file.read_bytes())
+    elif a.command == "compression":
+        out = report.compression(a.file.read_bytes(), a.column, a.page)
+    elif a.command in ("levels", "encodings", "pages"):
+        out = getattr(report, a.command)(a.file.read_bytes(), a.column)
     elif a.command == "interpret":
         out = report.interpret(a.file.read_bytes(), a.offset)
     else:
