@@ -66,10 +66,33 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 // Pyodide, for the labs' Python engine, comes from a public CDN. Fetch it through Node, which
 // trusts the same certificates as the rest of the toolchain (a proxy's included), and hand
 // Chromium the bytes: they are the same bytes either way.
+// Each file is fetched once per run and kept, and a failed fetch is tried again: a CI runner's
+// connection to the CDN sometimes times out, and that is not something the book can fix.
+const cdn = new Map();
+async function fromCdn(url) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const r = await fetch(url);
+      return { status: r.status, type: r.headers.get("content-type") || "application/octet-stream",
+        body: Buffer.from(await r.arrayBuffer()) };
+    } catch (error) {
+      if (attempt === 4) throw error;
+      await new Promise((r) => setTimeout(r, 2000 * 2 ** (attempt - 1)));
+    }
+  }
+}
 await page.context().route("https://cdn.jsdelivr.net/**", async (route) => {
-  const r = await fetch(route.request().url());
-  await route.fulfill({ status: r.status, headers: { "content-type": r.headers.get("content-type") || "application/octet-stream",
-    "access-control-allow-origin": "*" }, body: Buffer.from(await r.arrayBuffer()) });
+  const url = route.request().url();
+  if (!cdn.has(url)) cdn.set(url, fromCdn(url));
+  try {
+    const r = await cdn.get(url);
+    await route.fulfill({ status: r.status, headers: { "content-type": r.type, "access-control-allow-origin": "*" },
+      body: r.body });
+  } catch (error) {
+    cdn.delete(url);
+    console.log(`  (the CDN did not answer for ${url}: ${error.cause?.code || error.message})`);
+    await route.abort();
+  }
 });
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
