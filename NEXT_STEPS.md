@@ -178,8 +178,36 @@ So that a Run button could run the Rust problems' tests on a reader's own Rust.
   `scripts/fetch-rust-trial.mjs`). Phones are the open question: memory, and whether their
   browsers allow the threads rustc needs.
 
-Until that is settled, Rust runs online in a Codespace, and in the page as the prebuilt
-WebAssembly reader (`pqlab` Run buttons).
+First result from a phone (Samsung S22 Ultra, Firefox on Android, eight cores): cross-origin
+isolation and threads work; the downloads and compiling rustc take about ten seconds on first
+visit; hello world compiles in 1.7 s; the whole reader and its unit tests compile in 25 s, and
+the 80 tests pass.
+
+To consider, measuring each on the trial page before building it:
+
+- **A Rust Run button for the problems.** Compile the reader once, at deploy time, with rubrc's
+  rustc, so a Run compiles only the reader's answer and the chapter's tests against it. Hello
+  world's time suggests a few seconds on a phone.
+- **Editing the Rust reader in the page**, as "Edit the code" already does for Python: recompile
+  the reader and the labs' crate (for wasm32-wasip1, the page supplying its few WASI calls,
+  checked for the same JSON as the real module), swap it into the labs, and show what
+  `eprintln!` and `dbg!` print, so a reader can add debugging and watch it. Measure a full
+  compile at opt-level 0, and a recompile after a one-line edit with `-C incremental`, the cache
+  kept in the page's filesystem between runs.
+- **Checking the reader's browser before offering any of it.** Compiling needs cross-origin
+  isolation, `SharedArrayBuffer`, `Atomics`, several cores and close to a gigabyte of memory.
+  Test what the browser offers (`crossOriginIsolated`, `navigator.hardwareConcurrency`,
+  `navigator.deviceMemory` where it exists, `performance.measureUserAgentSpecificMemory()` where
+  it exists, and whether a large shared `WebAssembly.Memory` can be allocated and grown) and
+  offer in-page Rust only where it can work, with Codespaces otherwise. The trial page should
+  record the same checks, and the peak memory a compile used, so the thresholds come from real
+  devices.
+- **What the Python editor prints.** `print()` in an edited Python reader goes to the browser's
+  developer console, which a reader never sees, least of all on a phone. Show it under the
+  editor and the lab.
+
+Until then, Rust runs online in a Codespace, and in the page as the prebuilt WebAssembly reader
+(`pqlab` Run buttons).
 
 ## Then
 
