@@ -50,20 +50,21 @@ PYTHONPATH=python python3 -m parquet_lab interpret fixtures/tiny.parquet 629
 :sync: rust
 ```bash
 cargo run -p pqlab -- inspect fixtures/tiny.parquet
-cargo run -p pqlab -- footer fixtures/tiny.parquet
-cargo run -p pqlab -- footer fixtures/tiny.parquet --size suffix --prefetch 65536
+cargo run -p pqlab -- footer fixtures/tiny.parquet --json
+cargo run -p pqlab -- footer fixtures/tiny.parquet --size suffix --prefetch 65536 --json
 cargo run -p pqlab -- interpret fixtures/tiny.parquet 629
 ```
 :::
 ::::
 
-The Python reader covers every chapter whose excerpts have a Python tab; the Rust reader covers
-every chapter.
+Both readers cover every chapter. The commands the chapters mention, such as `statistics`,
+`skipping`, `scan`, `query`, `encryption` and `table`, are the same in each, and `--help` lists
+them.
 
 ## Solving the problems
 
-Each chapter's problems are stubs in Rust, in `exercises/src/<chapter>.rs`, and for the chapters
-the Python reader covers, in Python too, in `exercises/python/<chapter>.py`. Their tests are
+Each chapter's problems are stubs in Python, in `exercises/python/<chapter>.py`, and in Rust, in
+`exercises/src/<chapter>.rs`. Their tests are
 skipped by a plain test run, so the suite passes before you start. Run a chapter's problems with:
 
 ::::{tab-set}

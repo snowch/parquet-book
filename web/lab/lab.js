@@ -8,8 +8,8 @@
 //
 // The reader exists twice, in Rust and in Python, and the tests hold them to the same JSON. A lab
 // runs on the Rust reader compiled to WebAssembly unless the reader chooses Python, which runs the
-// book's Python files under Pyodide. The choice is remembered, and offered only for the labs the
-// Python reader can run so far.
+// book's Python files under Pyodide. The choice is remembered, and offered for every lab the
+// Python reader can run, which the build reads from its EXPERIMENTS list.
 
 import { Lab } from "./wasm.js";
 import { PyLab } from "./python.js";

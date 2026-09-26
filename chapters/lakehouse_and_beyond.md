@@ -64,9 +64,21 @@ The directory `country=UK` is a **Hive-style partition**: a name, an equals sign
 files under it do not hold a `country` column at all. The dataset writer removed it, since every
 row in the directory has the same value, and a reader restores it from the path:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
 ```bash
-pqlab query "fixtures/table/country=UK/part-0.parquet" "SELECT country FROM orders"
+PYTHONPATH=python python3 -m parquet_lab query "fixtures/table/country=UK/part-0.parquet" \
+    "SELECT country FROM orders"
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo run -p pqlab -- query "fixtures/table/country=UK/part-0.parquet" "SELECT country FROM orders"
+```
+:::
+::::
 
 ```text
 "error": "no column country"
@@ -146,21 +158,47 @@ Parquet file exactly as the earlier chapters read it.
 Every directory of the form `name=value` is a partition value, and values are percent-encoded
 where a path could not hold them:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/table.py
+:language: python
+:start-at: def partition_values(path: str)
+:end-before: def unescape(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/table.rs
 :language: rust
 :start-at: pub fn partition_values(
 :end-before: fn unescape(
 ```
+:::
+::::
 
 ### Reading the log
 
 Each line is one action. The statistics are JSON inside a JSON string, so they are parsed twice:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/table.py
+:language: python
+:start-at: def read_log(text: str)
+:end-before: def _stats(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/table.rs
 :language: rust
 :start-at: pub fn read_log(
 :end-before: /// A literal as the engine's value
 ```
+:::
+::::
 
 ### Ruling out a file
 
@@ -169,11 +207,24 @@ log records for it. The comparison is the one [ch09](#skipping-data) made agains
 statistics, with one more rule: a JSON number and a JSON string prove nothing about each other, so
 a comparison across kinds rules nothing out.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/table.py
+:language: python
+:start-at: def rules_out(
+:end-before: def query(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/table.rs
 :language: rust
 :start-at: fn rules_out(
 :end-before: /// Answer `sql` from the table
 ```
+:::
+::::
 
 ### Querying the files together
 
@@ -181,11 +232,24 @@ The query engine from [ch12](#a-tiny-query-engine) reads the files that survive 
 column named in a partition, rather than in the files' schema, takes its value from the path,
 the same value for every row of the file:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/engine.py
+:language: python
+:start-at: v = next((v for k, v in source.partition
+:end-before: cols.append(cells)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/engine.rs
 :language: rust
 :start-at: Col::Partition(p) => {
 :end-before: cols.push(cells);
 ```
+:::
+::::
 
 ### Checking it
 
@@ -193,9 +257,20 @@ The table's files were written by pyarrow, and pyarrow answered each query over 
 when the fixtures were generated. The tests hold the reader to those answers with every way of
 finding the files, and check that the log lists exactly the files a listing finds:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests -k table
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures table
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -236,24 +311,47 @@ at a time, and makes the log the only practical way to plan a query at all.
 
 ## Problems
 
-Three, in `exercises/src/lakehouse_and_beyond.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/lakehouse_and_beyond.py`, or in Rust in
+`exercises/src/lakehouse_and_beyond.rs`. The first two have tests. The third has none.
 
 **14.1 Partition values.** Read the partition values in a Hive-style path, percent-encoding
 included. The test compares your answer with the reader's for every file in the table and a set
 of awkward paths.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_lakehouse_and_beyond.py --problems -k problem_14_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test lakehouse_and_beyond problem_14_1 -- --ignored
 ```
+:::
+::::
 
 **14.2 Plan from the log.** Given a log and a range of `order_id`, return the files that could
 hold a row in it. The test compares your files with the reader's decisions for many ranges,
 checks against the files themselves that no file with a matching row is dropped, and runs a log
 that removes a file and adds one with no statistics.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_lakehouse_and_beyond.py --problems -k problem_14_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test lakehouse_and_beyond problem_14_2 -- --ignored
 ```
+:::
+::::
 
 **14.3 Your own table.** No test: the data is yours. Pick a table you query, and the three
 conditions its queries use most. Decide which column to partition by, and in what order to write

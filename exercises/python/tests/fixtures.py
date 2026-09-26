@@ -34,6 +34,17 @@ class Rng:
         return x % n
 
 
+class Lcg:
+    """The deterministic stream the Rust graders use, so both languages test the same cases."""
+
+    def __init__(self, seed: int) -> None:
+        self.state = seed
+
+    def next(self, below: int) -> int:
+        self.state = (self.state * 6364136223846793005 + 1442695040888963407) % 2**64
+        return (self.state >> 33) % below
+
+
 def stub(slug: str):
     """A chapter's problems module, loaded from ``exercises/python/<slug>.py`` by its path."""
     path = Path(__file__).resolve().parents[1] / f"{slug}.py"

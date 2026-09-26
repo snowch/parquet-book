@@ -11,12 +11,13 @@ from __future__ import annotations
 import json
 import math
 import struct
+from functools import cmp_to_key
 
-from . import bloom, crypto, logical, page_index
+from . import bloom, crypto, engine, logical, page_index, plain
 from .bytes import ByteReader, Span, le_terms, zigzag_decode
 from .column import first_rows, read_column
 from .compress import decompress, supported
-from .encoding import hex, plain_scalar, quote
+from .encoding import hex, json_text, plain_scalar, quote
 from .format import MIN_FILE_LEN, TRAILER_LEN, check_header, footer_span, parse_trailer
 from .layout import Layout, Query, Table, encode, ranges, show_cell
 from .metadata import ColumnChunk, FileMetaData, decode_file_metadata
@@ -24,22 +25,30 @@ from .nested import assemble, explain, path_fields
 from .object_store import Bounded, MemoryStore, NetworkModel, Request, StoreError, TracingStore
 from .pages import walk_pages
 from .parquet_thrift import Kind, enum_value_name, field_def
+from .prune import NONE as NO_MECHANISMS
+from .prune import Mechanisms, Op, Predicate, plan
 from .reader import FooterOptions, Head, Known, SuffixRange, read_footer
-from .schema import SchemaNode, build, leaves, to_text
+from .scan import Query as ScanQuery
+from .scan import Strategy
+from .scan import scan as run_scan
+from .schema import SchemaNode, build, leaves, physical_word, to_text
+from .stats import Comparator
+from .stats import bounds as stats_bounds
+from .table import query as table_query
 from .thrift import Map, Node, Struct, WireType
 
 MAX_SAFE = 2**53 - 1
 """The largest integer a JavaScript number holds exactly."""
 
 
-def plain(value: object) -> object:
+def jsonable(value: object) -> object:
     """A report as plain JSON values: spans as ``[start, end]``, and the two things JSON cannot
     hold written as strings, as the Rust reader writes them. An integer beyond 2^53 would be
     rounded by the browser, and JSON has no NaN or infinity."""
     if isinstance(value, dict):
-        return {k: plain(v) for k, v in value.items()}
+        return {k: jsonable(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
-        return [plain(v) for v in value]
+        return [jsonable(v) for v in value]
     if isinstance(value, Span):
         return [value.start, value.end]
     if isinstance(value, bool) or value is None or isinstance(value, str):
@@ -56,7 +65,7 @@ def plain(value: object) -> object:
 
 
 def dumps(value: object) -> str:
-    return json.dumps(plain(value), ensure_ascii=False, separators=(",", ":"))
+    return json.dumps(jsonable(value), ensure_ascii=False, separators=(",", ":"))
 
 
 def footer_lab(file: bytes, key: str, options: FooterOptions, model: NetworkModel) -> dict:
@@ -1054,4 +1063,594 @@ def compression(file: bytes, column: int, page: int | None) -> dict:
         "pages": listed,
         "page": page,
         "decompressed": decoded,
+    }
+
+
+def _stat_display(leaf, data: bytes) -> str:
+    shown = logical.interpret(leaf.physical_type, leaf.logical_type, data) if leaf.logical_type else None
+    return shown or plain_scalar(leaf.physical_type, data) or hex(data)
+
+
+def _all_null(reason: str, null_count: int | None, num_values: int) -> str:
+    """A chunk whose every value is null has no minimum or maximum, and that is not a gap in the
+    statistics: the null count says everything a reader needs."""
+    if null_count is not None and null_count == num_values and null_count > 0:
+        return (
+            "every value is null, so there is no minimum or maximum; the null count alone rules the "
+            "chunk out for any comparison with a value"
+        )
+    return reason
+
+
+def statistics(file: bytes, row_group: int, column: int) -> dict:
+    """Ch08's experiment: every column chunk's statistics, whether the reader may use them and
+    why, and for one chunk every field, the values in the column's order, and what a mistaken
+    order would have made of them."""
+    md = _open(file)
+    if isinstance(md, str):
+        return {"ok": False, "error": md}
+    try:
+        root = build(md.schema)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    found = leaves(root)
+
+    def comparator_of(leaf):
+        return Comparator.for_leaf(leaf, md.schema[leaf.element].converted_type)
+
+    def type_order(leaf) -> bool:
+        o = md.column_orders
+        return o is not None and leaf.column < len(o) and o[leaf.column] == "TYPE_ORDER"
+
+    def verdict_of(c, cmp, leaf):
+        if c.statistics is None:
+            return "the column chunk has no statistics"
+        try:
+            return stats_bounds(c.statistics, cmp, type_order(leaf))
+        except ValueError as e:
+            return _all_null(str(e), c.statistics.null_count, c.num_values)
+
+    columns = []
+    for leaf in found:
+        cmp = comparator_of(leaf)
+        chunks = []
+        for g, rg in enumerate(md.row_groups):
+            c = rg.columns[leaf.column]
+            null_count = c.statistics.null_count if c.statistics else None
+            v = verdict_of(c, cmp, leaf)
+            if isinstance(v, str):
+                chunks.append(
+                    {
+                        "row_group": g,
+                        "usable": False,
+                        "reason": v,
+                        "null_count": null_count,
+                        "num_rows": rg.num_rows,
+                    }
+                )
+            else:
+                chunks.append(
+                    {
+                        "row_group": g,
+                        "usable": True,
+                        "min": _stat_display(leaf, v.min),
+                        "max": _stat_display(leaf, v.max),
+                        "source": v.source,
+                        "null_count": null_count,
+                        "num_rows": rg.num_rows,
+                    }
+                )
+        lt = md.schema[leaf.element].logical_type
+        columns.append(
+            {
+                "column": leaf.column,
+                "path": leaf.dotted_path(),
+                "type": physical_word(leaf.physical_type, leaf.type_length),
+                "logical": str(lt) if lt else None,
+                "order": cmp.order(),
+                "comparator": cmp.description,
+                "chunks": chunks,
+            }
+        )
+    row_groups = [
+        {
+            "index": g,
+            "num_rows": rg.num_rows,
+            "total_byte_size": rg.total_byte_size,
+            "sorting_columns": [
+                {
+                    "column": s.column,
+                    "path": found[max(s.column, 0)].dotted_path() if max(s.column, 0) < len(found) else None,
+                    "descending": s.descending,
+                    "nulls_first": s.nulls_first,
+                }
+                for s in rg.sorting_columns
+            ],
+        }
+        for g, rg in enumerate(md.row_groups)
+    ]
+    if not (0 <= column < len(found) and 0 <= row_group < len(md.row_groups)):
+        return {"ok": False, "error": f"no column {column} in row group {row_group}"}
+    leaf = found[column]
+    chunk = md.row_groups[row_group].columns[leaf.column]
+    cmp = comparator_of(leaf)
+    # Every field of the Statistics struct the footer has, with the bytes that hold its value.
+    fields = []
+    s = chunk.statistics
+    if s is not None:
+        for name, data, span in (
+            ("min_value", s.min_value, s.min_span),
+            ("max_value", s.max_value, s.max_span),
+            ("min", s.min, s.min_deprecated_span),
+            ("max", s.max, s.max_deprecated_span),
+        ):
+            if data is not None and span is not None:
+                fields.append(
+                    {"name": name, "span": span, "hex": hex(data), "value": _stat_display(leaf, data)}
+                )
+        for name, v in (
+            ("null_count", s.null_count),
+            ("distinct_count", s.distinct_count),
+            ("is_min_value_exact", s.is_min_value_exact),
+            ("is_max_value_exact", s.is_max_value_exact),
+        ):
+            if v is not None:
+                shown = str(v).lower() if isinstance(v, bool) else str(v)
+                fields.append({"name": name, "span": s.span, "hex": None, "value": shown})
+    verdict = verdict_of(chunk, cmp, leaf)
+    # The values themselves, decoded, and what each order makes of them.
+    try:
+        triples = read_column(file, chunk, leaf).triples
+        values = [plain.to_plain_bytes(t.value, leaf.physical_type) for t in triples if t.value is not None]
+        nulls = sum(1 for t in triples if t.value is None)
+    except ValueError:
+        values, nulls = None, 0
+    values_json = None
+    if values is not None:
+        placed = sorted(
+            (v for v in values if cmp.compare(v, v) is not None),
+            key=cmp_to_key(lambda a, b: cmp.compare(a, b) or 0),
+        )
+
+        def pair(c):
+            found_pair = c.min_max(values)
+            if found_pair is None:
+                return None
+            return {"min": _stat_display(leaf, found_pair[0]), "max": _stat_display(leaf, found_pair[1])}
+
+        mistake = cmp.mistake()
+        values_json = {
+            "sorted": [_stat_display(leaf, v) for v in placed],
+            "unplaced": len(values) - len(placed),
+            "nulls": nulls,
+            "observed": pair(cmp),
+            "mistake": {"comparator": mistake[0].description, "what": mistake[1], "result": pair(mistake[0])}
+            if mistake
+            else None,
+        }
+    return {
+        "ok": True,
+        "created_by": md.created_by,
+        "column_orders": md.column_orders is not None,
+        "row_groups": row_groups,
+        "columns": columns,
+        "selected": {
+            "row_group": row_group,
+            "column": column,
+            "path": leaf.dotted_path(),
+            "order": cmp.order(),
+            "comparator": cmp.description,
+            "statistics_span": s.span if s else None,
+            "fields": fields,
+            "verdict": {"usable": False, "reason": verdict}
+            if isinstance(verdict, str)
+            else {
+                "usable": True,
+                "source": verdict.source,
+                "min": _stat_display(leaf, verdict.min),
+                "max": _stat_display(leaf, verdict.max),
+                "min_exact": verdict.min_exact,
+                "max_exact": verdict.max_exact,
+            },
+            "values": values_json,
+        },
+    }
+
+
+OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"]
+"""The comparisons :func:`skipping` accepts, in the order the browser numbers them."""
+
+
+def skipping(file: bytes, column: int, op: str, value: str, mechanisms: int) -> dict:
+    """Ch09's experiment: a condition on one column, and what the reader skips to answer
+    ``SELECT *`` with it. ``mechanisms`` is a bit set: 1 row group statistics, 2 Bloom filters,
+    4 the page index."""
+    md = _open(file)
+    if isinstance(md, str):
+        return {"ok": False, "error": md}
+    try:
+        root = build(md.schema)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    found = leaves(root)
+    flat = [leaf for leaf in found if leaf.max_repetition_level == 0]
+    columns = [
+        {
+            "column": leaf.column,
+            "path": leaf.dotted_path(),
+            "type": physical_word(leaf.physical_type, leaf.type_length),
+        }
+        for leaf in flat
+    ]
+
+    def fail(e: str) -> dict:
+        return {"ok": False, "error": e, "columns": columns}
+
+    leaf = next((leaf for leaf in flat if leaf.column == column), None)
+    if leaf is None:
+        return fail(f"no column {column} that does not repeat")
+    try:
+        parsed = Op.parse(op)
+        p = Predicate.new(leaf, md.schema[leaf.element].converted_type, parsed, value)
+    except ValueError as e:
+        return fail(str(e))
+    use = Mechanisms(bool(mechanisms & 1), bool(mechanisms & 2), bool(mechanisms & 4))
+    projection = [leaf.column for leaf in flat]
+    try:
+        pl = plan(file, md, leaf, p, projection, use)
+        full = plan(file, md, leaf, p, projection, NO_MECHANISMS)
+    except ValueError as e:
+        return fail(str(e))
+    # The answer, by reading everything: how many rows match, and in which row groups.
+    matching = []
+    for rg in md.row_groups:
+        try:
+            triples = read_column(file, rg.columns[leaf.column], leaf).triples
+        except ValueError as e:
+            return fail(str(e))
+        matching.append(
+            sum(
+                1
+                for t in triples
+                if p.row_matches(
+                    None if t.value is None else plain.to_plain_bytes(t.value, leaf.physical_type)
+                )
+            )
+        )
+
+    def path_of(c: int) -> str:
+        return found[c].dotted_path() if 0 <= c < len(found) else ""
+
+    groups = []
+    for g in pl.row_groups:
+        chunk = md.row_groups[g.index].columns[leaf.column]
+        # For equality, the Bloom filter probe in full, whether or not it decided.
+        probe = None
+        if p.value is not None and p.op is Op.EQ and use.bloom:
+            try:
+                f = bloom.read(file, chunk)
+            except ValueError:
+                f = None
+            if f is not None:
+                pr = f.probe(p.value)
+                probe = {
+                    "hash": f"{pr.hash:016x}",
+                    "block": pr.block,
+                    "blocks": f.num_blocks(),
+                    "block_span": f.block_span(pr.block),
+                    "bits": [{"bit": b, "set": is_set} for b, is_set in pr.bits],
+                    "may_contain": pr.may_contain,
+                }
+        groups.append(
+            {
+                "index": g.index,
+                "num_rows": g.num_rows,
+                "skipped": g.skipped,
+                "matching": matching[g.index],
+                "steps": [{"mechanism": m, "skip": d.skip, "why": d.why} for m, d in g.steps],
+                "bloom": probe,
+                "pages": [
+                    {"span": q.span, "rows": list(q.rows), "skip": q.decision.skip, "why": q.decision.why}
+                    for q in g.pages
+                ],
+                "rows": [list(r) for r in g.rows],
+                "reads": [
+                    {
+                        "column": r.column,
+                        "path": path_of(r.column),
+                        "spans": r.spans,
+                        "bytes": sum(s.length for s in r.spans),
+                        "pages_read": r.pages_read,
+                        "pages_total": r.pages_total,
+                    }
+                    for r in g.reads
+                ],
+                "index_bytes": g.index_bytes,
+            }
+        )
+    condition = (
+        f"{leaf.dotted_path()} {parsed.symbol} {value.strip()}"
+        if p.value is not None
+        else f"{leaf.dotted_path()} {parsed.symbol}"
+    )
+    return {
+        "ok": True,
+        "columns": columns,
+        "column": column,
+        "condition": condition,
+        "mechanisms": {"statistics": use.statistics, "bloom": use.bloom, "page_index": use.page_index},
+        "totals": {
+            "rows": md.num_rows,
+            "rows_read": pl.rows_read(),
+            "rows_matching": sum(matching),
+            "bytes_full_scan": full.bytes_read(),
+            "bytes_read": pl.bytes_read(),
+            "index_bytes": pl.index_bytes(),
+        },
+        "row_groups": groups,
+    }
+
+
+def flat_columns(file: bytes) -> list[int]:
+    """The leaf columns that do not repeat: the ones ``scan`` can return."""
+    md = open_bytes(file)
+    return [leaf.column for leaf in leaves(build(md.schema)) if leaf.max_repetition_level == 0]
+
+
+def scan(file: bytes, query: ScanQuery, strategy: Strategy, model: NetworkModel) -> dict:
+    """Ch10's experiment: a query run against the file in the simulated object store, with every
+    request, when it ran and on which connection, and the rows it returned."""
+    try:
+        md = open_bytes(file)
+        columns = [
+            {"column": leaf.column, "path": leaf.dotted_path()}
+            for leaf in leaves(build(md.schema))
+            if leaf.max_repetition_level == 0
+        ]
+    except (ValueError, StoreError) as e:
+        return {"ok": False, "error": str(e)}
+    try:
+        r = run_scan(file, "data.parquet", query, strategy, model)
+    except (ValueError, StoreError) as e:
+        return {"ok": False, "error": str(e), "columns": columns}
+    after = [q for q in r.requests if q.why.startswith(("read the indexes", "read the pages"))]
+    try:
+        footer_bytes = parse_trailer(file[-8:], len(file)).footer_length
+        row_groups = len(md.row_groups)
+    except ValueError:
+        footer_bytes, row_groups = 0, 0
+    return {
+        "ok": True,
+        "columns": columns,
+        "file_size": len(file),
+        "strategy": {
+            "footer": _options(strategy.footer, model),
+            "connections": strategy.connections,
+            "coalesce_gap": strategy.coalesce_gap,
+            "whole_chunks": strategy.whole_chunks,
+            "statistics": strategy.mechanisms.statistics,
+            "bloom": strategy.mechanisms.bloom,
+            "page_index": strategy.mechanisms.page_index,
+        },
+        "totals": {
+            "requests": len(r.requests),
+            "elapsed_us": r.elapsed_us,
+            "bytes_fetched": r.bytes_fetched,
+            "bytes_planned": r.bytes_planned,
+            "rows_decoded": r.rows_decoded,
+            "rows_matching": len(r.matches),
+            # What the query read once it had the footer: its indexes and pages.
+            "requests_after_footer": len(after),
+            "bytes_after_footer": sum(q.bytes_returned for q in after),
+            "footer_bytes": footer_bytes,
+            "row_groups": row_groups,
+        },
+        "requests": requests_json(r.requests),
+        "result": {"columns": r.column_names, "rows": r.rows},
+    }
+
+
+def query(file: bytes, sql: str) -> dict:
+    """Ch12's experiment: ``sql`` answered from ``file``, with every stage of the pipeline."""
+    try:
+        a = engine.run(file, sql)
+    except (ValueError, StoreError) as e:
+        return {"ok": False, "error": str(e)}
+    return _answer_json(a)
+
+
+def _answer_json(a) -> dict:
+    return {
+        "ok": True,
+        "columns": a.columns,
+        "rows": a.rows,
+        "row_groups": a.row_groups,
+        "row_groups_read": a.row_groups_read,
+        "bytes_read": a.bytes_read,
+        "stages": [
+            {
+                "name": s.name,
+                "detail": s.detail,
+                "rows_in": s.rows_in,
+                "rows_out": s.rows_out,
+                "columns": s.columns,
+                "sample": s.sample,
+            }
+            for s in a.stages
+        ],
+    }
+
+
+def _key_name(key_metadata: bytes) -> str:
+    """The master key a key-metadata blob names, when it is JSON with a ``masterKeyID``, as
+    pyarrow's is; otherwise its bytes as hex."""
+    try:
+        found = json.loads(key_metadata.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        found = None
+    if isinstance(found, dict) and isinstance(found.get("masterKeyID"), str):
+        return found["masterKeyID"]
+    return hex(key_metadata)
+
+
+def encryption(file: bytes) -> dict:
+    """Ch13's experiment: what a reader without keys can see in a file, and what it cannot.
+    Every "visible" item is something the reader decoded here; every "hidden" item is one it
+    tried to read and could not."""
+
+    def item(what: str, span: Span | None, value: str) -> dict:
+        return {"what": what, "span": span, "value": value}
+
+    visible, hidden, columns = [], [], []
+    if len(file) >= 4 and file[:4] == crypto.MAGIC_ENCRYPTED:
+        mode = "encrypted footer"
+        try:
+            f = crypto.encrypted_footer(file)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        visible.append(item("That it is Parquet, with an encrypted footer", Span(0, 4), "PARE"))
+        visible.append(item("The encryption algorithm", f.crypto_metadata.span, f.algorithm))
+        if f.key_metadata is not None:
+            visible.append(item("The footer key's name", f.crypto_metadata.span, _key_name(f.key_metadata)))
+        visible.append(item("The encrypted footer's size", f.module.span, f"{f.module.span.length} bytes"))
+        for what in (
+            "The schema",
+            "The number of rows",
+            "Where any column is",
+            "Any statistics",
+            "Any values, even of columns not encrypted",
+        ):
+            hidden.append(item(what, f.module.ciphertext, "inside the encrypted footer"))
+    else:
+        md = _open(file)
+        if isinstance(md, str):
+            return {"ok": False, "error": md}
+        mode = "plaintext footer" if md.encryption_algorithm is not None else "not encrypted"
+        if md.encryption_algorithm is not None:
+            visible.append(item("The encryption algorithm", md.footer_signature, md.encryption_algorithm))
+        if md.footer_signature is not None:
+            visible.append(
+                item(
+                    "The footer's signature, which only the footer key can check",
+                    md.footer_signature,
+                    "28 bytes",
+                )
+            )
+        try:
+            found = leaves(build(md.schema))
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        visible.append(item("The schema", None, ", ".join(leaf.dotted_path() for leaf in found)))
+        visible.append(item("The number of rows", None, str(md.num_rows)))
+        for leaf in found:
+            chunks = [rg.columns[leaf.column] for rg in md.row_groups]
+            if not chunks:
+                continue
+            first = chunks[0]
+            path = leaf.dotted_path()
+            key, sample, modules, error = None, [], 0, None
+            if first.crypto is not None:
+                c = first.crypto
+                key = (
+                    _key_name(c.key_metadata)
+                    if c.key_metadata is not None and c.with_column_key
+                    else "the footer key"
+                )
+                try:
+                    modules = len(crypto.chunk_modules(file, first.byte_range()))
+                except ValueError:
+                    modules = 0
+                try:
+                    read_column(file, first, leaf)
+                except ValueError as e:
+                    error = str(e)
+            else:
+                try:
+                    triples = read_column(file, first, leaf).triples[:4]
+                    sample = [
+                        None
+                        if t.value is None
+                        else logical.value_json(leaf.physical_type, leaf.logical_type, t.value)
+                        for t in triples
+                    ]
+                except ValueError:
+                    sample = []
+            if key is None and md.encryption_algorithm is not None:
+                shown = ", ".join(json_text(v) for v in sample)
+                visible.append(item(f"The values of {path}", first.byte_range(), f"{shown}, …"))
+                s = first.statistics
+                if s is not None and s.min_value is not None and s.max_value is not None:
+                    visible.append(
+                        item(
+                            f"The statistics of {path}",
+                            s.span,
+                            f"{_stat_display(leaf, s.min_value)} to {_stat_display(leaf, s.max_value)}",
+                        )
+                    )
+            if key is not None:
+                hidden.append(item(f"The values of {path}", first.byte_range(), error or ""))
+                if first.statistics is None:
+                    hidden.append(
+                        item(
+                            f"The statistics of {path}",
+                            first.crypto.encrypted_metadata if first.crypto else None,
+                            "withheld from the plaintext footer",
+                        )
+                    )
+                visible.append(item(f"Which key protects {path}", None, key))
+            columns.append(
+                {
+                    "path": path,
+                    "encrypted": key is not None,
+                    "key": key,
+                    "span": first.byte_range(),
+                    "statistics_visible": first.statistics is not None,
+                    "modules": modules,
+                    "sample": sample,
+                }
+            )
+    return {"ok": True, "mode": mode, "visible": visible, "hidden": hidden, "columns": columns}
+
+
+def table(
+    objects: list[tuple[str, bytes]], sql: str, discovery, connections: int, model: NetworkModel
+) -> dict:
+    """Ch14's experiment: ``sql`` over the table under ``table/`` in a store holding ``objects``,
+    with its files found by ``discovery``: every file considered, every request made, and the
+    answer."""
+    store = MemoryStore()
+    for k, v in objects:
+        store.put(k, v)
+    try:
+        a = table_query(store, "table/", sql, discovery, connections, model)
+    except (ValueError, StoreError) as e:
+        return {"ok": False, "error": str(e)}
+    return {
+        "ok": True,
+        "discovery": discovery.value,
+        "files": [
+            {
+                "key": f.key,
+                "partition": [f"{k}={v}" for k, v in f.partition],
+                "size": f.size,
+                "rows": f.stats.num_records if f.stats else None,
+                "read": f.read,
+                "why": f.why,
+            }
+            for f in a.files
+        ],
+        "requests": requests_json(a.requests),
+        "totals": {
+            "requests": len(a.requests),
+            "elapsed_us": a.elapsed_us,
+            "bytes_fetched": a.bytes_fetched,
+            "files": len(a.files),
+            "files_read": sum(1 for f in a.files if f.read),
+        },
+        "columns": a.answer.columns,
+        "rows": a.answer.rows,
+        "stages": [
+            {"name": s.name, "detail": s.detail, "rows_in": s.rows_in, "rows_out": s.rows_out}
+            for s in a.answer.stages
+        ],
     }

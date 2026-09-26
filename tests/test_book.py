@@ -208,11 +208,16 @@ def test_the_number_check_catches_a_typed_number(tmp_path):
         page.unlink()
 
 
+def test_every_chapter_is_in_both_readers():
+    """The book is written in Python and in Rust throughout; a chapter in one only is unfinished."""
+    assert [c.slug for c in PORTED] == [c.slug for c in WRITTEN]
+
+
 @pytest.mark.parametrize("chapter", PORTED, ids=lambda c: c.slug)
 def test_a_ported_chapter_quotes_both_readers(chapter):
     """Every excerpt of the Rust reader has its Python counterpart beside it, in a tab set."""
     text = (ROOT / chapter.path).read_text()
-    rust = re.findall(r"^```\{literalinclude\} \.\./crates/", text, re.M)
+    rust = re.findall(r"^```\{literalinclude\} \.\./crates/parquet-lab/", text, re.M)
     python = re.findall(r"^```\{literalinclude\} \.\./python/", text, re.M)
     assert len(rust) == len(python), "quote each step in Python and in Rust"
     assert text.count("::::{tab-set}") >= len(rust)

@@ -173,7 +173,7 @@ def test_records_rebuilt_from_levels_match_pyarrows_rows():
                 continue
             assert len(records) == len(rows), f"{name} {leaf.dotted_path()}: one record per row"
             for i, (mine, row) in enumerate(zip(records, rows, strict=True)):
-                assert report.plain(mine) == project(row, keys), f"{name} {leaf.dotted_path()} record {i}"
+                assert report.jsonable(mine) == project(row, keys), f"{name} {leaf.dotted_path()} record {i}"
                 checked += 1
     assert checked > 40
 

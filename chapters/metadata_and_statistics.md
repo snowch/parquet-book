@@ -157,21 +157,46 @@ reads anything else. [ch10](#how-readers-read) measures that.
 
 The order comes from the physical type and the annotation together:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/stats.py
+:language: python
+:start-at: def for_leaf(leaf: Leaf, converted: str | None)
+:end-before: def order(self)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/stats.rs
 :language: rust
 :start-at: pub fn for_leaf(
 :end-before: pub fn order(&self)
 ```
+:::
+::::
 
 ### The rules
 
 `bounds` applies the rules in the order the chapter gives them, and says why when it refuses:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/stats.py
+:language: python
+:start-at: def bounds(stats: Statistics
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/stats.rs
 :language: rust
 :start-at: pub fn bounds(
 :end-before: #[cfg(test)]
 ```
+:::
+::::
 
 [ch03](#the-type-system)'s reader used `min` and `max` whenever `min_value` and `max_value` were
 missing. That was the mistake this chapter describes, and the statistics decoder now keeps the
@@ -183,9 +208,20 @@ For every column chunk of every fixture, the reader decodes the values, finds th
 maximum in its chosen order, and compares them with the bounds pyarrow wrote. They agree. The
 statistics fixture also shows that each mistaken order gets at least one of its columns wrong:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -221,26 +257,50 @@ language does cannot use these bounds directly.
 
 ## Problems
 
-Three, in `exercises/src/metadata_and_statistics.rs`. The first two have tests. The third has
+Three, in `exercises/python/metadata_and_statistics.py`, or in Rust in
+`exercises/src/metadata_and_statistics.rs`. The first two have tests. The third has
 none.
 
 **8.1 Sort orders.** Compare two values of a column in its sort order, for six kinds of column.
 The test finds each column chunk's minimum and maximum with your order and checks them against
 the bounds pyarrow wrote.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_metadata_and_statistics.py --problems -k problem_8_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test metadata_and_statistics problem_8_1 -- --ignored
 ```
+:::
+::::
 
 **8.2 Which bounds.** Decide which bounds a reader may use. The test presents each chunk's
 statistics as written, without `column_orders`, as an old writer would have set them, and with a
 NaN.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_metadata_and_statistics.py --problems -k problem_8_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test metadata_and_statistics problem_8_2 -- --ignored
 ```
+:::
+::::
 
 **8.3 Your own footers.** No test: the files are yours. Run
+`PYTHONPATH=python python3 -m parquet_lab statistics FILE 0 COLUMN` or
 `cargo run -p pqlab -- statistics FILE 0 COLUMN` on a file your systems write, for a few
 columns. Record which columns have statistics, whether the reader accepts them, and what share of
 the file the footer takes. Then find one column where the statistics could not help a query you

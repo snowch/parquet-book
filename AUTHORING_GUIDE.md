@@ -29,7 +29,7 @@ Not the order the chapter is read in.
 2. **The problems and their tests.** Stubs in `exercises/src/<slug>.rs`, tests in
    `exercises/tests/<slug>.rs`. Make each fail, and read the failure: it is the first thing a
    reader sees, and it should say where to look. Then solve each one *outside the repository* and
-   check it passes. Never commit the solution. A ported chapter has the same problems in
+   check it passes. Never commit the solution. Every chapter has the same problems in
    `exercises/python/`, marked `@pytest.mark.problem`, graded the same way.
 3. **The experiment.** A report function that runs the reader, a WASM export, and a panel in
    `web/lab/`. See CLAUDE.md, *Adding things*.

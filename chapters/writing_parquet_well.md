@@ -143,9 +143,20 @@ requests after the footer:
 Every file reassembles to the same rows, and every query returns the same matches from every
 file, whatever the layout:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -176,25 +187,49 @@ writers choose differently, and a file's `created_by` says which one wrote it.
 
 ## Problems
 
-Three, in `exercises/src/writing_parquet_well.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/writing_parquet_well.py`, or in Rust in
+`exercises/src/writing_parquet_well.rs`. The first two have tests. The third has none.
 
 **11.1 Row groups per lookup.** From each row group's bounds, count the row groups a lookup for a
 value must read. The test compares your count with the reader's plans for values in every file.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_writing_parquet_well.py --problems -k problem_11_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test writing_parquet_well problem_11_1 -- --ignored
 ```
+:::
+::::
 
 **11.2 What order costs.** From a column's values in file order and a row group size, compute the
 mean number of row groups a lookup reads. The test checks every ch11 file's integer columns.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_writing_parquet_well.py --problems -k problem_11_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test writing_parquet_well problem_11_2 -- --ignored
 ```
+:::
+::::
 
 **11.3 Your own writer.** No test: the data is yours. Rewrite one of your files three ways,
 changing one setting each time: the sort column, the row group size, or dictionary encoding for
-one column. Measure each with `cargo run -p pqlab -- scan FILE --where ...` on a query you run
+one column. Measure each with `PYTHONPATH=python python3 -m parquet_lab scan FILE --where ...` or
+`cargo run -p pqlab -- scan FILE --where ...` on a query you run
 often. A good answer reports the file sizes, what each query read, and which setting you would
 change in production, with the cost that change puts on writing.
 

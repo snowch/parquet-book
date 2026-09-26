@@ -95,8 +95,7 @@ against pyarrow on its own, since two readers that agree can both be wrong. The 
 step in both languages, in tabs that remember the reader's choice, Python first. The labs run on
 the Rust reader through WebAssembly by default, because it loads instantly; a reader can switch
 them to the Python reader, which the page runs under Pyodide, fetched from a pinned CDN release
-only when chosen. The port proceeds chapter by chapter, and a chapter counts as ported only when
-its excerpts, problems and labs all exist in both.
+only when chosen. Every chapter's excerpts, problems and labs exist in both.
 
 **No dependencies in the reader.** Not for Thrift, not for JSON, not for WASM bindings. Each is
 small enough to write in the open, which is the point of the book, and `cargo build --offline`
@@ -136,8 +135,8 @@ intended rows, and the tests hold the keyless reader to pyarrow's keyed descript
 
 **Problems are tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page under
 Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the
-problems run with `cargo test -- --ignored`, or, for the chapters the Python reader covers, with
-`pytest --problems`, and the page shows both commands. The experiments carry the in-browser
+problems run with `cargo test -- --ignored`, or in Python with `pytest --problems`, and the page
+shows both commands. The experiments carry the in-browser
 interactivity instead.
 
 ## 5. The chapter shape

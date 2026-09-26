@@ -120,42 +120,92 @@ whole file, so a missed range cannot pass unnoticed.
 
 ### Merging ranges
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/scan.py
+:language: python
+:start-at: def coalesce(spans: list[Span], gap: int | None)
+:end-before: def fetch(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/scan.rs
 :language: rust
 :start-at: pub fn coalesce(
 :end-before: /// Fetch every range the reader does not already have
 ```
+:::
+::::
 
 ### A clock for every connection
 
 The simulated store gives each request the connection that is free first, and never starts it
 before its phase:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/object_store.py
+:language: python
+:start-at: # The connection that is free first
+:end-before: self.requests.append(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/object_store.rs
 :language: rust
 :start-at: // The connection that is free first
 :end-before: self.requests.push(Request {
 ```
+:::
+::::
 
 ### Reading chosen pages
 
 With the page index, the reader parses each wanted page where the OffsetIndex says it starts,
 without walking the pages before it:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/column.py
+:language: python
+:start-at: def read_column_pages(
+:end-before: def decode_pages(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: pub fn read_column_pages(
 :end-before: /// Decode pages already located
 ```
+:::
+::::
 
 ### Checking it
 
 Over two hundred combinations of fixture, condition and strategy, the reader's rows must equal a
 plain read's:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests -k every_strategy
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures every_strategy
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -191,26 +241,50 @@ can take longer than fetching, and a reader that overlaps the two gains most.
 
 ## Problems
 
-Three, in `exercises/src/how_readers_read.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/how_readers_read.py`, or in Rust in
+`exercises/src/how_readers_read.rs`. The first two have tests. The third has none.
 
 **10.1 Merge ranges.** Turn byte ranges into requests, merging those within a gap. The test
 compares your requests with the reader's on thousands of generated cases.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_how_readers_read.py --problems -k problem_10_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test how_readers_read problem_10_1 -- --ignored
 ```
+:::
+::::
 
 **10.2 Time the requests.** Given each phase's request durations and a number of connections,
 say when the last request finishes. The test compares your answer with the simulated store's
 clock.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_how_readers_read.py --problems -k problem_10_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test how_readers_read problem_10_2 -- --ignored
 ```
+:::
+::::
 
 **10.3 Your own network.** No test: the network is yours. Time a hundred small range requests
 and a few large ones against the object store your files live in, and estimate its latency and
-bandwidth. Then run `cargo run -p pqlab -- scan FILE --where ... --latency-us N --bandwidth N`
+bandwidth. Then run `PYTHONPATH=python python3 -m parquet_lab scan FILE --where ... --latency-us N --bandwidth N` or
+`cargo run -p pqlab -- scan FILE --where ... --latency-us N --bandwidth N`
 on one of your files, with a few gaps and connection counts. A good answer names the gap and
 connection count you would choose, and checks the prediction against a real query's timing.
 

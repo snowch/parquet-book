@@ -142,32 +142,71 @@ many requests they add, which [ch10](#how-readers-read) measures.
 
 Each comparison, and the fact that rules it out:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/prune.py
+:language: python
+:start-at: def against_bounds(
+:end-before: @dataclass(frozen=True)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/prune.rs
 :language: rust
 :start-at: pub fn against_bounds(
 :end-before: /// Which mechanisms a plan may use.
 ```
+:::
+::::
 
 ### Probing a Bloom filter
 
 The block and the eight bits come from the hash alone:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/bloom.py
+:language: python
+:start-at: def probe_hash(self, hash: int)
+:end-before: def read(file: bytes, chunk: ColumnChunk)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/bloom.rs
 :language: rust
 :start-at: pub fn probe_hash(
 :end-before: /// Read a column chunk's Bloom filter
 ```
+:::
+::::
 
 xxHash64 itself is about fifty lines in the same file, checked against the reference hashes of short
 strings.
 
 ### From kept rows to the pages of every column
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/prune.py
+:language: python
+:start-at: def column_read(
+:end-before: def plan(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/prune.rs
 :language: rust
 :start-at: /// The bytes of `chunk` needed for `rows`
 :end-before: /// Plan a read of `projection`
 ```
+:::
+::::
 
 ### Checking it
 
@@ -177,9 +216,20 @@ own minimum, maximum and null count, as the reader computes them from the decode
 for hundreds of conditions on every fixture, every row that matches must lie in a row range the
 plan keeps, in a page every column reads. Every value in a chunk must also pass its Bloom filter.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -217,25 +267,49 @@ there before reading any data page. This reader does not.
 
 ## Problems
 
-Three, in `exercises/src/skipping_data.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/skipping_data.py`, or in Rust in
+`exercises/src/skipping_data.rs`. The first two have tests. The third has none.
 
 **9.1 Can this be skipped?** Decide from a range and a null count whether a page can hold a match
 for four comparisons. The test checks every page of the pruning fixtures: you must never skip a
 page holding a match, and must skip every page the metadata rules out.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_skipping_data.py --problems -k problem_9_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test skipping_data problem_9_1 -- --ignored
 ```
+:::
+::::
 
 **9.2 Probe a Bloom filter.** Given a filter's bitset and a value's hash, test the eight bits.
 The test compares your answer with the reader's for thousands of customer numbers.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_skipping_data.py --problems -k problem_9_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test skipping_data problem_9_2 -- --ignored
 ```
+:::
+::::
 
 **9.3 Your own condition.** No test: the data is yours. Take a condition your queries use often
-and a file they run against, and run `cargo run -p pqlab -- skipping FILE COLUMN OP VALUE`. Record
+and a file they run against, and run `PYTHONPATH=python python3 -m parquet_lab skipping FILE COLUMN OP VALUE` or
+`cargo run -p pqlab -- skipping FILE COLUMN OP VALUE`. Record
 how many row groups and bytes it skips, and with which mechanisms. Then rewrite the file sorted by
 that column and run it again. A good answer reports both, says what the sort cost the other
 columns' compression, and names a condition the sort does not help.

@@ -100,8 +100,8 @@ same JSON as `report.rs`, and `tests/test_python.py` makes every call the Python
 through both, on every fixture and on damaged copies, requiring identical JSON, key order and
 error messages included. `python/parquet_lab/browser.py` is the Python engine's equivalent of the
 C ABI; `web/lab/python.js` loads it into Pyodide (pinned, from a CDN) behind the same methods as
-`wasm.js`. Its `EXPERIMENTS` names the labs it can run; the page offers the Python engine only for
-those, and a test requires them to be exactly the ported chapters' experiments.
+`wasm.js`. Its `EXPERIMENTS` names the labs it can run, which is every lab; the page offers the
+Python engine for those, and a test requires them to be exactly the chapters' experiments.
 
 **Experiments are fenced blocks.** A page embeds one with:
 
@@ -139,9 +139,9 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
    about the reader's own files, which has no test and says what a good answer contains.
 6. **Deterministic.** The object store is simulated, with a fixed `NetworkModel`; nothing reads a
    clock or a network. The same commit builds the same book, byte for byte.
-7. **Two readers, one answer.** The Python and Rust readers are ported together: a chapter the
-   Python reader covers quotes every step in both languages in a `{tab-set}` (Python first, synced
-   `python` and `rust`), ships its problems in both, and offers its labs on both engines. A change
+7. **Two readers, one answer.** The Python and Rust readers cover every chapter: a chapter quotes
+   every step in both languages in a `{tab-set}` (Python first, synced `python` and `rust`), ships
+   its problems in both, and offers its labs on both engines. A change
    to one reader is made to the other in the same commit; the parity test fails otherwise.
 
 ## Adding things
@@ -152,8 +152,8 @@ run `make chapter` for the skeleton. Then follow AUTHORING_GUIDE.md: problems fi
 reader code, then figures, then prose. A chapter's number is derived from its position; its
 identity is its slug. Never put a number in a slug, label or file name.
 
-**A chapter's Python port.** Port the Rust modules the chapter adds to `python/parquet_lab/`,
-same names and same JSON; add their reports to `browser.py` and its `EXPERIMENTS`, their calls to
+**A chapter's Python half.** A new chapter is written in both readers. Write the Python twin of
+every Rust module the chapter adds in `python/parquet_lab/`, same names and same JSON; add their reports to `browser.py` and its `EXPERIMENTS`, their calls to
 `tests/test_python.py` and methods to `web/lab/python.js`; port the Rust unit and fixture tests to
 `python/tests/`; write the problems in `exercises/python/`; and put every excerpt in the chapter
 in a tab set beside its Rust twin. `tests/test_book.py` checks the chapter's side of this.
@@ -163,9 +163,11 @@ commit the `.parquet`, the `.json` manifest and the regenerated `fixtures/README
 Keep it small enough to read byte by byte. The Rust fixture tests pick it up automatically.
 
 **An experiment.** Add a report function in `crates/parquet-lab/src/report.rs` that runs the reader
-and returns JSON (and, once its chapter is ported, in `python/parquet_lab/report.py`); export it from `crates/parquet-lab-wasm`; add a method to `web/lab/wasm.js`, a
-mount function in `web/lab/`, its name to `EXPERIMENTS` in `web/lab/lab.js` and `tools/outline.py`,
-a matching `pqlab` subcommand, and its calls to `tests/test_wasm.py`. JavaScript draws; it never
+and returns JSON, and its twin in `python/parquet_lab/report.py`; export it from
+`crates/parquet-lab-wasm` and `python/parquet_lab/browser.py`; add a method to `web/lab/wasm.js`
+and `web/lab/python.js`, a mount function in `web/lab/`, its name to `EXPERIMENTS` in
+`web/lab/lab.js` and `tools/outline.py`, a matching subcommand in `pqlab` and in
+`python -m parquet_lab`, and its calls to `tests/test_wasm.py` and `tests/test_python.py`. JavaScript draws; it never
 computes anything Parquet-shaped.
 
 **A figure.** Add a `Figure` to `crates/pqlab/src/figures.rs` that runs the reader and returns

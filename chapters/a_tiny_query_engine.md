@@ -92,38 +92,88 @@ that cannot, strings compared byte by byte, unsigned and negative integers, and 
 The parser is a tokenizer and a recursive-descent parser, one function per piece of the grammar.
 A condition, for example:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/engine.py
+:language: python
+:start-at: def condition(self) -> Condition
+:end-before: def list(self, one)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/engine.rs
 :language: rust
 :start-at: fn condition(&mut self)
 :end-before: fn list<T>(
 ```
+:::
+::::
 
 ### Scanning with the statistics
 
 The scan skips a row group if any condition's comparison against the footer's bounds rules it
 out, and records which:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/engine.py
+:language: python
+:start-at: # Skip the row group if any condition's comparison
+:end-before: read += 1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/engine.rs
 :language: rust
 :start-at: // Skip the row group if any condition's comparison
 :end-before: read += 1;
 ```
+:::
+::::
 
 ### Aggregating
 
 Each aggregate keeps a running state per group, and nulls are skipped, as SQL requires:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/engine.py
+:language: python
+:start-at: def add(self, v: object, star: bool = False)
+:end-before: def result(self)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/engine.rs
 :language: rust
 :start-at: /// Fold in one value.
 :end-before: fn result(&self) -> Value {
 ```
+:::
+::::
 
 ### Checking it
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests -k engine
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures engine
 ```
+:::
+::::
 
 ## What this cannot tell you
 
@@ -159,24 +209,48 @@ is the natural next step, and problem 12.3 asks what it would change.
 
 ## Problems
 
-Three, in `exercises/src/a_tiny_query_engine.rs`. The first two have tests. The third has none.
+Three, in `exercises/python/a_tiny_query_engine.py`, or in Rust in
+`exercises/src/a_tiny_query_engine.rs`. The first two have tests. The third has none.
 
 **12.1 A hash aggregate.** Sum values by group. The test compares your sums with pyarrow's for
 the baseline file's statuses, and with many generated cases.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_a_tiny_query_engine.py --problems -k problem_12_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test a_tiny_query_engine problem_12_1 -- --ignored
 ```
+:::
+::::
 
 **12.2 The top `n`.** Return the `n` largest amounts, ties broken by order number. The test
 compares your answer with pyarrow's sort, and with many generated cases.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_a_tiny_query_engine.py --problems -k problem_12_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test a_tiny_query_engine problem_12_2 -- --ignored
 ```
+:::
+::::
 
 **12.3 Your own queries.** No test: the queries are yours. Run three queries you use against one
-of your files with `cargo run -p pqlab -- query FILE "SQL"`, and the same queries in an engine you
+of your files with `PYTHONPATH=python python3 -m parquet_lab query FILE "SQL"` or
+`cargo run -p pqlab -- query FILE "SQL"`, and the same queries in an engine you
 trust. Record whether the answers agree and how many row groups the scan read. Then pick the one
 that read the most, and say how page-level skipping from [ch09](#skipping-data) would change its
 scan. A good answer estimates the rows it would no longer decode, using the page index.

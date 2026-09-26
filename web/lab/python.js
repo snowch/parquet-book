@@ -10,6 +10,8 @@
 
 import { SIZE_SOURCES } from "./wasm.js";
 
+const OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];
+
 export const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v0.29.3/full/";
 
 export class PyLab {
@@ -80,6 +82,43 @@ export class PyLab {
   /** `page` omitted or null: the first data page. */
   compression(id, column, page = null) {
     return this.#json(this.api.compression(id, column, page === null ? 0xffffffff : page));
+  }
+
+  statistics(id, rowGroup, column) {
+    return this.#json(this.api.statistics(id, rowGroup, column));
+  }
+
+  /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
+  skipping(id, column, op, value, mechanisms = 7) {
+    return this.#json(this.api.skipping(id, column, OPS.indexOf(op), value ?? "", mechanisms));
+  }
+
+  /** The same arguments as the WebAssembly Lab's `scan`. */
+  scan(id, columns, where, s) {
+    const mask = (columns || []).reduce((m, c) => m | (1 << c), 0);
+    const flags = (s.statistics ? 1 : 0) | (s.bloom ? 2 : 0) | (s.pageIndex ? 4 : 0) | (s.wholeChunks ? 8 : 0);
+    return this.#json(this.api.scan(id, mask, where ? where.column : 0xffffffff,
+      where ? OPS.indexOf(where.op) : 0, where ? where.value ?? "" : "", s.footer === "suffix" ? 1 : 0, s.prefetch,
+      s.connections, s.gap === null || s.gap === undefined ? 0xffffffff : s.gap, flags, s.latencyUs, s.bandwidth));
+  }
+
+  /** Answer SQL from the file, stage by stage. */
+  query(id, sql) {
+    return this.#json(this.api.query(id, sql));
+  }
+
+  encryption(id) {
+    return this.#json(this.api.encryption(id));
+  }
+
+  table(ids, sql, discovery = "log", connections = 4, latencyUs = 20000, bandwidth = 100000000) {
+    const d = { list: 0, prune: 1, log: 2 }[discovery] ?? 2;
+    const list = this.pyodide.toPy(ids);
+    try {
+      return this.#json(this.api.table(list, sql, d, connections, latencyUs, bandwidth));
+    } finally {
+      list.destroy();
+    }
   }
 
   interpret(id, offset) {
