@@ -2,13 +2,13 @@
 
 | File | How the size is found | Tail read | Requests | Bytes back | Simulated time |
 |---|---|--:|--:|--:|--:|
-| `tiny.parquet` | `HEAD` | 8 | 3 | 388 | 60.005 ms |
-| `tiny.parquet` | from a listing | 8 | 2 | 388 | 40.005 ms |
-| `tiny.parquet` | suffix range | 8 | 2 | 388 | 40.005 ms |
-| `tiny.parquet` | suffix range | 65536 | 1 | 637 | 20.007 ms |
-| `multiple-row-groups.parquet` | `HEAD` | 8 | 3 | 910 | 60.011 ms |
-| `multiple-row-groups.parquet` | from a listing | 8 | 2 | 910 | 40.011 ms |
-| `multiple-row-groups.parquet` | suffix range | 8 | 2 | 910 | 40.011 ms |
-| `multiple-row-groups.parquet` | suffix range | 65536 | 1 | 1517 | 20.016 ms |
+| `tiny.parquet` | `HEAD` | 8 | 3 | 388 | 60 ms |
+| `tiny.parquet` | from a listing | 8 | 2 | 388 | 40 ms |
+| `tiny.parquet` | suffix range | 8 | 2 | 388 | 40 ms |
+| `tiny.parquet` | suffix range | 65536 | 1 | 637 | 20 ms |
+| `multiple-row-groups.parquet` | `HEAD` | 8 | 3 | 910 | 60 ms |
+| `multiple-row-groups.parquet` | from a listing | 8 | 2 | 910 | 40 ms |
+| `multiple-row-groups.parquet` | suffix range | 8 | 2 | 910 | 40 ms |
+| `multiple-row-groups.parquet` | suffix range | 65536 | 1 | 1517 | 20 ms |
 
 *Computed by the reader from the fixtures: `tiny.parquet` is 637 bytes, `multiple-row-groups.parquet` is 1517 bytes. Simulated network: 20 ms per request, 100 MB/s once data flows.*

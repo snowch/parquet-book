@@ -146,8 +146,8 @@ figure.quoted pre { margin-top: 0; border-top-left-radius: 0; border-top-right-r
               font: 12px/1.4 var(--chrome); color: var(--faint); background: var(--panel);
               border: 1px solid var(--edge); border-bottom: 0; border-radius: 6px 6px 0 0;
               padding: .35rem 1rem; }
-.source-bar code { background: none; padding: 0; font-size: 12px; }
-.source-bar a { color: var(--muted); text-decoration: none; }
+.source-bar code { background: none; padding: 0; font-size: 12px; overflow-wrap: anywhere; }
+.source-bar a { color: var(--muted); text-decoration: none; min-width: 0; }
 .source-bar a:hover { color: var(--accent); }
 /* The same step in Python and in Rust. The head script sets <html data-code>; without it both
    panels show, one after the other, and the tab bar is hidden. */
@@ -180,6 +180,17 @@ th { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform:
 td.align-right, th.align-right { text-align: right; }
 td.align-center, th.align-center { text-align: center; }
 td code { font-size: 12.5px; }
+/* On a phone, a wide table becomes one card per row, each value under its column's heading. */
+@media (max-width: 40rem) {
+  table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
+  table.cards thead { display: none; }
+  table.cards tr { border-bottom: 1px solid var(--rule); padding: .45rem 0; }
+  table.cards td { display: grid; grid-template-columns: minmax(6.5rem, 38%) 1fr; gap: .7rem;
+                   border: 0; padding: .12rem 0; text-align: left; }
+  table.cards td::before { content: attr(data-label); font-size: 11px; font-weight: 600;
+                           letter-spacing: .05em; text-transform: uppercase; color: var(--faint);
+                           padding-top: .15em; }
+}
 .generated > p:last-child em { font: italic 13.5px/1.45 var(--chrome); color: var(--faint); }
 
 /* Boxes */

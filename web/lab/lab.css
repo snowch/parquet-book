@@ -386,6 +386,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .changes-grid .pages-list td { white-space: normal; }
 .changes-grid .pages-list th { text-align: left; }
 .changes-grid .c-files .table-wrap, .changes-grid .c-reqs .table-wrap { max-height: 22rem; overflow: auto; }
+/* The compaction option holds two inputs, and must wrap on a phone rather than run off the edge. */
+.lab[data-experiment="changes"] .controls label { white-space: normal; }
 .lab input[name="key"], .lab input[name="target"], .lab input[name="small"] { width: 5.5rem; }
 @media (max-width: 760px) {
   .changes-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "answer" "time" "files" "reqs"; }

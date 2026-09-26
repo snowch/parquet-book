@@ -296,12 +296,14 @@ fn conditions(name: &str, bytes: &[u8], model: Option<NetworkModel>) -> String {
     s
 }
 
+/// A simulated time, to a tenth of a millisecond: the transfer of a few hundred bytes adds
+/// microseconds that no reader would notice, and that a phone's column should not have to fit.
 fn ms(us: u64) -> String {
-    let v = us as f64 / 1000.0;
-    if us % 1000 == 0 {
-        format!("{v:.0} ms")
+    let tenths = (us + 50) / 100;
+    if tenths % 10 == 0 {
+        format!("{} ms", tenths / 10)
     } else {
-        format!("{v:.3} ms")
+        format!("{}.{} ms", tenths / 10, tenths % 10)
     }
 }
 
@@ -489,7 +491,7 @@ fn tiny_trace(root: &Path) -> Result<String, String> {
     let traced = trace_for(&bytes, name, FooterOptions::default(), model)?;
     let mut s = String::from(HEADER);
     s.push_str(
-        "| # | Request | `Range` | Bytes back | Finished at | Why |\n|--:|---|---|--:|--:|---|\n",
+        "| # | Request | Range | Bytes back | Finished at | Why |\n|--:|---|---|--:|--:|---|\n",
     );
     for r in &traced.requests {
         s.push_str(&format!(

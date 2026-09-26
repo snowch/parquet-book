@@ -216,7 +216,15 @@ def _xref(node: dict, inner: str) -> str:
     return f'<a class="xref" href="{html.escape(href)}">{inner}</a>'
 
 
-def render(node: dict, footnotes: list | None = None) -> str:
+def _plain(node: dict) -> str:
+    """A node's text, without markup: a table heading as a label."""
+    if "value" in node and node.get("type") in ("text", "inlineCode"):
+        return str(node["value"])
+    return "".join(_plain(c) for c in node.get("children", []))
+
+
+def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
+    """Render one node. ``label`` is a table cell's column heading."""
     kind = node.get("type")
 
     def children() -> str:
@@ -289,9 +297,22 @@ def render(node: dict, footnotes: list | None = None) -> str:
         head = [r for r in rows if all(c.get("header") for c in r.get("children", []))]
         body = [r for r in rows if r not in head]
         thead = "".join(render(r, footnotes) for r in head)
-        tbody = "".join(render(r, footnotes) for r in body)
+        # Each body cell carries its column's heading, so a wide table can become one card per row
+        # on a narrow screen (web/book.css), with every value labelled, instead of squeezing a
+        # sentence into a column one word wide.
+        labels = [_plain(c) for c in head[0].get("children", [])] if head else []
+        tbody = "".join(
+            "<tr>"
+            + "".join(
+                render(c, footnotes, label=labels[i] if i < len(labels) else "")
+                for i, c in enumerate(r.get("children", []))
+            )
+            + "</tr>"
+            for r in body
+        )
+        wide = ' class="cards"' if len(labels) >= 5 else ""
         return (
-            f'<div class="table-wrap"><table>'
+            f'<div class="table-wrap"><table{wide}>'
             f"{'<thead>' + thead + '</thead>' if thead else ''}<tbody>{tbody}</tbody></table></div>"
         )
     if kind == "tableRow":
@@ -300,7 +321,8 @@ def render(node: dict, footnotes: list | None = None) -> str:
         tag = "th" if node.get("header") else "td"
         align = node.get("align")
         style = f' class="align-{align}"' if align in ("left", "right", "center") else ""
-        return f"<{tag}{style}>{children()}</{tag}>"
+        data = f' data-label="{html.escape(label)}"' if label else ""
+        return f"<{tag}{style}{data}>{children()}</{tag}>"
     if kind == "div":
         classes = " ".join(str(node.get("class", "")).split())
         return f'<div class="{html.escape(classes)}">{children()}</div>'
