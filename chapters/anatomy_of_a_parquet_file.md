@@ -33,8 +33,10 @@ fixture: tiny.parquet
 fixtures: tiny.parquet, multiple-row-groups.parquet
 ```
 
-Nothing on the panel is drawn from a script of what should happen. Each control runs the Rust
-reader again, compiled to WebAssembly, and the panel shows what it returned. Try these, in order:
+Nothing on the panel is drawn from a script of what should happen. Each control runs the book's
+reader again and the panel shows what it returned. The reader is the Rust one compiled to
+WebAssembly, or, if you choose Python above the panel, the Python one run in your browser by
+Pyodide; they return the same answers. Try these, in order:
 
 1. **Click the footer-length bytes** in the step list. The byte view marks four bytes near the
    end of the file. Select the first of them in the byte view: the inspector shows the same four
@@ -139,9 +141,11 @@ none of it can be read.
 
 ## Building it
 
-The reader in the panels is `crates/parquet-lab`. This section builds the part of it the
-experiment used, in the order the reader ran it. Each piece is quoted from the crate, so what you
-read here is what ran above.
+The reader in the panels is the book's reader, which exists in Python (`python/parquet_lab`) and
+in Rust (`crates/parquet-lab`). The panels run the Rust one unless you switch them to Python; the
+tests hold the two to the same answers. This section builds the part of the reader the experiment
+used, in the order it ran. Each piece is quoted from the source, so what you read here is what ran
+above, and the tabs switch every excerpt on the page between the languages.
 
 ### Little-endian integers
 
@@ -149,11 +153,24 @@ read here is what ran above.
 The footer length is a little-endian unsigned integer: the first byte is the least significant.
 Reading one is a sum of each byte times a power of 256:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/bytes.py
+:language: python
+:start-at: def read_le_u32(data: bytes)
+:end-before: def le_terms(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/bytes.rs
 :language: rust
 :start-at: pub fn read_le_u32(bytes: [u8; 4])
 :end-before: /// Each byte of a little-endian integer
 ```
+:::
+::::
 
 Parquet uses little-endian order everywhere it stores a fixed-width number: the footer length,
 and every integer and float in a page ([ch05](#encodings)).
@@ -162,11 +179,24 @@ and every integer and float in a page ([ch05](#encodings)).
 
 Parsing the trailer checks the magic first, and only then trusts the length:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/format.py
+:language: python
+:start-at: def parse_trailer(
+:end-before: def footer_span(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/format.rs
 :language: rust
 :start-at: pub fn parse_trailer(
 :end-before: /// Where the footer is
 ```
+:::
+::::
 
 `PARE` is the closing magic of a file whose footer is encrypted. The reader recognises it and says
 so, rather than misreading ciphertext as a footer length. [ch13](#modular-encryption) reads those
@@ -177,26 +207,54 @@ files.
 The footer ends where the trailer starts, and starts `footer_length` bytes earlier. It cannot start
 inside the opening magic, so a length that would put it there means the file is damaged:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/format.py
+:language: python
+:start-at: def footer_span(
+:end-before: def check_header(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/format.rs
 :language: rust
 :start-at: pub fn footer_span(
 :end-before: /// Check the opening magic
 ```
+:::
+::::
 
 A span here is half-open: `start` is included and `end` is not. An HTTP range is inclusive at both
-ends. The object store converts one to the other in one place, `Span::http_range`, because getting
-it wrong by one byte is the most common range-request bug there is.
+ends. The object store converts one to the other in one place, a span's `http_range`, because
+getting it wrong by one byte is the most common range-request bug there is.
 
 ### The object store
 
-The reader asks for bytes through a trait with two methods. `why` is instrumentation: the reader
-says what it wants the bytes for, and the trace records it.
+The reader asks for bytes through an interface: a protocol in Python, a trait in Rust. `head` and
+`get` are all this chapter needs; later chapters list a table's files and group requests into
+phases. `why` is instrumentation: the reader says what it wants the bytes for, and the trace
+records it.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/object_store.py
+:language: python
+:start-at: class ObjectStore(Protocol):
+:end-before: class MemoryStore:
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/object_store.rs
 :language: rust
 :start-at: pub trait ObjectStore {
 :end-before: /// Objects held in memory
 ```
+:::
+::::
 
 `MemoryStore` serves ranges the way S3 does: a range that runs past the end of the object is cut
 short rather than refused, and a suffix range longer than the object returns all of it.
@@ -209,11 +267,24 @@ a byte is cheap, and it gives the same numbers every time the book is built.
 
 The whole procedure, with both shortcuts:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/reader.py
+:language: python
+:start-at: def read_footer(
+:end-before: def tail_range(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/reader.rs
 :language: rust
 :start-at: pub fn read_footer<S: ObjectStore>(
 :end-before: /// The last `want` bytes
 ```
+:::
+::::
 
 When the first read did not cover the footer, the reader requests only the part it is missing and
 joins it to the tail it already has. It never requests a byte twice.
@@ -224,15 +295,28 @@ The footer is serialised with Apache Thrift's compact protocol. Every field star
 byte: the high four bits are the difference between this field's id and the previous one, and the
 low four bits are its type.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/thrift.py
+:language: python
+:start-at: delta = byte >> 4
+:end-before: header = Span(header_start, r.offset())
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/thrift.rs
 :language: rust
 :start-at: let delta = byte >> 4;
 :end-before: let header = Span::new(header_start, r.offset());
 ```
+:::
+::::
 
 Because every field names itself, the decoder can walk a footer without knowing Parquet's schema,
-and a field it has never heard of still decodes. `crates/parquet-lab/src/parquet_thrift.rs` then
-gives the fields their names. Select any byte of the footer in the second panel and the inspector
+and a field it has never heard of still decodes. The `parquet_thrift` module then gives the fields
+their names. Select any byte of the footer in the second panel and the inspector
 reads it as a field header, so you can check the decoder by hand. [ch03](#the-type-system) reads
 the schema out of this structure.
 
@@ -240,10 +324,28 @@ the schema out of this structure.
 
 The reader is tested against the fixtures, and the expected values come from pyarrow, not from
 the reader. When pyarrow wrote each fixture it also wrote a manifest of what it wrote: sizes,
-offsets, encodings and the footer length. The tests compare the two implementations:
+offsets, encodings and the footer length. The tests compare the reader with pyarrow:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest python/tests
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p parquet-lab --test fixtures
+```
+:::
+::::
+
+A further test holds the Python and Rust readers to each other: every call a lab can make, on every
+fixture and on damaged copies of one, must return the same JSON from both.
+
+```bash
+python3 -m pytest tests/test_python.py
 ```
 
 ## What this cannot tell you
@@ -283,31 +385,65 @@ goes further.
 
 ## Problems
 
-Four, in `exercises/src/anatomy_of_a_parquet_file.rs`. The first three have tests that fail until
-you solve them. Each test compares your function with the book's reader or with pyarrow, across
+Four, in `exercises/python/anatomy_of_a_parquet_file.py`, or in Rust in
+`exercises/src/anatomy_of_a_parquet_file.rs`. The first three have tests that fail until you solve
+them. Each test compares your function with the book's reader or with pyarrow, across
 many cases, so a hard-coded answer does not pass. The fourth has no test, and says why.
 
 **2.1 The footer length.** Decode the footer length from the last eight bytes of a file, writing
 the little-endian arithmetic yourself.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_1 -- --ignored
 ```
+:::
+::::
 
 **2.2 Where the footer is.** Given a file size and a footer length, return the footer's byte
 range, or refuse when no valid file could have them.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_2
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_2 -- --ignored
 ```
+:::
+::::
 
 **2.3 How many requests.** A reader that knows the file size reads some number of bytes from the
 end, then fetches whatever part of the footer it missed. Predict how many `GET` requests it makes.
 The test runs the traced reader and counts.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_3
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_3 -- --ignored
 ```
+:::
+::::
 
 **2.4 Your own files.** No test: the files are yours, and nothing here can see them. Take a
 Parquet file your systems write. Read its last eight bytes (any hex viewer will do) and work out

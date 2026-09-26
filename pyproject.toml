@@ -1,5 +1,6 @@
-# Python here is tooling: the fixture generator, the site renderer and the checks. The reader
-# itself is Rust (Cargo.toml).
+# Python here is the book's Python reader (python/parquet_lab), its problems (exercises/python),
+# and the tooling: the fixture generator, the site renderer and the checks. The Rust reader is in
+# Cargo.toml.
 [tool.ruff]
 line-length = 110
 target-version = "py311"
@@ -11,4 +12,4 @@ select = ["E", "F", "W", "I", "B", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "python/tests", "exercises/python"]

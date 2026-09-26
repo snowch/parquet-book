@@ -4,8 +4,8 @@
 #   make serve      serve the built site at http://localhost:8000
 #   make check      everything CI runs
 #
-# The Rust reader is the one implementation. The site, the figures and the tests are all views
-# of it, so everything below starts by building it.
+# The reader exists in Rust (crates/parquet-lab) and in Python (python/parquet_lab), held to the
+# same answers by tests/test_python.py. The site, the figures and the tests are views of it.
 
 PYTHON ?= python3
 CARGO  ?= cargo
@@ -66,10 +66,11 @@ chapter:  ## Write skeletons for chapters in tools/outline.py that have no page 
 .PHONY: test
 test:  ## Run the tests (the reader's problems are skipped, as in CI)
 	$(CARGO) test --workspace
-	$(PYTHON) -m pytest tests -q
+	$(PYTHON) -m pytest tests python/tests exercises/python -q
 
 .PHONY: problems
 problems:  ## Run the chapter problems. They fail until you solve them; that is the point.
+	$(PYTHON) -m pytest exercises/python --problems -q
 	$(CARGO) test -p exercises -- --ignored
 
 .PHONY: browser-test

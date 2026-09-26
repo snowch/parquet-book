@@ -84,6 +84,20 @@ disagree, and a book whose pictures disagree with its tests teaches nothing. Rus
 small, import-free WASM, is fast enough to recompute every panel on every slider movement, and
 reads clearly when quoted.
 
+**The reader in Python too, held to the Rust reader's answers.** Rust made the browser honest,
+but it narrowed the audience: many readers who want to understand Parquet read Python far more
+easily than Rust, and the quoted code is the explanation. So the reader also exists in Python,
+`python/parquet_lab`, module for module, with the standard library only. This is the one place the
+book accepts two implementations, and it accepts it on one condition: they cannot disagree
+unnoticed. `tests/test_python.py` makes every call the labs make through both, on every fixture and
+on damaged copies, and requires identical JSON, error messages included; each is also tested
+against pyarrow on its own, since two readers that agree can both be wrong. The page shows each
+step in both languages, in tabs that remember the reader's choice, Python first. The labs run on
+the Rust reader through WebAssembly by default, because it loads instantly; a reader can switch
+them to the Python reader, which the page runs under Pyodide, fetched from a pinned CDN release
+only when chosen. The port proceeds chapter by chapter, and a chapter counts as ported only when
+its excerpts, problems and labs all exist in both.
+
 **No dependencies in the reader.** Not for Thrift, not for JSON, not for WASM bindings. Each is
 small enough to write in the open, which is the point of the book, and `cargo build --offline`
 works on a fresh clone. The WASM interface is a hand-written C ABI of numbers and byte buffers,
@@ -120,10 +134,11 @@ on every write, so the encrypted fixtures cannot be reproduced byte for byte: th
 the committed bytes while they decrypt, with test keys published in the generator, to exactly the
 intended rows, and the tests hold the keyless reader to pyarrow's keyed description of them.
 
-**Problems are Rust tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page
-under Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the
-problems run with `cargo test -- --ignored`, and the page shows the command. The experiments carry
-the in-browser interactivity instead.
+**Problems are tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page under
+Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the
+problems run with `cargo test -- --ignored`, or, for the chapters the Python reader covers, with
+`pytest --problems`, and the page shows both commands. The experiments carry the in-browser
+interactivity instead.
 
 ## 5. The chapter shape
 
@@ -133,8 +148,8 @@ Every chapter has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
 1. **The question**: one question, and why the previous chapter leaves it open.
 2. **The experiment**: a `lab` panel on a real fixture, a numbered list of things to try, and
    generated tables that record what the experiment shows.
-3. **Building it**: the code the experiment ran, quoted from the crate, in the order it ran, and
-   the command that tests it.
+3. **Building it**: the code the experiment ran, quoted from the reader in Python and in Rust, in
+   the order it ran, and the command that tests it.
 4. **What this cannot tell you**: the limits of the experiment, of the simulation, and of the code.
 5. **Key takeaways**: claims already made and shown above, each in bold with its reason.
 6. **Problems**: stubs with tests, and one problem about the reader's own files.

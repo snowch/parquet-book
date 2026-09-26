@@ -95,26 +95,54 @@ format for data written once and read many times.
 
 ## Building it
 
-The layouts are `crates/parquet-lab/src/layout.rs`. Encoding a table is one loop over rows and
-columns, in an order that depends on the layout, recording where each value lands:
+The book's reader exists in Python and in Rust, and the two are tested to give the same answers.
+The tabs above each excerpt switch between them, and every page remembers your choice. The layouts
+are the `layout` module: `python/parquet_lab/layout.py`, or `crates/parquet-lab/src/layout.rs`.
+Encoding a table is one loop over rows and columns, in an order that depends on the layout,
+recording where each value lands:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/layout.py
+:language: python
+:start-at: def encode(table: Table, layout: Layout)
+:end-before: @dataclass
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/layout.rs
 :language: rust
 :start-at: pub fn encode(table: &Table, layout: Layout)
 :end-before: /// What a query needs
 ```
+:::
+::::
 
 A query becomes reads in two steps: collect the span of every value it needs, then merge spans
 that touch, since one request can cover them all:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/layout.py
+:language: python
+:start-at: def ranges(enc: Encoded, q: Query)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/layout.rs
 :language: rust
 :start-at: pub fn ranges(enc: &Encoded, q: &Query)
 :end-before: #[cfg(test)]
 ```
+:::
+::::
 
 The experiment then asks the object store for each range and records the cost. That is the same
-`TracingStore` that [ch02](#anatomy-of-a-parquet-file) uses to open a Parquet file, so the costs
+traced store that [ch02](#anatomy-of-a-parquet-file) uses to open a Parquet file, so the costs
 here and in [ch02](#anatomy-of-a-parquet-file) are measured the same way.
 
 Parquet itself is more than this toy. It divides a column into row groups so that a writer never
@@ -154,16 +182,28 @@ number of columns. That difference is what the table shows, and it holds at any 
 
 ## Problems
 
-Two, in `exercises/src/why_parquet_exists.rs`. The first has a test that fails until you solve
-it. The second has no test.
+Two, in `exercises/python/why_parquet_exists.py`, or in Rust in
+`exercises/src/why_parquet_exists.rs`. The first has a test that fails until you solve it. The
+second has no test.
 
 **1.1 From values to reads.** Write the function that turns the byte ranges of the values a query
 needs into the reads it must make. The test runs it on every combination of columns and rows of
 the sales table, in both layouts, and compares with the book's own planner.
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_why_parquet_exists.py --problems
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test why_parquet_exists -- --ignored
 ```
+:::
+::::
 
 **1.2 Your own queries.** No test: the workload is yours. Take a table you query often and list the
 five most frequent queries against it. For each, write down how many of the table's columns it

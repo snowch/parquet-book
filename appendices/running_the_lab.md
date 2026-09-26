@@ -7,13 +7,19 @@ title: Running the lab
 
 ## What you need
 
+To read and run the book's reader in Python, Python 3.11 or later is enough: the Python reader and
+its tests use the standard library, and pytest. Everything below that builds the site needs the
+rest.
+
 - A Rust toolchain, with the WebAssembly target: `rustup target add wasm32-unknown-unknown`.
 - Python 3.11 or later, with the packages in `requirements.txt` for building the site and
   `requirements-dev.txt` for the tests.
 - Node.js and the pinned MyST command-line tool, which parses the pages:
   `npm install -g mystmd@1.10.1`.
 
-The reader itself has no dependencies outside the repository, so the Rust half builds offline.
+Neither reader has dependencies outside the repository, so both build and run offline. The labs
+can run the Python reader in the page too, through Pyodide, which the page fetches from a public
+CDN the first time you choose Python.
 
 ## Building and serving the book
 
@@ -28,22 +34,50 @@ make serve      # serve the book at http://localhost:8000
 
 ## Running the reader at a desk
 
-The command-line reader prints what the browser shows:
+Each reader has a command line that prints what the browser shows, as the same JSON:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+PYTHONPATH=python python3 -m parquet_lab structure fixtures/tiny.parquet
+PYTHONPATH=python python3 -m parquet_lab footer fixtures/tiny.parquet
+PYTHONPATH=python python3 -m parquet_lab footer fixtures/tiny.parquet --size suffix --prefetch 65536
+PYTHONPATH=python python3 -m parquet_lab interpret fixtures/tiny.parquet 629
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo run -p pqlab -- inspect fixtures/tiny.parquet
 cargo run -p pqlab -- footer fixtures/tiny.parquet
 cargo run -p pqlab -- footer fixtures/tiny.parquet --size suffix --prefetch 65536
 cargo run -p pqlab -- interpret fixtures/tiny.parquet 629
 ```
+:::
+::::
+
+The Python reader so far covers what ch01 and ch02 build; the Rust reader covers every chapter.
 
 ## Solving the problems
 
-Each chapter's problems are stubs in `exercises/src/<chapter>.rs`. Their tests are marked
-`#[ignore]`, so `cargo test` passes before you start. Run a chapter's problems with:
+Each chapter's problems are stubs in Rust, in `exercises/src/<chapter>.rs`, and for the chapters
+the Python reader covers, in Python too, in `exercises/python/<chapter>.py`. Their tests are
+skipped by a plain test run, so the suite passes before you start. Run a chapter's problems with:
 
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```bash
 cargo test -p exercises --test anatomy_of_a_parquet_file -- --ignored
 ```
+:::
+::::
 
 and `make problems` runs them all. They fail until you solve them.

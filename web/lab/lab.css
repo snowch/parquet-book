@@ -26,6 +26,14 @@
 
 .lab { margin: 1.8rem 0; border: 1px solid var(--edge); border-radius: 8px; background: var(--bg);
        font: 14px/1.5 var(--chrome); box-shadow: 0 1px 2px var(--raise); overflow: hidden; }
+/* Which reader runs the lab: Rust through WebAssembly, or Python through Pyodide. */
+.engine-bar { display: flex; align-items: center; gap: .35rem; justify-content: flex-end;
+              padding: .45rem .8rem; border-bottom: 1px solid var(--edge); background: var(--panel);
+              border-radius: 8px 8px 0 0; font: 12.5px var(--chrome); color: var(--faint); }
+.engine-bar span { margin-right: .2rem; }
+.lab .engine-bar button { font-size: 12px; padding: .15rem .6rem; }
+.lab .engine-bar button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent);
+                                               color: var(--on-accent); }
 .lab-fallback, .lab-loading, .lab-error { margin: 0; padding: 1rem; color: var(--muted); }
 .lab-error { color: var(--stop); }
 .lab-head { display: flex; flex-wrap: wrap; gap: .4rem 1rem; align-items: baseline; padding: .6rem 1rem;

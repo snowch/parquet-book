@@ -21,6 +21,7 @@ site works at a domain root, under a GitHub Pages project path, or opened from a
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import html
 import json
@@ -162,6 +163,20 @@ HEAD_SCRIPT = r"""<script>
     if (theme === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", theme);
   };
   apply();
+  // The language the book's code is shown in: Python unless the reader chose Rust. Every tab set
+  // on every page follows it; the stylesheet hides the other language's panels.
+  let code = "python";
+  try { if (localStorage.getItem("code-language") === "rust") code = "rust"; } catch (e) {}
+  root.setAttribute("data-code", code);
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest(".tab-bar button[data-code]");
+    if (!b) return;
+    const top = b.getBoundingClientRect().top;
+    root.setAttribute("data-code", b.dataset.code);
+    try { localStorage.setItem("code-language", b.dataset.code); } catch (e) {}
+    // Keep the clicked tab where it was: panels above it may change height.
+    scrollBy(0, b.getBoundingClientRect().top - top);
+  });
   document.addEventListener("DOMContentLoaded", () => {
     const button = document.getElementById("theme");
     const names = { system: "System", light: "Light", dark: "Dark" };
@@ -269,7 +284,9 @@ self.addEventListener("activate", (e) => {{
     keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 }});
 self.addEventListener("fetch", (e) => {{
-  if (e.request.method !== "GET") return;
+  // Only the book's own files: Pyodide, fetched from a CDN for the labs' Python engine, is
+  // cached by the browser as any other download.
+  if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
   e.respondWith(caches.match(e.request, {{ ignoreSearch: true }}).then((hit) => hit || fetch(e.request)));
 }});
 """
@@ -316,6 +333,22 @@ def build(out: Path) -> None:
     if not WASM.exists():
         sys.exit(f"{WASM.relative_to(ROOT)} is missing; run `make wasm` first")
     shutil.copy(WASM, out / "lab" / "parquet_lab.wasm")
+    # The Python reader, for the labs' Python engine: the same files the tests import.
+    package = ROOT / "python" / "parquet_lab"
+    (out / "lab" / "py" / "parquet_lab").mkdir(parents=True)
+    modules = sorted(f.name for f in package.glob("*.py"))
+    for name in modules:
+        shutil.copy(package / name, out / "lab" / "py" / "parquet_lab" / name)
+    # Which labs the Python engine can run: the lab offers the choice only for those.
+    tree = ast.parse((package / "browser.py").read_text())
+    experiments = next(
+        ast.literal_eval(n.value)
+        for n in tree.body
+        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
+    )
+    (out / "lab" / "py" / "package.json").write_text(
+        json.dumps({"modules": modules, "experiments": list(experiments)})
+    )
     for f in sorted((ROOT / "fixtures").glob("*.parquet")):
         shutil.copy(f, out / "fixtures" / f.name)
     # ch14's table: its listing, and every object under table/, in their directories.

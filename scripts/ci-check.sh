@@ -6,9 +6,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PY_PATHS=(tools scripts tests fixtures)
+PY_PATHS=(python exercises/python tools scripts tests fixtures)
 
-echo "== Python tooling: lint and format =="
+echo "== Python: lint and format =="
 python3 -m ruff check "${PY_PATHS[@]}"
 python3 -m ruff format --check "${PY_PATHS[@]}"
 
@@ -49,10 +49,11 @@ python3 scripts/build-site.py --out _build/html
 echo "== every link in the built site resolves =="
 python3 scripts/check-built-links.py _build/html
 
-echo "== the book's own tests =="
+echo "== the book's own tests, and the Python reader's =="
 # Includes tests/test_wasm.py: every call the pages make into the WebAssembly reader, made again
-# natively, with identical JSON required.
-python3 -m pytest tests -q
+# natively, with identical JSON required; and tests/test_python.py, which holds the Python reader
+# to the Rust reader's JSON the same way. The Python problems are skipped, as the Rust ones are.
+python3 -m pytest tests python/tests exercises/python -q
 
 echo "== the experiments, driven in a headless browser =="
 # Needs Playwright and a Chromium. CI installs both; locally the check runs if they are present.

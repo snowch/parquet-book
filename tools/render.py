@@ -9,7 +9,7 @@ A node type the renderer does not know **raises**. It is never skipped: a render
 drops what it does not recognise loses content, and the only symptom is a paragraph nobody
 notices is missing.
 
-Two node shapes are this book's own:
+Three node shapes are this book's own:
 
 - A fenced block in the language ``lab`` is an experiment. It becomes a mount point that
   ``web/lab/lab.js`` fills with the WebAssembly reader, and the renderer checks that the
@@ -17,6 +17,9 @@ Two node shapes are this book's own:
 - A ``{literalinclude}`` of a file in this repository gets a bar naming the file, because the
   book's code is quoted from the implementation, and the reader should always be able to see
   which file a block came from.
+- A ``{tab-set}`` whose two tab items are synced ``python`` and ``rust`` is the same step of the reader
+  in both languages. Every tab set on every page follows one choice, which the page's head script
+  keeps; without JavaScript both are shown, one after the other.
 """
 
 from __future__ import annotations
@@ -39,6 +42,14 @@ class UnknownNodeError(Exception):
 
 class LabBlockError(Exception):
     """A ``lab`` block that names an experiment or fixture that does not exist."""
+
+
+class TabSetError(Exception):
+    """A tab set whose tabs are not the book's two languages."""
+
+
+#: The languages a tab set may show, in the order the tabs appear.
+LANGUAGES = {"python": "Python", "rust": "Rust"}
 
 
 #: MyST page slug -> the file this build publishes it as. Filled in by the site build.
@@ -114,6 +125,27 @@ def _source_bar(include: dict) -> str:
         '<div class="source-bar"><span class="source-label">From the implementation</span>'
         f'<a href="{REPO_URL}{html.escape(clean)}"><code>{html.escape(clean)}</code></a></div>'
     )
+
+
+def _tab_set(node: dict, footnotes: list | None) -> str:
+    items = node.get("children", [])
+    syncs = [str(i.get("sync", "")) for i in items]
+    if any(i.get("type") != "tabItem" for i in items) or sorted(syncs) != sorted(LANGUAGES):
+        raise TabSetError(
+            f"a tab set must hold one tab-item synced python and one synced rust, not {syncs} "
+            f"(near {json.dumps(node.get('position', {}))})"
+        )
+    items = sorted(items, key=lambda i: list(LANGUAGES).index(i["sync"]))
+    bar = "".join(
+        f'<button type="button" data-code="{i["sync"]}">{LANGUAGES[i["sync"]]}</button>' for i in items
+    )
+    panels = "".join(
+        f'<div class="tab-panel" data-code="{i["sync"]}">'
+        + "".join(render(c, footnotes) for c in i.get("children", []))
+        + "</div>"
+        for i in items
+    )
+    return f'<div class="tab-set"><div class="tab-bar" aria-label="Language">{bar}</div>{panels}</div>'
 
 
 def _xref(node: dict, inner: str) -> str:
@@ -192,6 +224,8 @@ def render(node: dict, footnotes: list | None = None) -> str:
                 + "</figure>"
             )
         return f'<div class="generated">{children()}</div>'
+    if kind == "tabSet":
+        return _tab_set(node, footnotes)
     if kind == "blockquote":
         return f"<blockquote>{children()}</blockquote>"
     if kind == "list":

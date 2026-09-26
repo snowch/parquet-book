@@ -148,6 +148,23 @@ figure.quoted pre { margin-top: 0; border-top-left-radius: 0; border-top-right-r
 .source-bar code { background: none; padding: 0; font-size: 12px; }
 .source-bar a { color: var(--muted); text-decoration: none; }
 .source-bar a:hover { color: var(--accent); }
+/* The same step in Python and in Rust. The head script sets <html data-code>; without it both
+   panels show, one after the other, and the tab bar is hidden. */
+.tab-set { margin: 1.3rem 0; }
+.tab-set figure.quoted { margin: 0; }
+.tab-bar { display: none; gap: .25rem; font: 12.5px/1 var(--chrome); }
+html[data-code] .tab-bar { display: flex; }
+.tab-bar button { font: inherit; color: var(--muted); background: none; cursor: pointer;
+                  border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0;
+                  padding: .45rem .9rem; }
+.tab-bar button:hover { color: var(--accent); }
+html[data-code="python"] .tab-bar button[data-code="python"],
+html[data-code="rust"] .tab-bar button[data-code="rust"] {
+  color: var(--ink); background: var(--panel); border-color: var(--edge); font-weight: 600; }
+html[data-code] .tab-panel .source-bar { border-top-left-radius: 0; }
+html[data-code="python"] .tab-panel[data-code="rust"],
+html[data-code="rust"] .tab-panel[data-code="python"] { display: none; }
+html:not([data-code]) .tab-panel + .tab-panel { margin-top: 1rem; }
 kbd { font-size: .8em; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px;
       padding: .05em .35em; background: var(--panel); }
 

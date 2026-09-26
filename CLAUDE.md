@@ -7,15 +7,19 @@ Project instructions for anyone, human or AI, working on this book. They are bin
 *Parquet, byte by byte*: an interactive technical book about Apache Parquet in which the reader
 builds a working Parquet reader while reading. Each chapter asks a question, answers it with an
 experiment on the bytes of a real Parquet file, and builds the piece of the reader the experiment
-needed. The finished reader runs in the browser through WebAssembly.
+needed. The reader exists twice, in Python and in Rust, held to identical answers by tests; the
+page shows both, and the labs run either in the browser (Rust through WebAssembly, Python through
+Pyodide).
 
 Read **PLAN.md** for the argument and the settled decisions, **AUTHORING_GUIDE.md** before
 writing or editing a page, and **STYLE.md** while editing. **NEXT_STEPS.md** is the working list.
 
 The architecture follows `snowch/sizing-and-tco`: MyST parses, the repository renders, every
 number is generated, code is quoted rather than pasted, and problems are tests. What differs is the
-implementation boundary. There the core is Python; here it is Rust, compiled natively for the tests
-and the command line and to WebAssembly for the browser, so the page runs the code the tests run.
+implementation. The Rust reader is compiled natively for the tests, the command line and the
+figures, and to WebAssembly for the browser. The Python reader mirrors it module for module, for
+readers who know Python better, and runs natively for its tests and in the page under Pyodide.
+Either way the page runs the code the tests run.
 
 ## Architecture
 
@@ -28,8 +32,10 @@ and the command line and to WebAssembly for the browser, so the page runs the co
       {include} of generated tables                    │
                 └──────────────────┬──────────────────┘
                                    │
-                    crates/parquet-lab  (the reader)
-                                   │
+        crates/parquet-lab  (the reader)  ══ tests/test_python.py ══  python/parquet_lab
+                                   │                                    │  (the same reader,
+                                   │                                    │   in Python; pytest,
+                                   │                                    │   Pyodide in the page)
         ┌──────────────┬───────────┼─────────────┬─────────────────┐
         │              │           │             │                 │
    cargo tests    crates/pqlab   crates/        exercises/      fixtures/
@@ -42,9 +48,10 @@ and the command line and to WebAssembly for the browser, so the page runs the co
 | Path | What it is |
 |---|---|
 | `crates/parquet-lab/` | The reader. Zero dependencies. One module per layer (see its `lib.rs`). |
+| `python/parquet_lab/` | The same reader in Python, standard library only, module for module. Tests in `python/tests/`. |
 | `crates/parquet-lab-wasm/` | The reader behind a numbers-only C ABI, compiled to `wasm32-unknown-unknown`. |
 | `crates/pqlab/` | The reader on the command line, and `pqlab figures`, which writes every generated fragment. |
-| `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`). |
+| `exercises/` | Problem stubs (`src/<slug>.rs`) and the `#[ignore]`d tests that grade them (`tests/<slug>.rs`); in Python, `python/<slug>.py` and `python/tests/test_<slug>.py`, run with `--problems`. |
 | `fixtures/` | Parquet files written by pyarrow, each with a manifest (`.json`) pyarrow wrote about it. |
 | `chapters/`, `parts/`, `appendices/`, `index.md` | The book, in MyST markdown. |
 | `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
@@ -60,13 +67,14 @@ make install     # rustup wasm target, Python packages, pinned MyST
 make             # wasm + figures + site: _build/html
 make serve       # http://localhost:8000
 make test        # cargo test --workspace, then pytest
-make problems    # the reader's exercises; they fail until solved
+make problems    # the reader's exercises, Python and Rust; they fail until solved
 make check       # ./scripts/ci-check.sh: exactly what CI runs
 ```
 
 Always run `make check` before pushing. It runs, in order: ruff, `cargo fmt --check`, clippy with
 `-D warnings`, `cargo test`, the fixture check, the figures check, the number check, the WASM
-build, the MyST parse, the site render, the link check, pytest, and the headless browser test.
+build, the MyST parse, the site render, the link check, pytest (the book's tests, the Python
+reader's, and the Python-Rust parity test), and the headless browser test.
 
 ## How the pieces talk
 
@@ -86,6 +94,14 @@ The module imports nothing, so it cannot reach the network, the clock or the pag
 figures render it. `tests/test_wasm.py` makes every browser call twice, through WASM under Node and
 natively through `pqlab`, and requires identical JSON. That test has already caught one real bug:
 64-bit integers above 2^53 being rounded by JavaScript (`json.rs` now writes them as strings).
+
+**The Python reader gives the Rust reader's answers.** `python/parquet_lab/report.py` writes the
+same JSON as `report.rs`, and `tests/test_python.py` makes every call the Python engine supports
+through both, on every fixture and on damaged copies, requiring identical JSON, key order and
+error messages included. `python/parquet_lab/browser.py` is the Python engine's equivalent of the
+C ABI; `web/lab/python.js` loads it into Pyodide (pinned, from a CDN) behind the same methods as
+`wasm.js`. Its `EXPERIMENTS` names the labs it can run; the page offers the Python engine only for
+those, and a test requires them to be exactly the ported chapters' experiments.
 
 **Experiments are fenced blocks.** A page embeds one with:
 
@@ -123,6 +139,10 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
    about the reader's own files, which has no test and says what a good answer contains.
 6. **Deterministic.** The object store is simulated, with a fixed `NetworkModel`; nothing reads a
    clock or a network. The same commit builds the same book, byte for byte.
+7. **Two readers, one answer.** The Python and Rust readers are ported together: a chapter the
+   Python reader covers quotes every step in both languages in a `{tab-set}` (Python first, synced
+   `python` and `rust`), ships its problems in both, and offers its labs on both engines. A change
+   to one reader is made to the other in the same commit; the parity test fails otherwise.
 
 ## Adding things
 
@@ -132,12 +152,18 @@ run `make chapter` for the skeleton. Then follow AUTHORING_GUIDE.md: problems fi
 reader code, then figures, then prose. A chapter's number is derived from its position; its
 identity is its slug. Never put a number in a slug, label or file name.
 
+**A chapter's Python port.** Port the Rust modules the chapter adds to `python/parquet_lab/`,
+same names and same JSON; add their reports to `browser.py` and its `EXPERIMENTS`, their calls to
+`tests/test_python.py` and methods to `web/lab/python.js`; port the Rust unit and fixture tests to
+`python/tests/`; write the problems in `exercises/python/`; and put every excerpt in the chapter
+in a tab set beside its Rust twin. `tests/test_book.py` checks the chapter's side of this.
+
 **A fixture.** Add a `Fixture` to `fixtures/generate.py` with a `why`, run `make fixtures`, and
 commit the `.parquet`, the `.json` manifest and the regenerated `fixtures/README.md` together.
 Keep it small enough to read byte by byte. The Rust fixture tests pick it up automatically.
 
 **An experiment.** Add a report function in `crates/parquet-lab/src/report.rs` that runs the reader
-and returns JSON; export it from `crates/parquet-lab-wasm`; add a method to `web/lab/wasm.js`, a
+and returns JSON (and, once its chapter is ported, in `python/parquet_lab/report.py`); export it from `crates/parquet-lab-wasm`; add a method to `web/lab/wasm.js`, a
 mount function in `web/lab/`, its name to `EXPERIMENTS` in `web/lab/lab.js` and `tools/outline.py`,
 a matching `pqlab` subcommand, and its calls to `tests/test_wasm.py`. JavaScript draws; it never
 computes anything Parquet-shaped.
@@ -152,7 +178,12 @@ markdown ending with its conditions line, run `make figures`, and `{include}` th
   panics on bad input. `cargo fmt`, clippy clean with `-D warnings`. Module docs say what the
   module teaches and which chapter uses it.
 - **JavaScript:** plain ES modules, no framework, no build step. It moves bytes and draws JSON.
-- **Python:** tooling only. `python3 -m pytest`, ruff clean.
+- **Python reader:** standard library only, Python 3.11 and whatever Pyodide pins, so it runs
+  unchanged at a desk and in the page. Idiomatic Python, not transliterated Rust: dataclasses,
+  exceptions, `match`. It mirrors the Rust reader's modules, names and JSON. Errors are exceptions
+  whose messages are the Rust `Display` text, because the page shows them and the parity test
+  compares them. Readable before fast: this code is quoted in a book.
+- **Python tooling:** the renderer, the scripts and the tests. `python3 -m pytest`, ruff clean.
 - **Comments** say why, in full sentences, as in the reference repository.
 
 ## Book-writing conventions

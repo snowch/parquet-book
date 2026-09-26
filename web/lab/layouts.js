@@ -7,6 +7,7 @@
 // how many separate ranges that is, and what each way of fetching them cost.
 
 import { escapeHtml } from "./hexview.js";
+import { engineNote } from "./footer.js";
 
 const fmt = (n) => Number(n).toLocaleString("en-GB");
 const ms = (us) => `${(us / 1000).toLocaleString("en-GB", { maximumFractionDigits: 3 })} ms`;
@@ -16,9 +17,9 @@ export function mountLayouts(root, lab) {
   const cols = first.columns;
   const rows = first.rows;
 
-  root.innerHTML = `
+  root.insertAdjacentHTML("beforeend", `
     <div class="lab-head"><span class="lab-title">Row layout or column layout</span>
-      <span class="lab-note">running the book's Rust code, compiled to WebAssembly</span></div>
+      <span class="lab-note">${engineNote(root)}</span></div>
     <form class="controls">
       <fieldset><legend>Columns the query needs</legend>
         ${cols.map((c, i) => `<label><input type="checkbox" name="col" value="${i}"${i === 2 || i === 3 ? " checked" : ""}> <code>${escapeHtml(c)}</code></label>`).join("")}
@@ -35,7 +36,7 @@ export function mountLayouts(root, lab) {
     <p class="sql"></p>
     <div class="table-wrap"><table class="data"></table></div>
     <div class="strips"></div>
-    <div class="table-wrap"><table class="costs"></table></div>`;
+    <div class="table-wrap"><table class="costs"></table></div>`);
 
   const form = root.querySelector("form");
   const run = () => {

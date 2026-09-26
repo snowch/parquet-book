@@ -63,6 +63,14 @@ if (process.env.PLAYWRIGHT_BROWSERS_PATH === undefined) {
 }
 const browser = await chromium.launch(launch);
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+// Pyodide, for the labs' Python engine, comes from a public CDN. Fetch it through Node, which
+// trusts the same certificates as the rest of the toolchain (a proxy's included), and hand
+// Chromium the bytes: they are the same bytes either way.
+await page.context().route("https://cdn.jsdelivr.net/**", async (route) => {
+  const r = await fetch(route.request().url());
+  await route.fulfill({ status: r.status, headers: { "content-type": r.headers.get("content-type") || "application/octet-stream",
+    "access-control-allow-origin": "*" }, body: Buffer.from(await r.arrayBuffer()) });
+});
 const errors = [];
 page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
@@ -133,6 +141,51 @@ await page.waitForFunction(() => document.querySelector('.lab[data-experiment="l
 check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.getAttribute("data-columns-ranges") === "1",
   "a two-column scan: one range per row by rows, one range by columns");
 if (shots) await layouts.screenshot({ path: path.join(shots, "layouts-lab.png") });
+
+// The code tabs: Python first, one choice for every excerpt, remembered across pages.
+check(await page.evaluate(() => document.documentElement.dataset.code) === "python", "code is shown in Python by default");
+const visible = () => page.locator(".tab-panel").evaluateAll((els) =>
+  els.filter((e) => e.offsetParent !== null).map((e) => e.dataset.code));
+check((await visible()).every((c) => c === "python") && (await visible()).length > 0, "only the Python excerpts are visible");
+await page.locator('.tab-bar button[data-code="rust"]').first().click();
+check((await visible()).every((c) => c === "rust"), "one click shows every excerpt in Rust");
+await page.goto(base + "anatomy-of-a-parquet-file.html");
+check(await page.evaluate(() => document.documentElement.dataset.code) === "rust", "and the choice holds on the next page");
+await page.locator('.tab-bar button[data-code="python"]').first().click();
+
+// The same labs on the Python engine: the book's Python reader, run by Pyodide, must show what
+// the Rust reader computes natively.
+const footerLab = page.locator('.lab[data-experiment="footer"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]')?.dataset.state === "ok");
+await footerLab.locator('.engine-bar button[data-engine="python"]').click();
+await page.waitForFunction(() => {
+  const el = document.querySelector('.lab[data-experiment="footer"]');
+  return el.dataset.engine === "python" && el.dataset.state === "ok";
+}, null, { timeout: 180000 });
+check(await footerLab.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
+  await footerLab.getAttribute("data-requests") === String(expected.requests.length),
+  `on the Python engine, the footer lab shows the native reader's footer length and ${expected.requests.length} requests`);
+const pyRanges = await footerLab.locator("table.trace tbody tr td:nth-child(3)").allInnerTexts();
+check(JSON.stringify(pyRanges) === JSON.stringify(expected.requests.map((r) => r.range || "·")), "and the same trace");
+await footerLab.locator('input[name="size"][value="suffix"]').check();
+await footerLab.locator('input[name="prefetch"]').fill("13");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.requests === "1");
+check(true, "a large prefetch opens the file in one request on the Python engine too");
+const pyAnatomy = page.locator('.lab[data-experiment="anatomy"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.engine === "python");
+await pyAnatomy.locator(".tree .node-row").first().waitFor();
+const pyLabels = await pyAnatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
+check(JSON.stringify(pyLabels) === JSON.stringify(labels), "every lab on the page follows the engine choice, and maps the same regions");
+if (shots) await footerLab.screenshot({ path: path.join(shots, "footer-lab-python.png") });
+await page.goto(base + "why-parquet-exists.html");
+await page.waitForFunction(() => {
+  const el = document.querySelector('.lab[data-experiment="layouts"]');
+  return el?.dataset.engine === "python" && el.dataset.rowsRanges;
+}, null, { timeout: 180000 });
+check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.getAttribute("data-columns-ranges") === "1",
+  "the engine choice holds on the next page, and the layouts lab agrees");
+await layouts.locator('.engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]').dataset.engine === "rust");
 if (shots) {
   await page.goto(base + "anatomy-of-a-parquet-file.html");
   await page.screenshot({ path: path.join(shots, "chapter.png") });

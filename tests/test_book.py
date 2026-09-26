@@ -27,6 +27,8 @@ DOCS = [
     ROOT / n for n in ("README.md", "CLAUDE.md", "PLAN.md", "AUTHORING_GUIDE.md", "STYLE.md", "NEXT_STEPS.md")
 ]
 WRITTEN = [c for c in CHAPTERS if UNWRITTEN not in (ROOT / c.path).read_text()]
+#: Chapters the Python reader covers: their problems exist in Python as well as Rust.
+PORTED = [c for c in WRITTEN if (ROOT / "exercises" / "python" / f"{c.slug}.py").exists()]
 
 
 def fences(text: str):
@@ -150,12 +152,28 @@ def test_a_written_chapters_problems_are_tests(chapter):
     section = text.split("\n## Problems\n", 1)[1].split("\n## Where to go next\n", 1)[0]
     commands = [body.strip() for lang, body in fences(section) if lang == "bash"]
     assert commands, "each tested problem shows the command that runs it"
+    python_tests = ROOT / "exercises" / "python" / "tests" / f"test_{chapter.slug}.py"
+    rust, python = [], []
     for cmd in commands:
         m = re.fullmatch(r"cargo test -p exercises --test (\w+)(?: (\w+))? -- --ignored", cmd)
+        if m:
+            assert m.group(1) == chapter.slug
+            if m.group(2):
+                assert f"fn {m.group(2)}" in test_src, f"no test named {m.group(2)}*"
+            rust.append(m.group(2))
+            continue
+        m = re.fullmatch(
+            r"python3 -m pytest exercises/python/tests/test_(\w+)\.py --problems(?: -k (\w+))?", cmd
+        )
         assert m, f"unexpected command: {cmd}"
         assert m.group(1) == chapter.slug
         if m.group(2):
-            assert f"fn {m.group(2)}" in test_src, f"no test named {m.group(2)}*"
+            assert f"def test_{m.group(2)}" in python_tests.read_text(), f"no test named {m.group(2)}*"
+        python.append(m.group(2))
+    if chapter in PORTED:
+        assert python == rust, "a ported chapter shows each problem's command in both languages"
+    else:
+        assert not python, "Python problem commands belong to chapters the Python reader covers"
     assert "No test" in section, "every chapter has a problem about the reader's own system"
 
 
@@ -188,3 +206,30 @@ def test_the_number_check_catches_a_typed_number(tmp_path):
         assert len(vn.problems(page)) == 1
     finally:
         page.unlink()
+
+
+@pytest.mark.parametrize("chapter", PORTED, ids=lambda c: c.slug)
+def test_a_ported_chapter_quotes_both_readers(chapter):
+    """Every excerpt of the Rust reader has its Python counterpart beside it, in a tab set."""
+    text = (ROOT / chapter.path).read_text()
+    rust = re.findall(r"^```\{literalinclude\} \.\./crates/", text, re.M)
+    python = re.findall(r"^```\{literalinclude\} \.\./python/", text, re.M)
+    assert len(rust) == len(python), "quote each step in Python and in Rust"
+    assert text.count("::::{tab-set}") >= len(rust)
+    stubs = (ROOT / "exercises" / "python" / f"{chapter.slug}.py").read_text()
+    assert "raise NotImplementedError(" in stubs, "ship the stubs unsolved"
+    tests = (ROOT / "exercises" / "python" / "tests" / f"test_{chapter.slug}.py").read_text()
+    assert "@pytest.mark.problem(" in tests
+
+
+def test_the_python_engine_runs_exactly_the_ported_chapters_labs():
+    """The labs offer the Python engine for a chapter once its reader is ported, and not before."""
+    import ast
+
+    tree = ast.parse((ROOT / "python" / "parquet_lab" / "browser.py").read_text())
+    engine = next(
+        ast.literal_eval(n.value)
+        for n in tree.body
+        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
+    )
+    assert set(engine) == {e for c in PORTED for e in c.experiments}

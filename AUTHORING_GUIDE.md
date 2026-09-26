@@ -23,11 +23,14 @@ Not the order the chapter is read in.
 1. **The reader code.** Add the piece of `crates/parquet-lab` the chapter builds, with unit tests
    and, where a fixture can check it, a test against the pyarrow manifest in
    `crates/parquet-lab/tests/fixtures.rs`. If the chapter needs a new fixture, write it first
-   (`fixtures/generate.py`), and say in its `why` what it exists to show.
+   (`fixtures/generate.py`), and say in its `why` what it exists to show. For a chapter the
+   Python reader covers, write the same piece in `python/parquet_lab`, with the same JSON, and add
+   its calls to `tests/test_python.py`: the two readers must agree before either is quoted.
 2. **The problems and their tests.** Stubs in `exercises/src/<slug>.rs`, tests in
    `exercises/tests/<slug>.rs`. Make each fail, and read the failure: it is the first thing a
    reader sees, and it should say where to look. Then solve each one *outside the repository* and
-   check it passes. Never commit the solution.
+   check it passes. Never commit the solution. A ported chapter has the same problems in
+   `exercises/python/`, marked `@pytest.mark.problem`, graded the same way.
 3. **The experiment.** A report function that runs the reader, a WASM export, and a panel in
    `web/lab/`. See CLAUDE.md, *Adding things*.
 4. **The figures.** Every number the prose will need, as a fragment from `pqlab figures`.
@@ -84,16 +87,35 @@ by the specification. A definition that must be typed as digits takes
 
 ### Never paste code into prose
 
+A chapter the Python reader covers quotes each step in both languages, Python first, in a tab set
+whose items are synced `python` and `rust`, so every excerpt on every page follows the reader's
+choice:
+
 ````markdown
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/format.py
+:language: python
+:start-at: def footer_span(
+:end-before: def check_header(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/format.rs
 :language: rust
 :start-at: pub fn footer_span(
 :end-before: /// Check the opening magic
 ```
+:::
+::::
 ````
 
-Anchor on text that will survive `cargo fmt`: a signature's opening, a doc comment's first
-words. Never `:lines:`. The MyST parse fails if an anchor stops matching.
+Anchor on text that will survive `cargo fmt` and `ruff format`: a signature's opening, a doc
+comment's first words. Never `:lines:`. The MyST parse fails if an anchor stops matching. Write
+the prose around a tab set about the format, not the language: a remark that holds for one
+language only belongs in a sentence that names it.
 
 ### Never fake the experiment
 
