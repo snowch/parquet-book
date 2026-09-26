@@ -73,8 +73,52 @@ def facts(chapter: str, step: str) -> list[str]:
         ],
     }
     known.update(changes_facts())
+    known.update(formats_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     return known[(chapter, step)]
+
+
+def formats_facts() -> dict:
+    """What ch01's steps must print, from pyarrow's reading of the CSV and Parquet files."""
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
+
+    formats = ROOT / "fixtures" / "formats"
+    orders = pq.read_table(formats / "orders.parquet")
+    uk = pc.sum(orders.filter(pc.equal(orders["country"], "UK"))["amount_cents"]).as_py()
+    csv_size = (formats / "orders.csv").stat().st_size
+    parquet_size = (formats / "orders.parquet").stat().st_size
+    return {
+        ("why_parquet_exists", "read_a_csv"): [
+            f"read {csv_size} of {csv_size} bytes",
+            f"amount_cents in the UK: {uk}",
+        ],
+        ("why_parquet_exists", "columns_with_a_library"): [
+            f"of {parquet_size} bytes",
+            f"amount_cents in the UK: {uk}",
+        ],
+    }
+
+
+def the_least_a_parquet_reader_reads() -> int:
+    """The trailer, the footer and the two columns' chunks, from pyarrow's own metadata."""
+    import pyarrow.parquet as pq
+
+    md = pq.read_metadata(ROOT / "fixtures" / "formats" / "orders.parquet")
+    chunks = [md.row_group(g).column(c) for g in range(md.num_row_groups) for c in range(md.num_columns)]
+    wanted = [c for c in chunks if c.path_in_schema in ("country", "amount_cents")]
+    return 8 + md.serialized_size + sum(c.total_compressed_size for c in wanted)
+
+
+def test_parquet_reads_less_than_the_csv_and_the_crate_reads_the_least(built):
+    """ch01's point, measured: a row-at-a-time CSV reader reads every byte; pyarrow reads less of
+    the Parquet file, including a prefetched tail; the Rust crate reads only what it needs."""
+    py = run_python("why_parquet_exists", "columns_with_a_library")
+    rs = run_rust("columns_with_a_library")
+    csv_size = (ROOT / "fixtures" / "formats" / "orders.csv").stat().st_size
+    read = lambda out: int(re.search(r"read (\d+) of", out).group(1))  # noqa: E731
+    assert the_least_a_parquet_reader_reads() <= read(py) < csv_size
+    assert read(rs) == the_least_a_parquet_reader_reads()
 
 
 def changes_facts() -> dict:
@@ -117,6 +161,22 @@ def changes_facts() -> dict:
     }
 
 
+def run_python(chapter: str, step: str) -> str:
+    return subprocess.run(
+        [sys.executable, str(PYTHON / chapter / f"{step}.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+def run_rust(step: str) -> str:
+    return subprocess.run(
+        [str(rust_binary(step))], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout
+
+
 @pytest.fixture(scope="module")
 def built():
     subprocess.run(["cargo", "build", "--quiet", "-p", "walkthroughs"], cwd=ROOT, check=True)
@@ -131,14 +191,7 @@ def test_every_step_has_a_twin():
 
 @pytest.mark.parametrize(("chapter", "step"), STEPS, ids=[f"{c}/{s}" for c, s in STEPS])
 def test_a_step_prints_the_same_facts_in_both_languages(built, chapter, step):
-    py = subprocess.run(
-        [sys.executable, str(PYTHON / chapter / f"{step}.py")],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    rs = subprocess.run([str(rust_binary(step))], cwd=ROOT, capture_output=True, text=True, check=True).stdout
+    py, rs = run_python(chapter, step), run_rust(step)
     for fact in facts(chapter, step):
         assert fact in py.replace("True", "true"), f"Python {step} should print {fact!r}:\n{py}"
         assert fact in rs, f"Rust {step} should print {fact!r}:\n{rs}"

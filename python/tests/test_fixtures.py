@@ -131,18 +131,18 @@ def test_the_structure_view_and_the_footer_lab_report_success(name, data, manife
 
 
 def test_the_eight_orders_file_holds_the_layouts_table():
-    """ch01 stores Table.sales() by hand, then shows pyarrow's Parquet file of the same orders."""
+    """ch01 stores Table.sales() by hand, and measures pyarrow's files of the same orders."""
+    from parquet_lab import engine
     from parquet_lab.layout import Table, show_cell
 
     table = Table.sales()
-    manifest = json.loads((ROOT / "fixtures" / "eight-orders.json").read_text())
-    names = [name for name, _ in table.columns]
-    assert [leaf["path"] for leaf in manifest["leaves"]] == names
+    data = (ROOT / "fixtures" / "formats" / "eight-orders.parquet").read_bytes()
+    answer = engine.run(data, "SELECT * FROM orders")
+    assert answer.columns == [name for name, _ in table.columns]
     expected = [
-        {name: show_cell(v, kind) for (name, kind), v in zip(table.columns, row, strict=True)}
-        for row in table.rows
+        [show_cell(v, kind) for (_, kind), v in zip(table.columns, row, strict=True)] for row in table.rows
     ]
-    assert [{k: str(v) for k, v in r.items()} for r in manifest["rows"]] == expected
+    assert [[str(v) for v in row] for row in answer.rows] == expected
 
 
 # ---- ch15: a changing table -------------------------------------------------------------------

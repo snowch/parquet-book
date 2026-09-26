@@ -16,5 +16,7 @@ publish = false
 [dependencies]
 # The format only, without Arrow or async, and Snappy, which ch15's table is compressed with.
 parquet = { version = "60", default-features = false, features = ["snap"] }
+# The byte buffers a Parquet reader hands the crate, for ch01's step that counts what it reads.
+bytes = "1"
 
 [workspace]

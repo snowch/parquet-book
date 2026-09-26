@@ -217,6 +217,17 @@ await page.goto(base + "why-parquet-exists.html");
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]')?.dataset.ready === "true");
 check(await layouts.getAttribute("data-engine") === "rust" && await layouts.locator(".engine-bar").count() === 0,
   "ch01's lab offers no engine choice and no editor");
+{
+  // ch01 opens on code: the CSV file read a row at a time, in the page, reads every byte.
+  const step = page.locator('figure.walkthrough[data-file$="read_a_csv.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  const box = step.locator(".runnable");
+  await box.and(page.locator('[data-state="running"]')).waitFor({ timeout: 10000 }).catch(() => {});
+  await box.and(page.locator('[data-state="idle"]')).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const csvSize = (await stat("fixtures/formats/orders.csv")).size;
+  check(out.includes(`read ${csvSize} of ${csvSize} bytes`), `ch01's CSV step runs in the page and reads all ${csvSize} bytes`);
+}
 await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 if (shots) {
   await page.goto(base + "anatomy-of-a-parquet-file.html");

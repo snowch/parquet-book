@@ -18,7 +18,7 @@ use parquet_lab::json::Json;
 use parquet_lab::metadata::FileMetaData;
 use parquet_lab::object_store::{MemoryStore, NetworkModel, TracingStore};
 use parquet_lab::reader::{read_footer, FooterOptions, SizeSource};
-use parquet_lab::report::{layouts, open_bytes};
+use parquet_lab::report::open_bytes;
 
 struct Figure {
     file: &'static str,
@@ -27,12 +27,8 @@ struct Figure {
 
 const FIGURES: &[Figure] = &[
     Figure {
-        file: "layouts-costs.md",
-        render: layouts_costs,
-    },
-    Figure {
-        file: "eight-orders-regions.md",
-        render: |root| regions(root, "eight-orders.parquet"),
+        file: "csv-or-parquet.md",
+        render: csv_or_parquet,
     },
     Figure {
         file: "tiny-regions.md",
@@ -334,6 +330,54 @@ fn metadata(bytes: &[u8]) -> Result<FileMetaData, String> {
     open_bytes(bytes)
 }
 
+/// ch01: what reading two columns costs from a CSV file and from a Parquet file of the same
+/// table. A CSV reader reads every byte, since each line holds every column; a Parquet reader
+/// needs the trailer, the footer, and the two columns' chunks, which the reader finds here from
+/// the footer as any reader would.
+fn csv_or_parquet(root: &Path) -> Result<String, String> {
+    let wanted = ["country", "amount_cents"];
+    let mut rows = vec![
+        "| Table | CSV file | Read a row at a time | Parquet file | Trailer and footer | Two column chunks | A Parquet reader needs |".to_string(),
+        "|---|--:|--:|--:|--:|--:|--:|".to_string(),
+    ];
+    for (name, label) in [
+        ("eight-orders", "eight orders"),
+        ("orders", "the larger table"),
+    ] {
+        let csv = fixture(root, &format!("formats/{name}.csv"))?;
+        let bytes = fixture(root, &format!("formats/{name}.parquet"))?;
+        let size = bytes.len() as u64;
+        let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
+        let trailer = parse_trailer(last8, size).map_err(|e| e.to_string())?;
+        let md = metadata(&bytes)?;
+        let footer = 8 + u64::from(trailer.footer_length);
+        let chunks: u64 = md
+            .row_groups
+            .iter()
+            .flat_map(|rg| &rg.columns)
+            .filter(|c| wanted.contains(&c.dotted_path().as_str()))
+            .map(|c| c.byte_range().len())
+            .sum();
+        rows.push(format!(
+            "| {label}, {} rows | {} | {} | {} | {} | {} | {} |",
+            thousands(md.num_rows as u64),
+            thousands(csv.len() as u64),
+            thousands(csv.len() as u64),
+            thousands(size),
+            thousands(footer),
+            thousands(chunks),
+            thousands(footer + chunks)
+        ));
+    }
+    Ok(format!(
+        "{HEADER}{}\n\n*Computed by the reader from `fixtures/formats/`, written by pyarrow with its \
+         default settings. The query wants `country` and `amount_cents`. A row-at-a-time CSV reader \
+         reads every byte, because every line holds every column; the Parquet column is the \
+         least any Parquet reader can read, found from the file's footer.*\n",
+        rows.join("\n")
+    ))
+}
+
 /// Every region of a file, in order: the magic, each row group and its column chunks, the footer.
 fn regions(root: &Path, name: &str) -> Result<String, String> {
     let bytes = fixture(root, name)?;
@@ -529,57 +573,6 @@ fn footer_strategies(root: &Path) -> Result<String, String> {
     s.push_str(&format!(
         "\n*Computed by the reader from the fixtures: {}. Simulated network: {} per request, {} once data flows.*\n",
         sizes.join(", "),
-        ms(model.latency_us),
-        rate(model.bandwidth_bytes_per_sec)
-    ));
-    Ok(s)
-}
-
-fn layouts_costs(_root: &Path) -> Result<String, String> {
-    let model = NetworkModel::default();
-    let all = |r: &Json, k: &str| -> Result<(u64, u64, u64, u64, u64, u64), String> {
-        let l = r.get(k).ok_or("no layout")?;
-        let n = |j: Option<&Json>| j.and_then(Json::as_u64).ok_or("missing number".to_string());
-        Ok((
-            n(l.get("needed_bytes"))?,
-            l.get("needed")
-                .and_then(Json::as_array)
-                .map(|a| a.len() as u64)
-                .unwrap_or(0),
-            n(l.get("by_range").and_then(|b| b.get("elapsed_us")))?,
-            n(l.get("whole").and_then(|b| b.get("bytes")))?,
-            n(l.get("whole").and_then(|b| b.get("elapsed_us")))?,
-            n(l.get("total_bytes"))?,
-        ))
-    };
-    // Bits are column positions: order_id, customer_id, country, amount_cents, order_date.
-    let queries: [(&str, u32, Option<usize>); 3] = [
-        ("`SELECT country, amount_cents FROM sales`", 0b01100, None),
-        ("`SELECT amount_cents FROM sales`", 0b01000, None),
-        ("`SELECT * FROM sales WHERE order_id = 4`", 0b11111, Some(3)),
-    ];
-    let mut s = String::from(HEADER);
-    s.push_str(
-        "| Query | Layout | Bytes needed | Separate ranges | Fetch each range | Fetch the whole object |\n\
-         |---|---|--:|--:|--:|--:|\n",
-    );
-    let mut total = 0;
-    for (sql, mask, row) in queries {
-        let r = layouts(mask, row, model);
-        for (key, name) in [("rows_layout", "rows"), ("columns_layout", "columns")] {
-            let (need, ranges, each_us, whole_bytes, whole_us, t) = all(&r, key)?;
-            total = t;
-            s.push_str(&format!(
-                "| {sql} | {name} | {need} | {ranges} | {ranges} request{}, {} | {whole_bytes} bytes, {} |\n",
-                if ranges == 1 { "" } else { "s" },
-                ms(each_us),
-                ms(whole_us)
-            ));
-        }
-    }
-    s.push_str(&format!(
-        "\n*Computed by the reader from the eight-order sales table in `crates/parquet-lab/src/layout.rs`, \
-         {total} bytes in either layout. Simulated network: {} per request, {} once data flows.*\n",
         ms(model.latency_us),
         rate(model.bandwidth_bytes_per_sec)
     ));

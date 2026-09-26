@@ -40,6 +40,7 @@ from pathlib import Path
 
 import pyarrow as pa
 import pyarrow.compute as pc
+import pyarrow.csv  # noqa: F401  (pa.csv)
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pyarrow.parquet.encryption as pe
@@ -379,6 +380,7 @@ CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
 
 #: ch01's eight orders, as a pipeline would hold them before writing them out. The same rows as
 #: the layouts lab's table (``Table.sales()``); python/tests/test_fixtures.py holds them equal.
+#: They are written to ``formats/`` as CSV and as Parquet, beside a larger table of orders.
 #: pyarrow infers a nullable schema, and the lab's table has no nulls, so every column is then
 #: made required, as in tiny.parquet.
 EIGHT_ORDERS = pa.table(
@@ -394,16 +396,6 @@ EIGHT_ORDERS = EIGHT_ORDERS.cast(pa.schema([f.with_nullable(False) for f in EIGH
 
 
 FIXTURES = (
-    Fixture(
-        name="eight-orders",
-        why=(
-            "ch01's table: the eight orders its layouts lab stores by rows and by columns, "
-            "written as Parquet with the same settings as tiny.parquet. Each column lands in "
-            "the file as one contiguous chunk, which is the column layout, and ch01 ends by "
-            "showing where."
-        ),
-        table=EIGHT_ORDERS,
-    ),
     Fixture(
         name="tiny",
         why=(
@@ -1392,6 +1384,27 @@ def changes_outputs() -> dict[Path, bytes]:
     return out
 
 
+#: ch01's files: the same tables as CSV and as Parquet, each written by pyarrow with its default
+#: settings, as a pipeline that calls ``write_csv`` or ``write_table`` writes them. The eight
+#: orders are small enough to see; the larger table is large enough for a reader's fixed costs,
+#: the footer and a prefetched tail, to be small beside the data.
+FORMATS_DIR = "formats"
+FORMATS_ORDERS = 5000
+
+
+def formats_outputs() -> dict[Path, bytes]:
+    orders = pa.Table.from_pylist(_writing_rows(FORMATS_ORDERS), schema=WRITING_SCHEMA)
+    out = {}
+    for name, table in (("eight-orders", EIGHT_ORDERS), ("orders", orders)):
+        sink = io.BytesIO()
+        pq.write_table(table, sink)
+        out[HERE / FORMATS_DIR / f"{name}.parquet"] = sink.getvalue()
+        sink = io.BytesIO()
+        pa.csv.write_csv(table, sink)
+        out[HERE / FORMATS_DIR / f"{name}.csv"] = sink.getvalue()
+    return out
+
+
 def dump_manifest(m: dict) -> str:
     """The manifest as indented JSON, except that each row is on one line: the rows are most of
     a manifest, and one line each keeps them readable and the file small."""
@@ -1417,6 +1430,7 @@ def outputs() -> dict[Path, bytes]:
     files[HERE / "queries.json"] = query_answers({m["name"]: files[HERE / m["file"]] for m in manifests})
     files.update(table_outputs())
     files.update(changes_outputs())
+    files.update(formats_outputs())
     return files
 
 

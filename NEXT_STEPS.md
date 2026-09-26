@@ -173,8 +173,12 @@ The book's readers are data engineers, and code is their interface, so the metho
 the structure by hand, build it into the reader, then ask a library (PLAN.md, section 1).
 
 - ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): no *Building it*, no coding problems,
-  two questions to reason about. It keeps its layouts lab and ends on the same eight orders as
-  a Parquet file pyarrow wrote (`eight-orders.parquet`), with the reader's map of its regions.
+  two questions to reason about. It opens on a measurement: two columns read from a CSV file a
+  row at a time, and from the Parquet file of the same table with pyarrow and the `parquet` crate,
+  each through a file that counts the bytes read (`fixtures/formats/`, pyarrow's defaults). The
+  book's reader works out the least a Parquet reader can read; the crate reads exactly that, and
+  pyarrow more, for its prefetched tail. The eight-order version shows Parquet losing to a tiny
+  CSV. The layouts lab follows, as the picture of why, with no engine choice or editor.
 - ch02 ends *Building it* with "Ask a library": `footer_with_a_library`, pyarrow's `read_metadata` in
   Python (run in the page, pyarrow loaded under Pyodide on first run) and the `parquet` crate in
   Rust (`walkthroughs/libraries`, a workspace of its own). The test checks both against the

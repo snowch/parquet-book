@@ -130,7 +130,7 @@ _CHAPTERS = (
         "Why store a table one column at a time, when every program thinks in rows?",
         "A tiny table stored both ways, and a count of the bytes each query must touch.",
         ("layouts",),
-        ("eight-orders.parquet",),
+        ("formats/orders.csv", "formats/orders.parquet"),
     ),
     (
         "anatomy_of_a_parquet_file",
