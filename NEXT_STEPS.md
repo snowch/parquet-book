@@ -160,6 +160,22 @@ reader's numbers too.
 - `.devcontainer/` makes the repository a Codespace, for the Rust reader and its problems.
 - The browser test runs a workbench against native pytest and checks an edit and its restore.
 
+## Ruled out: Rust compiled or interpreted in the page
+
+Tried so that a Run button could run the Rust problems' tests on a reader's own Rust.
+
+- **rustc in WebAssembly** ([rubrc](https://github.com/oligamiq/rubrc)): experimental by its own
+  account, needs COOP/COEP headers GitHub Pages cannot send, and a whole toolchain to download.
+- **Miri in WebAssembly** ([Rubri](https://github.com/lyonsyonii/rubri), which interprets instead of
+  compiling). Measured with the reader flattened into one file: the download is about 58 MB
+  compressed, and Miri type-checks the whole reader in about six seconds. But it runs slowly: the
+  reader's own unit tests took close to three minutes, and chapter 2's problem tests, a second or
+  so natively, had not finished after twenty. The graders loop over many cases and fixtures, so
+  every chapter would be worse.
+
+Rust therefore runs online in a Codespace, and in the page only as the prebuilt WebAssembly reader
+(`pqlab` Run buttons). Revisit if an in-browser Rust toolchain becomes fast and small.
+
 ## Then
 
 - A multi-version log with a checkpoint, and time travel between versions.
