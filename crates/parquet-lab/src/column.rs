@@ -123,6 +123,7 @@ pub fn read_column(
     chunk: &ColumnChunk,
     leaf: &Leaf,
 ) -> Result<ColumnData, ColumnError> {
+    refuse_encrypted(chunk)?;
     let range = chunk.byte_range();
     let Some(bytes) = file.get(range.start as usize..range.end as usize) else {
         return err(format!(
@@ -142,6 +143,7 @@ pub fn read_column_pages(
     leaf: &Leaf,
     offsets: &[u64],
 ) -> Result<ColumnData, ColumnError> {
+    refuse_encrypted(chunk)?;
     let range = chunk.byte_range();
     let one = |at: u64| -> Result<Page, ColumnError> {
         let bytes = file
@@ -158,6 +160,23 @@ pub fn read_column_pages(
         pages.push(one(at)?);
     }
     decode_pages(file, chunk, leaf, pages)
+}
+
+/// An encrypted column chunk's pages are encrypted modules (ch13). Without its key they cannot
+/// be read, and the reader says so rather than decoding ciphertext.
+fn refuse_encrypted(chunk: &ColumnChunk) -> Result<(), ColumnError> {
+    match &chunk.crypto {
+        Some(c) => err(format!(
+            "column {} is encrypted with {}, and this reader has no keys",
+            chunk.dotted_path(),
+            if c.with_column_key {
+                "its own key"
+            } else {
+                "the footer key"
+            }
+        )),
+        None => Ok(()),
+    }
 }
 
 /// Decode pages already located: a dictionary page first, if there is one, then data pages.

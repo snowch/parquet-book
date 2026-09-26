@@ -113,6 +113,13 @@ no-dependency rule. Their fixtures are still written and measured, from footers,
 needs them is refused with a message naming the codec. Decompressed output is checked against
 `codec-none.parquet`, pyarrow's own uncompressed pages, not against the reader.
 
+**Encryption is read, not decrypted, and its fixtures are written once.** The reader recognises
+both footer modes, walks encrypted modules by their lengths, and refuses encrypted columns by
+name; it does not implement AES, GCM or a key service. pyarrow draws fresh data keys and nonces
+on every write, so the encrypted fixtures cannot be reproduced byte for byte: the generator keeps
+the committed bytes while they decrypt, with test keys published in the generator, to exactly the
+intended rows, and the tests hold the keyless reader to pyarrow's keyed description of them.
+
 **Problems are Rust tests, run at a desk.** `sizing-and-tco` runs its Python problems in the page
 under Pyodide. A Rust problem cannot be compiled in a browser page at reasonable cost, so here the
 problems run with `cargo test -- --ignored`, and the page shows the command. The experiments carry

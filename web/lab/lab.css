@@ -157,6 +157,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .scan-grid .p-scan-sum { border-right: 0; }
   .engine-grid { grid-template-columns: minmax(0, 1fr); }
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
+  .crypt-grid .p-seen { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
@@ -341,6 +343,18 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
 .pipeline .flow { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pipeline .detail { margin: .15rem 0 .3rem; color: var(--muted); overflow-wrap: anywhere; }
 
+/* Ch13: encryption. */
+.crypt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+              grid-template-areas: "seen unseen" "cols cols"; border-bottom: 1px solid var(--edge); }
+.crypt-grid .p-seen { grid-area: seen; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
+.crypt-grid .p-unseen { grid-area: unseen; border-bottom: 1px solid var(--edge); }
+.crypt-grid .p-crypt-cols { grid-area: cols; }
+.crypt-grid ul { margin: 0; padding-left: 1.1rem; font-size: 13px; }
+.crypt-grid li { margin-bottom: .35rem; }
+.crypt-grid li.mode { list-style: none; margin-left: -1.1rem; }
+.crypt-grid .detail { color: var(--muted); overflow-wrap: anywhere; }
+.crypt-grid button.span { font: 12px var(--chrome); padding: 0 .3rem; background: var(--code); border-color: var(--edge); text-align: left; }
+
 /* Ch01: the layouts. */
 .lab .sql { margin: .7rem 1rem 0; }
 .lab table.data, .lab table.costs { margin: 0 1rem; font-size: 13px; }
@@ -375,6 +389,8 @@ table.trace td.bar span { position: absolute; top: .55rem; height: .55rem; backg
   .scan-grid .p-scan-sum { border-right: 0; }
   .engine-grid { grid-template-columns: minmax(0, 1fr); }
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
+  .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
+  .crypt-grid .p-seen { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
   .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }

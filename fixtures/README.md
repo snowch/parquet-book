@@ -869,6 +869,72 @@ row_group_size=200
 max_rows_per_page=40
 ```
 
+## `encrypted-footer.parquet`
+
+Twelve orders with modular encryption and an encrypted footer: the file ends in PARE. email is encrypted with the pii key and amount_cents with the finance key; order_id and country are not encrypted, but the footer that would say where they are is. Written once, since encryption is never byte-for-byte reproducible; the check decrypts it with the published test keys.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 2123 bytes |
+| Rows | 12 |
+| Row groups | 1 |
+| Footer length | 954 bytes |
+| SHA-256 | `0ab7d6a98676365f…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `email` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
+## `plaintext-footer.parquet`
+
+The same orders and keys with a plaintext footer: the file ends in PAR1, the footer is readable and signed, and only the two encrypted columns' pages and details are hidden.
+
+| | |
+|---|---|
+| Written by | pyarrow 25.0.1 (`fixtures/generate.py`) |
+| Size | 2192 bytes |
+| Rows | 12 |
+| Row groups | 1 |
+| Footer length | 1222 bytes |
+| SHA-256 | `9a58c765f5254a27…` |
+
+Leaf columns, as pyarrow reads the Parquet schema:
+
+| Column | Physical type | Logical type | Max def | Max rep | Encodings | Codec |
+|---|---|---|--:|--:|---|---|
+| `order_id` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `country` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `email` | BYTE_ARRAY | String | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+| `amount_cents` | INT64 | None | 0 | 0 | PLAIN, RLE | UNCOMPRESSED |
+
+Writer options:
+
+```python
+compression='none'
+use_dictionary=False
+write_statistics=True
+store_schema=False
+data_page_version='1.0'
+write_page_index=False
+```
+
 ## `pages-v2-snappy.parquet`
 
 pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values are compressed: its levels stay as they were, so a reader can count rows and nulls without decompressing anything.

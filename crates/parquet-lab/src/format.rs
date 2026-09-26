@@ -57,7 +57,7 @@ impl fmt::Display for FormatError {
             ),
             FormatError::EncryptedFooter => write!(
                 f,
-                "this file ends in PARE: its footer is encrypted, which this reader does not handle yet"
+                "this file ends in PARE: its footer is encrypted, and without the footer key a reader can see only its crypto metadata (ch13)"
             ),
             FormatError::FooterLengthTooLarge { footer_length, available } => write!(
                 f,

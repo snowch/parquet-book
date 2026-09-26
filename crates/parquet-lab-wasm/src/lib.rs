@@ -233,6 +233,15 @@ pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
     }
 }
 
+/// Ch13's experiment: what a reader without keys can see. See `report::encryption`.
+#[no_mangle]
+pub extern "C" fn pl_encryption(id: u32) -> usize {
+    match with_file(id, |f| report::encryption(&f.bytes)) {
+        Some(json) => emit(json),
+        None => no_such_file(id),
+    }
+}
+
 /// Ch12's experiment: SQL answered from the file, stage by stage. `sql` is a `pl_alloc` buffer
 /// this call takes and frees. See `report::query`.
 ///

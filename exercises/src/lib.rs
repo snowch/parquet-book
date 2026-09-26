@@ -20,6 +20,7 @@ pub mod compression;
 pub mod encodings;
 pub mod how_readers_read;
 pub mod metadata_and_statistics;
+pub mod modular_encryption;
 pub mod nested_data;
 pub mod pages;
 pub mod skipping_data;

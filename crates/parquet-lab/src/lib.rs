@@ -47,6 +47,7 @@ pub mod bloom;
 pub mod bytes;
 pub mod column;
 pub mod compress;
+pub mod crypto;
 pub mod decode;
 pub mod delta;
 pub mod encoding;

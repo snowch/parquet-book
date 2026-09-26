@@ -48,8 +48,8 @@ make problems                                           # the chapter exercises 
 
 ch01 (row and column layouts), ch02 (footer discovery through a simulated object store), ch03
 (the type system), ch04 (nested data), ch05 (encodings), ch06 (pages), ch07 (compression), ch08
-(metadata and statistics), ch09 (skipping data), ch10 (how readers read), ch11 (writing Parquet well) and ch12 (a tiny query engine) are
-written, with
+(metadata and statistics), ch09 (skipping data), ch10 (how readers read), ch11 (writing Parquet well), ch12 (a tiny query engine) and ch13 (modular
+encryption) are written, with
 working experiments and graded problems.
 The other chapters are planned in `tools/outline.py` and appear in the book as outlines. See
 `PLAN.md` for the plan and `NEXT_STEPS.md` for what comes next.

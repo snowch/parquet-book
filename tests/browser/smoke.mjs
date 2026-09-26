@@ -330,6 +330,19 @@ if (shots) {
   await engineLab.screenshot({ path: path.join(shots, "engine-lab.png") });
 }
 
+// ch13: encryption. What is visible is what the reader could read.
+await page.goto(base + "modular-encryption.html");
+const cryptLab = page.locator('.lab[data-experiment="encryption"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]')?.dataset.state === "ok");
+const plain = native(["encryption", "fixtures/plaintext-footer.parquet"]);
+check(await cryptLab.getAttribute("data-mode") === "plaintext footer" &&
+  await cryptLab.getAttribute("data-hidden") === String(plain.hidden.length),
+  `a plaintext footer hides the reader's ${plain.hidden.length} items`);
+await cryptLab.locator(".lab-head select").selectOption("encrypted-footer.parquet");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]').dataset.mode === "encrypted footer");
+check((await cryptLab.locator(".p-tree").innerText()).includes("Encrypted FileMetaData"), "the structure view shows the encrypted footer as one module");
+if (shots) await cryptLab.screenshot({ path: path.join(shots, "encryption-lab.png") });
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

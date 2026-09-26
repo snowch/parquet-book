@@ -1,0 +1,192 @@
+{
+  "name": "encrypted-footer",
+  "file": "encrypted-footer.parquet",
+  "why": "Twelve orders with modular encryption and an encrypted footer: the file ends in PARE. email is encrypted with the pii key and amount_cents with the finance key; order_id and country are not encrypted, but the footer that would say where they are is. Written once, since encryption is never byte-for-byte reproducible; the check decrypts it with the published test keys.",
+  "generator": {
+    "script": "fixtures/generate.py",
+    "writer": "pyarrow 25.0.1",
+    "options": {
+      "compression": "none",
+      "use_dictionary": false,
+      "write_statistics": true,
+      "store_schema": false,
+      "data_page_version": "1.0",
+      "write_page_index": false
+    },
+    "encryption": {
+      "footer_key": "footer",
+      "column_keys": {
+        "pii": [
+          "email"
+        ],
+        "finance": [
+          "amount_cents"
+        ]
+      },
+      "plaintext_footer": false,
+      "encryption_algorithm": "AES_GCM_V1"
+    }
+  },
+  "file_size": 2123,
+  "sha256": "0ab7d6a98676365fcbf697cca6adf7a62594e18c8c7019c74807971c49481c9e",
+  "footer_length": 954,
+  "created_by": "parquet-cpp-arrow version 25.0.1",
+  "format_version": "2.6",
+  "num_rows": 12,
+  "num_columns": 4,
+  "num_row_groups": 1,
+  "schema": [
+    {
+      "name": "order_id",
+      "type": "int64",
+      "nullable": false
+    },
+    {
+      "name": "country",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "email",
+      "type": "string",
+      "nullable": false
+    },
+    {
+      "name": "amount_cents",
+      "type": "int64",
+      "nullable": false
+    }
+  ],
+  "leaves": [
+    {
+      "path": "order_id",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "country",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "email",
+      "physical_type": "BYTE_ARRAY",
+      "logical_type": "String",
+      "converted_type": "UTF8",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    },
+    {
+      "path": "amount_cents",
+      "physical_type": "INT64",
+      "logical_type": "None",
+      "converted_type": "NONE",
+      "max_definition_level": 0,
+      "max_repetition_level": 0
+    }
+  ],
+  "rows": [
+    {"order_id": 1, "country": "UK", "email": "customer1@example.com", "amount_cents": 1999},
+    {"order_id": 2, "country": "SE", "email": "customer2@example.com", "amount_cents": 500},
+    {"order_id": 3, "country": "UK", "email": "customer3@example.com", "amount_cents": 4210},
+    {"order_id": 4, "country": "PL", "email": "customer4@example.com", "amount_cents": 1250},
+    {"order_id": 5, "country": "UK", "email": "customer5@example.com", "amount_cents": 875},
+    {"order_id": 6, "country": "US", "email": "customer6@example.com", "amount_cents": 3000},
+    {"order_id": 7, "country": "SE", "email": "customer7@example.com", "amount_cents": 640},
+    {"order_id": 8, "country": "UK", "email": "customer8@example.com", "amount_cents": 2275},
+    {"order_id": 9, "country": "UK", "email": "customer9@example.com", "amount_cents": 1999},
+    {"order_id": 10, "country": "PL", "email": "customer10@example.com", "amount_cents": 500},
+    {"order_id": 11, "country": "UK", "email": "customer11@example.com", "amount_cents": 1250},
+    {"order_id": 12, "country": "SE", "email": "customer12@example.com", "amount_cents": 875}
+  ],
+  "row_groups": [
+    {
+      "num_rows": 12,
+      "total_byte_size": 866,
+      "columns": [
+        {
+          "path": "order_id",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 12,
+          "data_page_offset": 4,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 161,
+          "total_uncompressed_size": 161,
+          "statistics": {
+            "min": 1,
+            "max": 12,
+            "null_count": 0
+          }
+        },
+        {
+          "path": "country",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 12,
+          "data_page_offset": 165,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 105,
+          "total_uncompressed_size": 105,
+          "statistics": {
+            "min": "PL",
+            "max": "US",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "email",
+          "physical_type": "BYTE_ARRAY",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 12,
+          "data_page_offset": 270,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 439,
+          "total_uncompressed_size": 407,
+          "statistics": {
+            "min": "customer10@example.com",
+            "max": "customer9@example.com",
+            "null_count": 0
+          }
+        },
+        {
+          "path": "amount_cents",
+          "physical_type": "INT64",
+          "compression": "UNCOMPRESSED",
+          "encodings": [
+            "PLAIN",
+            "RLE"
+          ],
+          "num_values": 12,
+          "data_page_offset": 709,
+          "dictionary_page_offset": null,
+          "total_compressed_size": 225,
+          "total_uncompressed_size": 193,
+          "statistics": {
+            "min": 500,
+            "max": 4210,
+            "null_count": 0
+          }
+        }
+      ]
+    }
+  ]
+}

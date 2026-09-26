@@ -47,6 +47,9 @@ position and description of every column chunk. [ch02](#anatomy-of-a-parquet-fil
 **Footer length.** The four-byte little-endian integer immediately before the closing magic.
 [ch02](#anatomy-of-a-parquet-file)
 
+**Key metadata.** Bytes stored with an encrypted module that name the key protecting it without
+revealing it. [ch13](#modular-encryption)
+
 **Latency.** The time from sending a request to the first byte of its response, paid once per
 request whatever its size. [ch02](#anatomy-of-a-parquet-file), [ch10](#how-readers-read)
 
@@ -61,6 +64,9 @@ many. Every codec in [ch07](#compression) is built on it.
 
 **Magic.** The four ASCII bytes `PAR1` at the start and end of every unencrypted Parquet file.
 [ch02](#anatomy-of-a-parquet-file)
+
+**Module.** In modular encryption, one separately encrypted piece of a file: the footer, a page
+header or a page, each a length, a nonce, ciphertext and a tag. [ch13](#modular-encryption)
 
 **Object store.** Storage addressed by key that serves whole objects and byte ranges over HTTP,
 such as S3. [ch02](#anatomy-of-a-parquet-file)

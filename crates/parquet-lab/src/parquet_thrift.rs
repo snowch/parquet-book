@@ -300,6 +300,41 @@ const BLOOM_FILTER_ALGORITHM: &[FieldDef] = &[f(1, "BLOCK", Kind::Struct("SplitB
 const BLOOM_FILTER_HASH: &[FieldDef] = &[f(1, "XXHASH", Kind::Struct("XxHash"))];
 const BLOOM_FILTER_COMPRESSION: &[FieldDef] = &[f(1, "UNCOMPRESSED", Kind::Struct("Uncompressed"))];
 
+// Modular encryption (ch13).
+const FILE_CRYPTO_META_DATA: &[FieldDef] = &[
+    f(
+        1,
+        "encryption_algorithm",
+        Kind::Struct("EncryptionAlgorithm"),
+    ),
+    f(2, "key_metadata", Kind::Bytes),
+];
+const ENCRYPTION_ALGORITHM: &[FieldDef] = &[
+    f(1, "AES_GCM_V1", Kind::Struct("AesGcmV1")),
+    f(2, "AES_GCM_CTR_V1", Kind::Struct("AesGcmCtrV1")),
+];
+const AES_GCM: &[FieldDef] = &[
+    f(1, "aad_prefix", Kind::Bytes),
+    f(2, "aad_file_unique", Kind::Bytes),
+    f(3, "supply_aad_prefix", Kind::Bool),
+];
+const COLUMN_CRYPTO_META_DATA: &[FieldDef] = &[
+    f(
+        1,
+        "ENCRYPTION_WITH_FOOTER_KEY",
+        Kind::Struct("EncryptionWithFooterKey"),
+    ),
+    f(
+        2,
+        "ENCRYPTION_WITH_COLUMN_KEY",
+        Kind::Struct("EncryptionWithColumnKey"),
+    ),
+];
+const ENCRYPTION_WITH_COLUMN_KEY: &[FieldDef] = &[
+    f(1, "path_in_schema", STR_LIST),
+    f(2, "key_metadata", Kind::Bytes),
+];
+
 /// The fields of a named struct, or an empty list for one this table does not describe.
 pub fn fields_of(struct_name: &str) -> &'static [FieldDef] {
     match struct_name {
@@ -327,6 +362,11 @@ pub fn fields_of(struct_name: &str) -> &'static [FieldDef] {
         "OffsetIndex" => OFFSET_INDEX,
         "PageLocation" => PAGE_LOCATION,
         "BloomFilterHeader" => BLOOM_FILTER_HEADER,
+        "FileCryptoMetaData" => FILE_CRYPTO_META_DATA,
+        "EncryptionAlgorithm" => ENCRYPTION_ALGORITHM,
+        "AesGcmV1" | "AesGcmCtrV1" => AES_GCM,
+        "ColumnCryptoMetaData" => COLUMN_CRYPTO_META_DATA,
+        "EncryptionWithColumnKey" => ENCRYPTION_WITH_COLUMN_KEY,
         "BloomFilterAlgorithm" => BLOOM_FILTER_ALGORITHM,
         "BloomFilterHash" => BLOOM_FILTER_HASH,
         "BloomFilterCompression" => BLOOM_FILTER_COMPRESSION,
@@ -428,9 +468,11 @@ mod tests {
             "MilliSeconds",
             "MicroSeconds",
             "NanoSeconds",
+            "EncryptionWithFooterKey",
+            "SplitBlockAlgorithm",
+            "XxHash",
+            "Uncompressed",
             // Not described yet: named here so the omission is a decision, not an accident.
-            "EncryptionAlgorithm",
-            "ColumnCryptoMetaData",
             "GeospatialStatistics",
             "GeometryType",
             "GeographyType",
@@ -457,6 +499,19 @@ mod tests {
             "DataPageHeader",
             "DictionaryPageHeader",
             "DataPageHeaderV2",
+            "ColumnIndex",
+            "OffsetIndex",
+            "PageLocation",
+            "BloomFilterHeader",
+            "BloomFilterAlgorithm",
+            "BloomFilterHash",
+            "BloomFilterCompression",
+            "FileCryptoMetaData",
+            "EncryptionAlgorithm",
+            "AesGcmV1",
+            "AesGcmCtrV1",
+            "ColumnCryptoMetaData",
+            "EncryptionWithColumnKey",
         ];
         fn child(kind: Kind) -> Option<&'static str> {
             match kind {

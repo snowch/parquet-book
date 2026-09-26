@@ -205,10 +205,107 @@ fn region(label: &str, kind: &str, span: Span, value: Json, children: Vec<Json>)
     ])
 }
 
+/// A module's parts, as structure regions.
+fn module_region(label: &str, m: &crate::crypto::Module) -> Json {
+    region(
+        label,
+        "encrypted",
+        m.span,
+        format!("{} bytes, encrypted", m.span.len()).into(),
+        vec![
+            region(
+                "Length",
+                "module_length",
+                m.length,
+                format!("{} (u32, little-endian)", m.span.len() - 4).into(),
+                vec![],
+            ),
+            region(
+                "Nonce",
+                "nonce",
+                m.nonce,
+                "12 bytes, used once".into(),
+                vec![],
+            ),
+            region("Ciphertext", "ciphertext", m.ciphertext, Json::Null, vec![]),
+            region(
+                "Tag",
+                "tag",
+                m.tag,
+                "16 bytes: AES-GCM's check".into(),
+                vec![],
+            ),
+        ],
+    )
+}
+
+/// An encrypted-footer file, as far as a reader without the footer key can see it (ch13).
+fn encrypted_structure(file: &[u8]) -> Result<Json, String> {
+    let size = file.len() as u64;
+    let e = crate::crypto::encrypted_footer(file)?;
+    let last = Span::new(size - TRAILER_LEN, size);
+    Ok(region(
+        "Parquet file",
+        "file",
+        Span::new(0, size),
+        format!("{size} bytes").into(),
+        vec![
+            region("Header", "magic", Span::new(0, 4), "PARE".into(), vec![]),
+            region(
+                "Data",
+                "encrypted",
+                Span::new(4, e.footer.start),
+                "row groups the reader cannot locate without the footer".into(),
+                vec![],
+            ),
+            region(
+                "Footer",
+                "footer",
+                e.footer,
+                "FileCryptoMetaData, then the encrypted FileMetaData".into(),
+                vec![
+                    annotate(
+                        &e.crypto_metadata,
+                        "FileCryptoMetaData",
+                        "FileCryptoMetaData",
+                        None,
+                    ),
+                    module_region("Encrypted FileMetaData", &e.module),
+                ],
+            ),
+            region(
+                "Trailer",
+                "trailer",
+                last,
+                Json::Null,
+                vec![
+                    region(
+                        "Footer length",
+                        "footer_length",
+                        Span::new(last.start, last.start + 4),
+                        format!("{} (u32, little-endian)", e.footer.len()).into(),
+                        vec![],
+                    ),
+                    region(
+                        "Magic",
+                        "magic",
+                        Span::new(last.start + 4, last.end),
+                        "PARE".into(),
+                        vec![],
+                    ),
+                ],
+            ),
+        ],
+    ))
+}
+
 fn structure_inner(file: &[u8]) -> Result<Json, String> {
     let size = file.len() as u64;
     if size < crate::format::MIN_FILE_LEN {
         return Err(format!("{size} bytes is too short to be a Parquet file"));
+    }
+    if file[..4] == crate::crypto::MAGIC_ENCRYPTED {
+        return encrypted_structure(file);
     }
     let header = check_header([file[0], file[1], file[2], file[3]]).map_err(|e| e.to_string())?;
     let last8: [u8; 8] = file[file.len() - 8..].try_into().unwrap();
@@ -306,12 +403,37 @@ fn structure_inner(file: &[u8]) -> Result<Json, String> {
             extra.into_iter().map(|(_, j)| j).collect(),
         ));
     }
+    let mut footer_children = vec![annotate(&md.tree, "FileMetaData", "FileMetaData", None)];
+    if let Some(sig) = md.footer_signature {
+        footer_children.push(region(
+            "Signature",
+            "signature",
+            sig,
+            "a nonce and an AES-GCM tag made with the footer key".into(),
+            vec![
+                region(
+                    "Nonce",
+                    "nonce",
+                    Span::new(sig.start, sig.start + 12),
+                    Json::Null,
+                    vec![],
+                ),
+                region(
+                    "Tag",
+                    "tag",
+                    Span::new(sig.start + 12, sig.end),
+                    Json::Null,
+                    vec![],
+                ),
+            ],
+        ));
+    }
     top.push(region(
         "Footer",
         "footer",
         footer,
         "FileMetaData".into(),
-        vec![annotate(&md.tree, "FileMetaData", "FileMetaData", None)],
+        footer_children,
     ));
     top.push(region(
         "Trailer",
@@ -350,6 +472,42 @@ fn chunk_region(file: &[u8], c: &ColumnChunk) -> Result<Json, String> {
         return Err(format!(
             "column chunk {} claims bytes {range}, past the end of the file",
             c.dotted_path()
+        ));
+    }
+    if let Some(crypto) = &c.crypto {
+        // Encrypted pages cannot be walked by their headers; their modules can, by length.
+        let modules = crate::crypto::chunk_modules(file, range)
+            .map_err(|e| format!("column chunk {}: {e}", c.dotted_path()))?;
+        let children = modules
+            .iter()
+            .enumerate()
+            .map(|(i, m)| {
+                module_region(
+                    if i % 2 == 0 {
+                        "Encrypted page header"
+                    } else {
+                        "Encrypted page"
+                    },
+                    m,
+                )
+            })
+            .collect();
+        let key = if crypto.with_column_key {
+            "its own key"
+        } else {
+            "the footer key"
+        };
+        return Ok(region(
+            &format!("Column chunk {}", c.dotted_path()),
+            "column_chunk",
+            range,
+            format!(
+                "{} · encrypted with {key} · {} modules",
+                c.physical_type.name(),
+                modules.len()
+            )
+            .into(),
+            children,
         ));
     }
     let pages = walk_pages(&file[range.start as usize..range.end as usize], range.start)
@@ -2218,5 +2376,215 @@ pub fn query(file: &[u8], sql: &str) -> Json {
                     .collect(),
             ),
         ),
+    ])
+}
+
+/// The master key a key-metadata blob names, when it is JSON with a `masterKeyID`, as pyarrow's
+/// is; otherwise its bytes as text or hex.
+fn key_name(key_metadata: &[u8]) -> String {
+    std::str::from_utf8(key_metadata)
+        .ok()
+        .and_then(|t| Json::parse(t).ok())
+        .and_then(|j| {
+            j.get("masterKeyID")
+                .and_then(Json::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_else(|| hex(key_metadata))
+}
+
+/// Ch13's experiment: what a reader without keys can see in a file, and what it cannot. Every
+/// "visible" item is something the reader decoded here; every "hidden" item is one it tried to
+/// read and could not.
+pub fn encryption(file: &[u8]) -> Json {
+    let fail = |e: String| obj([("ok", false.into()), ("error", e.into())]);
+    let item = |what: &str, span: Option<Span>, value: String| {
+        obj([
+            ("what", what.into()),
+            ("span", span.map(Json::from).unwrap_or(Json::Null)),
+            ("value", value.into()),
+        ])
+    };
+    let mut visible = Vec::new();
+    let mut hidden = Vec::new();
+    let mut columns = Vec::new();
+    let mode;
+    if file.len() >= 4 && file[..4] == crate::crypto::MAGIC_ENCRYPTED {
+        mode = "encrypted footer";
+        let f = match crate::crypto::encrypted_footer(file) {
+            Ok(f) => f,
+            Err(e) => return fail(e),
+        };
+        visible.push(item(
+            "That it is Parquet, with an encrypted footer",
+            Some(Span::new(0, 4)),
+            "PARE".into(),
+        ));
+        visible.push(item(
+            "The encryption algorithm",
+            Some(f.crypto_metadata.span),
+            f.algorithm.clone(),
+        ));
+        if let Some(k) = &f.key_metadata {
+            visible.push(item(
+                "The footer key's name",
+                Some(f.crypto_metadata.span),
+                key_name(k),
+            ));
+        }
+        visible.push(item(
+            "The encrypted footer's size",
+            Some(f.module.span),
+            format!("{} bytes", f.module.span.len()),
+        ));
+        for what in [
+            "The schema",
+            "The number of rows",
+            "Where any column is",
+            "Any statistics",
+            "Any values, even of columns not encrypted",
+        ] {
+            hidden.push(item(
+                what,
+                Some(f.module.ciphertext),
+                "inside the encrypted footer".into(),
+            ));
+        }
+    } else {
+        let md = match open_bytes(file) {
+            Ok(md) => md,
+            Err(e) => return fail(e),
+        };
+        mode = if md.encryption_algorithm.is_some() {
+            "plaintext footer"
+        } else {
+            "not encrypted"
+        };
+        if let Some(a) = &md.encryption_algorithm {
+            visible.push(item(
+                "The encryption algorithm",
+                md.footer_signature,
+                a.clone(),
+            ));
+        }
+        if let Some(sig) = md.footer_signature {
+            visible.push(item(
+                "The footer's signature, which only the footer key can check",
+                Some(sig),
+                "28 bytes".into(),
+            ));
+        }
+        let root = match crate::schema::build(&md.schema) {
+            Ok(r) => r,
+            Err(e) => return fail(e.to_string()),
+        };
+        let leaves = crate::schema::leaves(&root);
+        visible.push(item(
+            "The schema",
+            None,
+            leaves
+                .iter()
+                .map(|l| l.dotted_path())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ));
+        visible.push(item("The number of rows", None, md.num_rows.to_string()));
+        for leaf in &leaves {
+            let chunks: Vec<&ColumnChunk> = md
+                .row_groups
+                .iter()
+                .map(|rg| &rg.columns[leaf.column])
+                .collect();
+            let Some(first) = chunks.first() else {
+                continue;
+            };
+            let path = leaf.dotted_path();
+            let (key, sample, modules, error) = match &first.crypto {
+                Some(c) => {
+                    let key = match &c.key_metadata {
+                        Some(k) if c.with_column_key => key_name(k),
+                        _ => "the footer key".into(),
+                    };
+                    let modules = crate::crypto::chunk_modules(file, first.byte_range())
+                        .map(|m| m.len())
+                        .unwrap_or(0);
+                    let error = crate::column::read_column(file, first, leaf)
+                        .err()
+                        .map(|e| e.to_string());
+                    (Some(key), Vec::new(), modules, error)
+                }
+                None => {
+                    let sample = crate::column::read_column(file, first, leaf)
+                        .map(|d| {
+                            d.triples
+                                .iter()
+                                .take(4)
+                                .map(|t| {
+                                    t.value
+                                        .as_ref()
+                                        .map(|v| {
+                                            crate::logical::value_json(
+                                                leaf.physical_type,
+                                                leaf.logical_type.as_ref(),
+                                                v,
+                                            )
+                                        })
+                                        .unwrap_or(Json::Null)
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    (None, sample, 0, None)
+                }
+            };
+            if key.is_none() && md.encryption_algorithm.is_some() {
+                let shown: Vec<String> = sample.iter().map(|v| v.to_json()).collect();
+                visible.push(item(
+                    &format!("The values of {path}"),
+                    Some(first.byte_range()),
+                    format!("{}, …", shown.join(", ")),
+                ));
+                if let Some(s) = &first.statistics {
+                    if let (Some(lo), Some(hi)) = (&s.min_value, &s.max_value) {
+                        visible.push(item(
+                            &format!("The statistics of {path}"),
+                            Some(s.span),
+                            format!("{} to {}", stat_display(leaf, lo), stat_display(leaf, hi)),
+                        ));
+                    }
+                }
+            }
+            if let Some(k) = &key {
+                hidden.push(item(
+                    &format!("The values of {path}"),
+                    Some(first.byte_range()),
+                    error.clone().unwrap_or_default(),
+                ));
+                if first.statistics.is_none() {
+                    hidden.push(item(
+                        &format!("The statistics of {path}"),
+                        first.crypto.as_ref().and_then(|c| c.encrypted_metadata),
+                        "withheld from the plaintext footer".into(),
+                    ));
+                }
+                visible.push(item(&format!("Which key protects {path}"), None, k.clone()));
+            }
+            columns.push(obj([
+                ("path", path.into()),
+                ("encrypted", key.is_some().into()),
+                ("key", key.into()),
+                ("span", first.byte_range().into()),
+                ("statistics_visible", first.statistics.is_some().into()),
+                ("modules", modules.into()),
+                ("sample", Json::Arr(sample)),
+            ]));
+        }
+    }
+    obj([
+        ("ok", true.into()),
+        ("mode", mode.into()),
+        ("visible", Json::Arr(visible)),
+        ("hidden", Json::Arr(hidden)),
+        ("columns", Json::Arr(columns)),
     ])
 }

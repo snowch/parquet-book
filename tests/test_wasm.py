@@ -75,6 +75,8 @@ def cases():
                             "--json",
                         )
                     )
+        calls.append({"call": "encryption", "file": f})
+        native.append(("encryption", f))
         calls.append({"call": "structure", "file": f})
         native.append(("structure", f))
         calls.append({"call": "schema", "file": f})

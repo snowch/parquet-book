@@ -106,16 +106,24 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Experiment: a query box with every stage shown. Problems 12.1 (hash aggregate) and 12.2 (top n)
   graded against pyarrow; 12.3 open.
 
-## Next: ch13, modular encryption
+## Done: ch13, modular encryption
 
-1. Check whether pyarrow 25 can write encrypted files without a KMS server (an in-memory KMS
-   client class in Python). If it can, write `encrypted-footer.parquet` and
-   `plaintext-footer.parquet` with a test key committed as a fixture input.
-2. Reader: recognise `PARE`, read `FileCryptoMetaData`, report what a reader without keys can see
-   (in plaintext-footer mode: the schema and the plaintext columns' statistics), and refuse
-   encrypted modules by name. Decrypting AES-GCM needs AES, which would be written from the
-   specification if at all.
-3. Experiment: the structure view of both files side by side, marking what is readable.
+- Fixtures `plaintext-footer.parquet` and `encrypted-footer.parquet`, written by pyarrow through a
+  toy key service with published test keys; written once and checked by decryption (PLAN.md §4).
+- Reader: `crypto.rs` (modules by their lengths; an encrypted footer's crypto metadata and
+  module); signed plaintext footers; column crypto metadata; encrypted columns refused by name;
+  the structure view shows modules, signatures and `PARE` files.
+- Experiment: what a reader without keys can and cannot see. Problems 13.1 and 13.2; 13.3 open.
+
+## Next: ch14, lakehouse and beyond
+
+1. Fixtures: a small table as several files in Hive-style partition directories
+   (`country=UK/part-0.parquet`), written by pyarrow's dataset writer, and a minimal manifest file
+   listing them with per-file statistics, in the spirit of Iceberg and Delta.
+2. Reader: list the objects under a prefix in the simulated store; prune files by partition value
+   and by manifest statistics before opening any footer; run ch12's engine over the surviving
+   files.
+3. Experiment: a query over the table, with the files skipped and why, and the requests made.
 
 ## Then
 

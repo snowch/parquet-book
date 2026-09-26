@@ -26,6 +26,7 @@ check refuses to run under any other version rather than reporting a false diffe
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime
 import decimal
 import hashlib
@@ -39,6 +40,7 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
+import pyarrow.parquet.encryption as pe
 
 HERE = Path(__file__).resolve().parent
 
@@ -64,6 +66,8 @@ class Fixture:
     #: When the table holds the same rows as another fixture's, in some order: that fixture's
     #: name. The manifest then lists the rows' ``order_id`` in file order instead of the rows.
     rows_same_as: str | None = None
+    #: Modular encryption (ch13): pyarrow's ``EncryptionConfiguration`` arguments.
+    encryption: dict | None = None
 
 
 #: Options every fixture starts from. Each is chosen to keep a file small enough to read byte by
@@ -346,6 +350,26 @@ def _writing(name: str, why: str, rows: list, **options) -> Fixture:
     )
 
 
+#: Twelve orders with a column of personal data and a column of amounts to encrypt (ch13).
+ENCRYPTION_TABLE = pa.table(
+    {
+        "order_id": pa.array(range(1, 13), pa.int64()),
+        "country": pa.array(["UK", "SE", "UK", "PL", "UK", "US", "SE", "UK", "UK", "PL", "UK", "SE"]),
+        "email": pa.array([f"customer{i}@example.com" for i in range(1, 13)]),
+        "amount_cents": pa.array(
+            [1999, 500, 4210, 1250, 875, 3000, 640, 2275, 1999, 500, 1250, 875], pa.int64()
+        ),
+    },
+    schema=pa.schema(
+        [
+            pa.field("order_id", pa.int64(), nullable=False),
+            pa.field("country", pa.string(), nullable=False),
+            pa.field("email", pa.string(), nullable=False),
+            pa.field("amount_cents", pa.int64(), nullable=False),
+        ]
+    ),
+)
+
 #: The same orders under every codec the format defines that pyarrow writes (ch07).
 ORDERS = _orders(256)
 CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
@@ -621,6 +645,37 @@ FIXTURES = (
         write_page_index=False,
     ),
     Fixture(
+        name="encrypted-footer",
+        why=(
+            "Twelve orders with modular encryption and an encrypted footer: the file ends in PARE. "
+            "email is encrypted with the pii key and amount_cents with the finance key; order_id "
+            "and country are not encrypted, but the footer that would say where they are is. "
+            "Written once, since encryption is never byte-for-byte reproducible; the check "
+            "decrypts it with the published test keys."
+        ),
+        table=ENCRYPTION_TABLE,
+        encryption={
+            "footer_key": "footer",
+            "column_keys": {"pii": ["email"], "finance": ["amount_cents"]},
+            "plaintext_footer": False,
+            "encryption_algorithm": "AES_GCM_V1",
+        },
+    ),
+    Fixture(
+        name="plaintext-footer",
+        why=(
+            "The same orders and keys with a plaintext footer: the file ends in PAR1, the footer is "
+            "readable and signed, and only the two encrypted columns' pages and details are hidden."
+        ),
+        table=ENCRYPTION_TABLE,
+        encryption={
+            "footer_key": "footer",
+            "column_keys": {"pii": ["email"], "finance": ["amount_cents"]},
+            "plaintext_footer": True,
+            "encryption_algorithm": "AES_GCM_V1",
+        },
+    ),
+    Fixture(
         name="pages-v2-snappy",
         why=(
             "pages-v2.parquet compressed with Snappy. In data page version 2 only a page's values "
@@ -651,7 +706,64 @@ FIXTURES = (
 )
 
 
+#: Master keys for ch13's fixtures. They are published here on purpose: these files exist to
+#: show what encryption hides from a reader without keys, not to hide anything.
+TEST_MASTER_KEYS = {
+    "footer": b"footer-key-16byt",
+    "pii": b"pii-column-key16",
+    "finance": b"finance-key-16by",
+}
+
+
+class ToyKms(pe.KmsClient):
+    """A key management service for fixtures only. It "wraps" a data key by XOR with the master
+    key, which protects nothing; a real KMS never lets the master key leave it."""
+
+    def __init__(self, config):
+        super().__init__()
+
+    def wrap_key(self, key_bytes, master_key_identifier):
+        mk = TEST_MASTER_KEYS[master_key_identifier]
+        return base64.b64encode(bytes(a ^ b for a, b in zip(key_bytes, mk, strict=True)))
+
+    def unwrap_key(self, wrapped_key, master_key_identifier):
+        mk = TEST_MASTER_KEYS[master_key_identifier]
+        return bytes(a ^ b for a, b in zip(base64.b64decode(wrapped_key), mk, strict=True))
+
+
+def _crypto():
+    return pe.CryptoFactory(ToyKms), pe.KmsConnectionConfig()
+
+
+def decryption_properties():
+    factory, kms = _crypto()
+    return factory.file_decryption_properties(kms, pe.DecryptionConfiguration())
+
+
+def write_encrypted(fixture: Fixture) -> bytes:
+    """Encryption draws fresh data keys and nonces on every write, so an encrypted fixture cannot
+    be reproduced byte for byte. It is written once. Later runs keep the committed bytes if they
+    decrypt, with the test keys, to exactly the fixture's table, and write new ones otherwise."""
+    path = HERE / f"{fixture.name}.parquet"
+    if path.exists():
+        data = path.read_bytes()
+        try:
+            got = pq.read_table(io.BytesIO(data), decryption_properties=decryption_properties())
+            if got.equals(fixture.table):
+                return data
+        except (OSError, ValueError, pa.ArrowException):
+            pass
+    factory, kms = _crypto()
+    config = pe.EncryptionConfiguration(**fixture.encryption, double_wrapping=False)
+    props = factory.file_encryption_properties(kms, config)
+    sink = io.BytesIO()
+    pq.write_table(fixture.table, sink, encryption_properties=props, **{**BASE_OPTIONS, **fixture.options})
+    return sink.getvalue()
+
+
 def write(fixture: Fixture) -> bytes:
+    if fixture.encryption:
+        return write_encrypted(fixture)
     sink = io.BytesIO()
     pq.write_table(fixture.table, sink, **{**BASE_OPTIONS, **fixture.options})
     return sink.getvalue()
@@ -683,7 +795,8 @@ def _stat(value):
 
 def manifest(fixture: Fixture, data: bytes) -> dict:
     """What pyarrow reports about the bytes it wrote. Nothing here is computed by this book."""
-    md = pq.ParquetFile(io.BytesIO(data)).metadata
+    decrypt = {"decryption_properties": decryption_properties()} if fixture.encryption else {}
+    md = pq.ParquetFile(io.BytesIO(data), **decrypt).metadata
     row_groups = []
     for i in range(md.num_row_groups):
         rg = md.row_group(i)
@@ -722,6 +835,7 @@ def manifest(fixture: Fixture, data: bytes) -> dict:
             "script": "fixtures/generate.py",
             "writer": f"pyarrow {pa.__version__}",
             "options": _stat({**BASE_OPTIONS, **fixture.options}),
+            **({"encryption": fixture.encryption} if fixture.encryption else {}),
         },
         "file_size": len(data),
         "sha256": hashlib.sha256(data).hexdigest(),

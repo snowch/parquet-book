@@ -179,6 +179,14 @@ const FIGURES: &[Figure] = &[
         render: engine_answers,
     },
     Figure {
+        file: "encryption-plaintext-footer.md",
+        render: |root| encryption_view(root, "plaintext-footer.parquet"),
+    },
+    Figure {
+        file: "encryption-encrypted-footer.md",
+        render: |root| encryption_view(root, "encrypted-footer.parquet"),
+    },
+    Figure {
         file: "codec-files.md",
         render: codec_files,
     },
@@ -2240,5 +2248,32 @@ fn engine_answers(root: &Path) -> Result<String, String> {
         "{}\n\n*Every query in `fixtures/queries.json`, answered by the engine from the file's \
          bytes and compared with the answer pyarrow computed when the fixtures were written.*\n",
         rows.join("\n")
+    ))
+}
+
+fn encryption_view(root: &Path, name: &str) -> Result<String, String> {
+    let bytes = fixture(root, name)?;
+    let r = parquet_lab::report::encryption(&bytes);
+    let mut rows = vec![
+        "| A reader without keys | What | Detail |".to_string(),
+        "|---|---|---|".to_string(),
+    ];
+    for (key, label) in [("visible", "can see"), ("hidden", "cannot see")] {
+        for item in arr(r.get(key)) {
+            let mut detail = text_of(item.get("value"));
+            if detail.len() > 90 {
+                detail = format!("{}…", detail.chars().take(88).collect::<String>());
+            }
+            rows.push(format!(
+                "| {label} | {} | {} |",
+                cell(&text_of(item.get("what"))),
+                cell(&detail)
+            ));
+        }
+    }
+    Ok(format!(
+        "{}\n{}",
+        rows.join("\n"),
+        conditions(name, &bytes, None)
     ))
 }

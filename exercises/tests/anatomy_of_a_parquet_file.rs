@@ -21,6 +21,14 @@ fn fixtures() -> Vec<(String, Vec<u8>, Json)> {
             let manifest =
                 Json::parse(&std::fs::read_to_string(path.with_extension("json")).unwrap())
                     .unwrap();
+            // ch13's encrypted fixtures need keys for most of what these problems read.
+            if manifest
+                .get("generator")
+                .and_then(|g| g.get("encryption"))
+                .is_some()
+            {
+                continue;
+            }
             out.push((
                 path.display().to_string(),
                 std::fs::read(&path).unwrap(),

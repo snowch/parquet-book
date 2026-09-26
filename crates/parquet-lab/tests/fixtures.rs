@@ -20,6 +20,13 @@ fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
+fn encrypted(manifest: &Json) -> bool {
+    manifest
+        .get("generator")
+        .and_then(|g| g.get("encryption"))
+        .is_some()
+}
+
 /// Every fixture, with its bytes and its manifest.
 fn fixtures() -> Vec<(String, Vec<u8>, Json)> {
     let dir = root().join("fixtures");
@@ -37,6 +44,10 @@ fn fixtures() -> Vec<(String, Vec<u8>, Json)> {
         )
         .expect("manifest is JSON");
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        // The encrypted fixtures (ch13) have tests of their own: most of these need keys.
+        if encrypted(&manifest) {
+            continue;
+        }
         out.push((name, std::fs::read(&path).unwrap(), manifest));
     }
     out.sort_by(|a, b| a.0.cmp(&b.0));
@@ -1095,4 +1106,109 @@ fn the_engine_answers_as_pyarrow_does() {
         checked += 1;
     }
     assert!(checked >= 10);
+}
+
+/// The encrypted fixtures, with their manifests, which pyarrow wrote with the keys.
+fn encrypted_fixture(name: &str) -> (Vec<u8>, Json) {
+    let path = root().join("fixtures").join(name);
+    let manifest =
+        Json::parse(&std::fs::read_to_string(path.with_extension("json")).unwrap()).unwrap();
+    (std::fs::read(&path).unwrap(), manifest)
+}
+
+fn key_id(key_metadata: &[u8]) -> String {
+    // pyarrow's key material is JSON naming the master key; it never holds the key itself.
+    let j = Json::parse(std::str::from_utf8(key_metadata).unwrap()).unwrap();
+    j.get("masterKeyID")
+        .and_then(Json::as_str)
+        .unwrap()
+        .to_string()
+}
+
+#[test]
+fn an_encrypted_footer_shows_only_its_crypto_metadata() {
+    let (bytes, manifest) = encrypted_fixture("encrypted-footer.parquet");
+    let e = report::open_bytes(&bytes).unwrap_err();
+    assert!(e.contains("encrypted"), "{e}");
+    let f = parquet_lab::crypto::encrypted_footer(&bytes).unwrap();
+    assert_eq!(f.algorithm, "AES_GCM_V1");
+    assert_eq!(key_id(f.key_metadata.as_deref().unwrap()), "footer");
+    // The crypto metadata, then one module, fill the footer exactly.
+    assert_eq!(f.crypto_metadata.span.start, f.footer.start);
+    assert_eq!(f.crypto_metadata.span.end, f.module.span.start);
+    assert_eq!(f.module.span.end, f.footer.end);
+    // pyarrow, with the key, reports the footer as the encrypted module's size.
+    assert_eq!(f.module.span.len(), num(&manifest, "footer_length"));
+    // And the column chunks it found with the key fill exactly the bytes before the footer.
+    let mut at = 4;
+    for c in manifest.get("row_groups").and_then(Json::as_array).unwrap()[0]
+        .get("columns")
+        .and_then(Json::as_array)
+        .unwrap()
+    {
+        assert_eq!(num(c, "data_page_offset"), at);
+        at += num(c, "total_compressed_size");
+    }
+    assert_eq!(at, f.footer.start);
+}
+
+#[test]
+fn a_plaintext_footer_shows_everything_but_the_encrypted_columns() {
+    let (bytes, manifest) = encrypted_fixture("plaintext-footer.parquet");
+    let md = report::open_bytes(&bytes).unwrap();
+    assert_eq!(md.encryption_algorithm.as_deref(), Some("AES_GCM_V1"));
+    let sig = md.footer_signature.unwrap();
+    assert_eq!(sig.len(), 28);
+    let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
+    let t = parse_trailer(last8, bytes.len() as u64).unwrap();
+    // pyarrow's footer length leaves out the signature that follows the FileMetaData.
+    assert_eq!(
+        u64::from(t.footer_length) - sig.len(),
+        num(&manifest, "footer_length")
+    );
+    let root_node = parquet_lab::schema::build(&md.schema).unwrap();
+    let rows = manifest_rows(&manifest);
+    for leaf in parquet_lab::schema::leaves(&root_node) {
+        let chunk = &md.row_groups[0].columns[leaf.column];
+        let path = leaf.dotted_path();
+        match &chunk.crypto {
+            None => {
+                // Readable: decoded, and equal to pyarrow's rows.
+                let d = parquet_lab::column::read_column(&bytes, chunk, &leaf).unwrap();
+                for (t, row) in d.triples.iter().zip(&rows) {
+                    let mine = parquet_lab::logical::value_json(
+                        leaf.physical_type,
+                        leaf.logical_type.as_ref(),
+                        t.value.as_ref().unwrap(),
+                    );
+                    assert_eq!(mine.to_json(), row.get(&path).unwrap().to_json(), "{path}");
+                }
+            }
+            Some(c) => {
+                assert!(c.with_column_key, "{path}");
+                let expected = if path == "email" { "pii" } else { "finance" };
+                assert_eq!(key_id(c.key_metadata.as_deref().unwrap()), expected);
+                let e = parquet_lab::column::read_column(&bytes, chunk, &leaf).unwrap_err();
+                assert!(e.0.contains("encrypted"), "{e}");
+                // Statistics are withheld; pyarrow, with the key, has them.
+                assert!(chunk.statistics.is_none(), "{path}: statistics visible");
+                let theirs = manifest.get("row_groups").and_then(Json::as_array).unwrap()[0]
+                    .get("columns")
+                    .and_then(Json::as_array)
+                    .unwrap()[leaf.column]
+                    .get("statistics")
+                    .cloned();
+                assert!(
+                    matches!(theirs, Some(Json::Obj(_))),
+                    "{path}: pyarrow sees statistics"
+                );
+                // The modules, found by their lengths alone, tile the chunk: a page header and a page.
+                let modules =
+                    parquet_lab::crypto::chunk_modules(&bytes, chunk.byte_range()).unwrap();
+                assert_eq!(modules.len(), 2, "{path}");
+                assert_eq!(modules[0].span.start, chunk.byte_range().start);
+                assert_eq!(modules[1].span.end, chunk.byte_range().end);
+            }
+        }
+    }
 }

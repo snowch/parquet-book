@@ -239,8 +239,8 @@ _CHAPTERS = (
         "beyond_one_file",
         "What can a reader still see in an encrypted file, and what changes for it?",
         "A reader that recognises encrypted modules and reports what stays visible.",
-        (),
-        (),
+        ("encryption",),
+        ("plaintext-footer.parquet", "encrypted-footer.parquet"),
     ),
     (
         "lakehouse_and_beyond",
@@ -292,4 +292,5 @@ EXPERIMENTS = (
     "scan",
     "writing",
     "engine",
+    "encryption",
 )

@@ -19,6 +19,7 @@ import { mountSkipping } from "./skipping.js";
 import { mountScan } from "./scan.js";
 import { mountWriting } from "./writing.js";
 import { mountEngine } from "./engine.js";
+import { mountEncryption } from "./encryption.js";
 
 const EXPERIMENTS = {
   footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
@@ -28,6 +29,7 @@ const EXPERIMENTS = {
   scan: mountScan,
   writing: mountWriting,
   engine: mountEngine,
+  encryption: mountEncryption,
 };
 
 class Fixtures {

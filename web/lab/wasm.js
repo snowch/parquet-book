@@ -74,6 +74,10 @@ export class Lab {
     return this.#result(this.exports.pl_schema(id));
   }
 
+  encryption(id) {
+    return this.#result(this.exports.pl_encryption(id));
+  }
+
   /** Answer SQL from the file, stage by stage. */
   query(id, sql) {
     const text = encoder.encode(sql);

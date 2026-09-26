@@ -139,6 +139,8 @@ pub struct ColumnChunk {
     /// format; without it the filter's header says how long its bitset is.
     pub bloom_filter_offset: Option<i64>,
     pub bloom_filter_length: Option<i64>,
+    /// Modular encryption (ch13): how this chunk's pages are encrypted, if they are.
+    pub crypto: Option<ColumnCrypto>,
     /// Where this chunk's description sits in the footer.
     pub span: Span,
 }
@@ -173,6 +175,17 @@ pub struct RowGroup {
     pub span: Span,
 }
 
+/// How a column chunk is encrypted (ch13).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ColumnCrypto {
+    /// `None`: encrypted with the footer key. `Some`: with its own key, described by this key
+    /// metadata, which names the key but never holds it.
+    pub key_metadata: Option<Vec<u8>>,
+    pub with_column_key: bool,
+    /// The full ColumnMetaData, encrypted: only a reader with the column's key can read it.
+    pub encrypted_metadata: Option<Span>,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SortingColumn {
     pub column: i64,
@@ -199,6 +212,10 @@ pub struct FileMetaData {
     /// one this reader knows. `None` when the footer has no `column_orders`, in which case the order of
     /// those fields is undefined (ch08).
     pub column_orders: Option<Vec<String>>,
+    /// Set when the file uses modular encryption with a plaintext footer (ch13): the algorithm,
+    /// such as `AES_GCM_V1`, and where the footer's signature is.
+    pub encryption_algorithm: Option<String>,
+    pub footer_signature: Option<Span>,
     /// The decoded Thrift tree the fields above were taken from. Kept, because the browser
     /// shows every field, including the ones this struct does not name.
     pub tree: Node,
@@ -223,13 +240,18 @@ impl FileMetaData {
 pub fn decode_file_metadata(footer: &[u8], base: u64) -> Result<FileMetaData, MetadataError> {
     let mut r = ByteReader::new(footer, base);
     let tree = read_struct(&mut r)?;
-    if !r.is_at_end() {
-        let start = r.offset();
-        return Err(MetadataError::TrailingBytes {
-            span: Span::new(start, base + footer.len() as u64),
-        });
-    }
     let s = as_struct(&tree)?;
+    // An encrypted file with a plaintext footer (ch13) signs it: the FileMetaData is followed by
+    // a 12-byte nonce and a 16-byte AES-GCM tag, and the footer length counts them.
+    let mut footer_signature = None;
+    if !r.is_at_end() {
+        let rest = Span::new(r.offset(), base + footer.len() as u64);
+        if s.field(8).is_some() && rest.len() == FOOTER_SIGNATURE_LEN {
+            footer_signature = Some(rest);
+        } else {
+            return Err(MetadataError::TrailingBytes { span: rest });
+        }
+    }
     const FMD: &str = "FileMetaData";
     Ok(FileMetaData {
         version: req_int(s, FMD, 1, "version", tree.span)?,
@@ -247,6 +269,8 @@ pub fn decode_file_metadata(footer: &[u8], base: u64) -> Result<FileMetaData, Me
             None => Vec::new(),
         },
         created_by: opt_str(s, 6),
+        encryption_algorithm: s.field(8).map(|f| union_member(&f.node)),
+        footer_signature,
         column_orders: opt_list(s, 7).map(|items| {
             items
                 .iter()
@@ -357,6 +381,22 @@ fn column_chunk(node: &Node) -> Result<ColumnChunk, MetadataError> {
         offset_index: offset_and_length(chunk, 4, 5),
         bloom_filter_offset: opt_int(m, 14),
         bloom_filter_length: opt_int(m, 15),
+        crypto: chunk.field(8).map(|f| {
+            // A union: field 1 for the footer key, field 2 for a column key and its metadata.
+            let with_key = match &f.node.value {
+                Value::Struct(u) => u.field(2).map(|k| &k.node.value),
+                _ => None,
+            };
+            let key_metadata = match with_key {
+                Some(Value::Struct(k)) => opt_bytes(k, 2),
+                _ => None,
+            };
+            ColumnCrypto {
+                with_column_key: with_key.is_some(),
+                key_metadata,
+                encrypted_metadata: value_span(chunk, 9),
+            }
+        }),
         span: node.span,
     })
 }
@@ -383,6 +423,25 @@ pub(crate) fn statistics(node: &Node) -> Result<Statistics, MetadataError> {
         is_min_value_exact: opt_bool(s, 8),
         span: node.span,
     })
+}
+
+/// The nonce and tag that sign a plaintext footer (ch13).
+pub const FOOTER_SIGNATURE_LEN: u64 = 28;
+
+/// The name of the member a Thrift union holds, from `parquet.thrift`'s names.
+pub(crate) fn union_member(node: &Node) -> String {
+    match &node.value {
+        Value::Struct(u) => u
+            .fields
+            .first()
+            .map(|f| match f.id {
+                1 => "AES_GCM_V1".to_string(),
+                2 => "AES_GCM_CTR_V1".to_string(),
+                id => format!("UNKNOWN({id})"),
+            })
+            .unwrap_or_else(|| "UNKNOWN".into()),
+        _ => "UNKNOWN".into(),
+    }
 }
 
 /// A region given as an offset field and a length field, when both are present and sensible.

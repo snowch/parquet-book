@@ -15,6 +15,11 @@ fn fixtures() -> Vec<(String, Vec<u8>)> {
         .unwrap()
         .map(|e| e.unwrap().path())
         .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("parquet"))
+        // ch13's encrypted fixtures: their pages are encrypted modules, not pages to walk.
+        .filter(|p| {
+            let manifest = std::fs::read_to_string(p.with_extension("json")).unwrap();
+            !manifest.contains("\"encryption\"")
+        })
         .map(|p| (p.display().to_string(), std::fs::read(&p).unwrap()))
         .collect();
     out.sort();

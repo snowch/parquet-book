@@ -5,6 +5,7 @@
 //! pqlab footer FILE [options]        open FILE through the simulated object store
 //! pqlab structure FILE               the structure, as JSON
 //! pqlab pages FILE COLUMN           every page of one column chunk
+//! pqlab encryption FILE             what a reader without keys can see
 //! pqlab query FILE SQL             SQL answered from the file, stage by stage
 //! pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N]
 //!            [--connections N] [--gap BYTES] [--chunks] [--use ...] [--latency-us N] [--bandwidth N]
@@ -60,6 +61,7 @@ const USAGE: &str = "usage:
   pqlab levels FILE COLUMN
   pqlab encodings FILE COLUMN
   pqlab pages FILE COLUMN
+  pqlab encryption FILE
   pqlab query FILE SQL
   pqlab scan FILE [--where COLUMN OP VALUE] [--columns 0,2] [--size head|suffix] [--prefetch N] [--connections N] [--gap BYTES] [--chunks] [--use statistics,bloom,page-index] [--latency-us N] [--bandwidth N]
   pqlab skipping FILE COLUMN OP [VALUE] [--use statistics,bloom,page-index]
@@ -105,6 +107,7 @@ fn run(args: &[String]) -> Result<ExitCode, String> {
     let command = args.first().ok_or("no command given")?.as_str();
     let file = || args.get(1).ok_or(format!("{command} needs a FILE"));
     match command {
+        "encryption" => out!("{}", report::encryption(&read(file()?)?).to_json_pretty()),
         "query" => {
             let sql = args.get(2).ok_or("query needs SQL, in quotes")?;
             out!("{}", report::query(&read(file()?)?, sql).to_json_pretty());
