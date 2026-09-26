@@ -56,6 +56,11 @@ jobs:
           python3 scripts/build-site.py --out _build/html
           python3 scripts/check-built-links.py _build/html
 
+      # The hidden Rust-in-the-browser trial (rust-trial/, not linked from the book) needs rubrc's
+      # rustc and standard library, too large for git: fetched here, pinned and hash-checked.
+      - name: Toolchain for the Rust trial page
+        run: node scripts/fetch-rust-trial.mjs _build/html/rust-trial
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _build/html

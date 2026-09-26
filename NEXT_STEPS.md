@@ -160,21 +160,26 @@ reader's numbers too.
 - `.devcontainer/` makes the repository a Codespace, for the Rust reader and its problems.
 - The browser test runs a workbench against native pytest and checks an edit and its restore.
 
-## Ruled out: Rust compiled or interpreted in the page
+## Trying: Rust compiled in the page
 
-Tried so that a Run button could run the Rust problems' tests on a reader's own Rust.
+So that a Run button could run the Rust problems' tests on a reader's own Rust.
 
-- **rustc in WebAssembly** ([rubrc](https://github.com/oligamiq/rubrc)): experimental by its own
-  account, needs COOP/COEP headers GitHub Pages cannot send, and a whole toolchain to download.
 - **Miri in WebAssembly** ([Rubri](https://github.com/lyonsyonii/rubri), which interprets instead of
-  compiling). Measured with the reader flattened into one file: the download is about 58 MB
-  compressed, and Miri type-checks the whole reader in about six seconds. But it runs slowly: the
-  reader's own unit tests took close to three minutes, and chapter 2's problem tests, a second or
-  so natively, had not finished after twenty. The graders loop over many cases and fixtures, so
-  every chapter would be worse.
+  compiling): ruled out. It type-checks the whole reader in about six seconds, but runs it far
+  too slowly: chapter 2's problem tests, a second or so natively, had not finished after twenty
+  minutes.
+- **rustc in WebAssembly** ([rubrc](https://github.com/oligamiq/rubrc), with threads): works.
+  With the reader flattened into one file, it compiles the reader and a chapter's real tests,
+  and they pass. In headless Chromium on four cores: the reader and its unit tests compile in
+  about twenty seconds at opt-level 1, after a download of about sixty megabytes. Under Node,
+  the same compiles take about eight to twelve seconds.
+- **The trial page**, `rust-trial/` on the published site and linked from nowhere, times every
+  step on the reader's own device (`web/rust-trial/`; its toolchain is fetched at deploy time by
+  `scripts/fetch-rust-trial.mjs`). Phones are the open question: memory, and whether their
+  browsers allow the threads rustc needs.
 
-Rust therefore runs online in a Codespace, and in the page only as the prebuilt WebAssembly reader
-(`pqlab` Run buttons). Revisit if an in-browser Rust toolchain becomes fast and small.
+Until that is settled, Rust runs online in a Codespace, and in the page as the prebuilt
+WebAssembly reader (`pqlab` Run buttons).
 
 ## Then
 

@@ -58,6 +58,7 @@ Either way the page runs the code the tests run.
 | `tools/` | Python: the outline (`outline.py`), the renderer (`render.py`), the highlighter. |
 | `scripts/` | Build and check entry points. `ci-check.sh` is what CI runs. |
 | `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory, the problems workbench and the reader editor. |
+| `web/rust-trial/` | A hidden page (`rust-trial/`, linked from nowhere) that compiles Rust in the browser with rubrc and times it on the reader's device; its toolchain is fetched at deploy time by `scripts/fetch-rust-trial.mjs`. Not part of the book. |
 | `.devcontainer/` | The repository as a Codespace: the pinned toolchains, for editing and running the Rust reader online. |
 | `tests/` | Python tests of the book, the renderer, WASM/native parity; `tests/browser/` drives Chromium. |
 

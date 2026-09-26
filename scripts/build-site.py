@@ -25,6 +25,7 @@ import ast
 import hashlib
 import html
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -383,15 +384,52 @@ def build(out: Path) -> None:
             }
         )
     )
+    rust_trial(out / "rust-trial")
     (out / ".nojekyll").write_text("")
 
-    files = sorted(str(f.relative_to(out)) for f in out.rglob("*") if f.is_file() and f.name != ".nojekyll")
+    # The book's offline cache leaves out the Rust trial, which is not part of the book and has
+    # its own service worker.
+    files = sorted(
+        str(f.relative_to(out))
+        for f in out.rglob("*")
+        if f.is_file() and f.name != ".nojekyll" and f.relative_to(out).parts[0] != "rust-trial"
+    )
     digest = hashlib.sha256()
     for f in files:
         digest.update(f.encode())
         digest.update((out / f).read_bytes())
     (out / "sw.js").write_text(service_worker(["./", *files], digest.hexdigest()[:12]))
     print(f"wrote {len(pages)} pages and {len(files) - len(pages)} assets to {out.relative_to(ROOT)}")
+
+
+def flattened_reader() -> str:
+    """The Rust reader (crates/parquet-lab) as one file, unit tests included, for the trial page:
+    rubrc's rustc compiles one file. Each module becomes an inline `mod`, and `crate::` paths gain
+    the `parquet_lab` module they now sit in."""
+    src = ROOT / "crates" / "parquet-lab" / "src"
+
+    def module(text: str) -> str:
+        return text.replace("crate::", "crate::parquet_lab::")
+
+    def inline(m) -> str:
+        return f"pub mod {m.group(1)} {{\n{module((src / f'{m.group(1)}.rs').read_text())}\n}}"
+
+    lib = re.sub(r"^pub mod (\w+);$", inline, module((src / "lib.rs").read_text()), flags=re.M)
+    return (
+        "// The book's Rust reader, crates/parquet-lab, flattened into one file by scripts/build-site.py\n"
+        "// for the Rust-in-the-browser trial (rust-trial/). Compile it with --test to run its unit tests.\n"
+        "#![allow(dead_code)]\n\n"
+        f"pub mod parquet_lab {{\n{lib}\n}}\n"
+    )
+
+
+def rust_trial(out: Path) -> None:
+    """The hidden trial page: web/rust-trial, the sources it compiles, and nothing else. Its
+    toolchain is fetched into the same directory by scripts/fetch-rust-trial.mjs at deploy time;
+    without it the page says the toolchain is missing."""
+    shutil.copytree(ROOT / "web" / "rust-trial", out)
+    (out / "hello.rs").write_text('fn main() {\n    println!("Hello from rustc in your browser");\n}\n')
+    (out / "reader.rs").write_text(flattened_reader())
 
 
 def main() -> None:

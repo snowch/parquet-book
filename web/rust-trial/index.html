@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Rust in the browser: a trial</title>
+<style>
+  :root { --ink: #263238; --muted: #5a707b; --bg: #fdfdfc; --panel: #f2f6f7; --edge: #dfe5e8;
+          --accent: #35648f; --on-accent: #fff; --go: #2e7d32; --stop: #b3413a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #dde4e8; --muted: #a7b8c1; --bg: #14191c; --panel: #1b2327; --edge: #2c373d;
+            --accent: #7fb2dd; --on-accent: #10171b; --go: #81c784; --stop: #e8756c; }
+  }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 44rem; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: .2rem 0 .6rem; }
+  p { margin: .5rem 0; }
+  .muted { color: var(--muted); font-size: 13.5px; }
+  button { font: 600 15px system-ui, sans-serif; padding: .6rem 1.1rem; border-radius: 6px; border: 0;
+           background: var(--accent); color: var(--on-accent); cursor: pointer; }
+  button:disabled { opacity: .55; }
+  button.plain { background: var(--panel); color: var(--ink); border: 1px solid var(--edge); font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-variant-numeric: tabular-nums; }
+  td { padding: .45rem .3rem; border-bottom: 1px solid var(--edge); vertical-align: top; }
+  td:last-child { text-align: right; white-space: nowrap; }
+  tr.running td:last-child { color: var(--accent); }
+  tr.ok td:last-child { color: var(--go); }
+  tr.failed td:last-child { color: var(--stop); }
+  pre { background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; padding: .6rem;
+        font: 12px/1.45 ui-monospace, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+        max-height: 18rem; overflow: auto; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Rust in the browser: a trial</h1>
+  <p>This page compiles Rust in your browser with <a href="https://github.com/oligamiq/rubrc">rubrc</a>'s
+    rustc, compiled to WebAssembly, and times each step on this device. It downloads about 60 MB
+    the first time (the compiler and Rust's standard library), and uses a lot of memory while it
+    compiles. It is not part of the book.</p>
+  <p class="muted" id="env"></p>
+  <div class="row">
+    <button id="go" type="button">Run the trial</button>
+    <button id="copy" type="button" class="plain" hidden>Copy the results</button>
+  </div>
+  <table id="steps" aria-label="Steps and their timings"></table>
+  <pre id="summary" hidden></pre>
+  <details id="log-box" hidden><summary class="muted">What the compiler and the programs printed</summary><pre id="log"></pre></details>
+</main>
+<script type="module" src="trial.js"></script>
+</body>
+</html>
