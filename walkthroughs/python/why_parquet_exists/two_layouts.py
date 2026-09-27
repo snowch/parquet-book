@@ -11,4 +11,5 @@ by_columns = [(name, row[c]) for c, name in enumerate(header) for row in rows]
 for label, layout in (("by rows", by_rows), ("by columns", by_columns)):
     picture = "".join("#" if name in wanted else "." for name, _ in layout)
     runs = len([p for p in picture.split(".") if p])
-    print(f"{label:>10}: {picture}  {runs} run{'s' * (runs != 1)}")
+    print(f"{label}, {runs} run{'s' * (runs != 1)}:")
+    print(picture)

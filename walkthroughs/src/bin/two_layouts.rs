@@ -30,9 +30,7 @@ fn main() {
             .map(|(name, _)| if wanted.contains(name) { '#' } else { '.' })
             .collect();
         let runs = picture.split('.').filter(|p| !p.is_empty()).count();
-        println!(
-            "{label:>10}: {picture}  {runs} run{}",
-            if runs == 1 { "" } else { "s" }
-        );
+        println!("{label}, {runs} run{}:", if runs == 1 { "" } else { "s" });
+        println!("{picture}");
     }
 }

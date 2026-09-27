@@ -183,7 +183,7 @@ check(await page.locator(".lab").count() === 0, "ch01 has no panels: its picture
   await layouts.locator(".run-button:not(.edit-button)").click();
   await layouts.locator(".run-output").filter({ hasText: "by columns" }).waitFor({ timeout: 60000 });
   const drawn = await layouts.locator(".run-output").innerText();
-  check(/by rows: \S+ {2}8 runs/.test(drawn) && /by columns: \S+ {2}1 run$/m.test(drawn), "ch01's layouts step draws both layouts in the page");
+  check(/^by rows, 8 runs:\n[.#]+$/m.test(drawn) && /^by columns, 1 run:\n[.#]+$/m.test(drawn), "ch01's layouts step draws both layouts in the page");
 }
 await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 if (shots) {

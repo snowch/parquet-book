@@ -106,8 +106,8 @@ def formats_facts() -> dict:
     by_columns = "".join(m * len(rows) for m in mark)
     return {
         ("why_parquet_exists", "two_layouts"): [
-            f"by rows: {by_rows}  {len(rows)} runs",
-            f"by columns: {by_columns}  1 run",
+            f"by rows, {len(rows)} runs:\n{by_rows}\n",
+            f"by columns, 1 run:\n{by_columns}\n",
         ],
         ("why_parquet_exists", "read_a_csv"): [
             f"read {csv_size} of {csv_size} bytes",
