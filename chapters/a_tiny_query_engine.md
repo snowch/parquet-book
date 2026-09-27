@@ -11,21 +11,83 @@ What does it take to answer SQL from Parquet bytes?
 
 The reader can now find a footer, trust its statistics, skip row groups and pages, decode any
 encoding, decompress pages, and fetch bytes carefully. A query engine is what turns a question
-into those steps. This chapter builds the smallest one worth the name: a parser for a little SQL,
-and a pipeline of stages that runs it, every stage a loop over rows that the laboratory shows.
+into those steps. This chapter answers one query by hand, then builds the smallest engine worth
+the name: a parser for a little SQL, and a pipeline of stages that runs it, every stage a loop
+over rows that says what it did.
 
 ## The experiment
 
-### SQL, stage by stage
+### One query, by hand
 
-Type a query, or pick an example. The engine answers it from the file's bytes, and shows each
-stage with the rows it took in, the rows it produced, and the first few of them.
+The query counts the first orders by country:
 
-```lab
-experiment: engine
-fixture: writing-baseline.parquet
-fixtures: writing-baseline.parquet, statistics.parquet
+```sql
+SELECT country, count(*) FROM orders WHERE order_id < 300 GROUP BY country
 ```
+
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name.
+
+**A query by hand.** `writing-baseline.parquet` holds the orders of [ch11](#writing-parquet-well),
+sorted by `order_id`. Answer the query with pieces the reader already has: the footer, each row
+group's statistics from [ch08](#metadata-and-statistics), and the column reader from
+[ch04](#nested-data). Skip a row group whose smallest order is too large, read the two columns of
+the others, keep the rows that pass, and count them by country:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/a_tiny_query_engine/a_query_by_hand.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/a_query_by_hand.rs
+:language: rust
+```
+:::
+::::
+
+The last two row groups were skipped without reading a page: their smallest `order_id` is already
+too large. The first row group passed every row it read, the second fewer than half. The counts
+are the answer. The step did four things, in order: it read the columns the query needs, skipping
+what the statistics rule out; it kept the rows the condition accepts; it folded them into a count
+per country; and it sorted the countries.
+
+Change `limit` to `450`: the third row group is read too, and only some of its rows pass. Then try
+`1`: every row group is skipped, and the answer is empty without a page read.
+
+### The same query in SQL
+
+**Run a query.** The book's reader has an engine that does those four things for any query in a
+small language. It parses the text, runs the query as a pipeline of stages, and records what each
+stage did. Run the same query through it:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/a_tiny_query_engine/run_a_query.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/run_a_query.rs
+:language: rust
+```
+:::
+::::
+
+The answer is the one you counted by hand, and the stages are the loops you wrote. The scan read
+two row groups of the two columns and skipped the others on their statistics. The filter kept the
+rows below the limit, the aggregate counted each country, and the sort ordered them.
+
+Add `AND status = 'refunded'` after the condition. The scan still skips on `order_id`, but no
+statistics rule out a status, so the filter does the rest. Add `LIMIT 3` at the end, and a Limit
+stage cuts the answer. Misspell a keyword, or leave out a value: the engine reports where it
+stopped rather than guess.
 
 The language is small:
 
@@ -38,24 +100,9 @@ FROM name                                   max(c) or avg(c)
 [LIMIT n]
 ```
 
-Try these:
-
-1. **Run the first example.** A scan, an aggregate and a sort: counting orders by country reads
-   every row group, because nothing rules any out.
-2. **Add `WHERE order_id < 300`.** The scan now skips the row groups whose smallest order is too
-   large, and says so.
-3. **Switch to `statistics.parquet` and run the second example.** Customer numbers above `2^31`
-   are compared as the unsigned integers they are, as [ch08](#metadata-and-statistics) required.
-4. **Break the query.** A misspelled keyword or a missing value is reported, not guessed at.
-
 ### A query is a pipeline
 
-The engine runs a query as a fixed sequence of stages:
-
-```{include} _generated/engine-stages.md
-```
-
-Each stage consumes the rows of the one before:
+The engine runs a query as a fixed sequence of stages, each consuming the rows of the one before:
 
 - **Scan** reads the columns the query mentions, and nothing else: [ch01](#why-parquet-exists)'s
   projection. Before reading a row group, it asks each condition whether the footer's statistics
@@ -87,6 +134,10 @@ that cannot, strings compared byte by byte, unsigned and negative integers, and 
 
 ## Building it
 
+The first step answered one query with the reader's footer, statistics and column reader. The
+engine writes the same loops once, for any query: a parser turns the text into a plan, the scan
+skips and decodes, and the stages after it fold the rows.
+
 ### Parsing
 
 The parser is a tokeniser and a recursive-descent parser, one function per piece of the grammar.
@@ -114,7 +165,8 @@ A condition, for example:
 ### Scanning with the statistics
 
 The scan skips a row group if any condition's comparison against the footer's bounds rules it
-out, and records which:
+out, and records which. This is the first step's test on the minimum, for every condition and
+every column order:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -137,7 +189,8 @@ out, and records which:
 
 ### Aggregating
 
-Each aggregate keeps a running state per group, and nulls are skipped, as SQL requires:
+Each aggregate keeps a running state per group. `count(*)` counts every row, and the others skip
+nulls, as SQL requires:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -145,7 +198,7 @@ Each aggregate keeps a running state per group, and nulls are skipped, as SQL re
 ```{literalinclude} ../python/parquet_lab/engine.py
 :language: python
 :start-at: def add(self, v: object, star: bool = False)
-:end-before: def result(self)
+:end-before: elif self.kind == "sum":
 ```
 :::
 :::{tab-item} Rust
@@ -153,10 +206,14 @@ Each aggregate keeps a running state per group, and nulls are skipped, as SQL re
 ```{literalinclude} ../crates/parquet-lab/src/engine.rs
 :language: rust
 :start-at: /// Fold in one value.
-:end-before: fn result(&self) -> Value {
+:end-before: Acc::Sum(s) => {
 ```
 :::
 ::::
+
+The other aggregates fold a value the same way. A sum adds it. A minimum or a maximum keeps it if
+it comes first or last in the column's order. An average keeps a total and a count, and is null
+for a group with no values.
 
 ### Checking it
 
@@ -174,6 +231,43 @@ cargo test -p parquet-lab --test fixtures engine
 ```
 :::
 ::::
+
+### Ask a library
+
+At work a library runs the query. pyarrow's dataset module takes the condition, keeps the row
+groups whose statistics allow it, reads only the columns the query needs, filters and groups. The
+`parquet` crate has no query language: you give it a predicate on each row group's statistics, as
+in [ch09](#skipping-data), and a projection of the columns to read, and filter and count the rows
+yourself:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/a_tiny_query_engine/query_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/query_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+Both keep the two row groups the engine's scan read, and both count the same orders per country.
+pyarrow's `subset` says which row groups a condition keeps from the statistics alone, before any
+page is read. The crate's predicate is the first step's test on the minimum, written for the
+crate, and its row iterator decodes only the projected columns. Change the limit to `450` in
+either, and both keep a third row group.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin query_with_a_library
+```
 
 ## What this cannot tell you
 

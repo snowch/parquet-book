@@ -143,10 +143,6 @@ const FIGURES: &[Figure] = &[
         render: writing_lookups,
     },
     Figure {
-        file: "engine-stages.md",
-        render: engine_stages,
-    },
-    Figure {
         file: "engine-answers.md",
         render: engine_answers,
     },
@@ -1938,39 +1934,13 @@ fn writing_lookups(root: &Path) -> Result<String, String> {
     ))
 }
 
-const ENGINE_QUERY: &str = "SELECT country, count(*), avg(amount_cents) FROM orders WHERE order_id < 300 AND status = 'refunded' GROUP BY country ORDER BY country";
-
-fn engine_stages(root: &Path) -> Result<String, String> {
-    let name = "writing-baseline.parquet";
-    let bytes = fixture(root, name)?;
-    let a = parquet_lab::engine::run(&bytes, ENGINE_QUERY)?;
-    let mut rows = vec![
-        "| Stage | What it did | Rows in | Rows out |".to_string(),
-        "|---|---|--:|--:|".to_string(),
-    ];
-    for s in &a.stages {
-        rows.push(format!(
-            "| {} | {} | {} | {} |",
-            s.name,
-            cell(&s.detail),
-            thousands(s.rows_in as u64),
-            thousands(s.rows_out as u64)
-        ));
-    }
-    Ok(format!(
-        "`{ENGINE_QUERY}`\n\n{}\n{}",
-        rows.join("\n"),
-        conditions(name, &bytes, None)
-    ))
-}
-
 fn engine_answers(root: &Path) -> Result<String, String> {
     let text = std::fs::read_to_string(root.join("fixtures/queries.json"))
         .map_err(|e| format!("cannot read queries.json: {e}"))?;
     let queries = Json::parse(&text).map_err(|e| e.to_string())?;
     let mut rows = vec![
-        "| Query | File | Rows | Row groups read | Same as pyarrow |".to_string(),
-        "|---|---|--:|--:|---|".to_string(),
+        "| Query | File | Rows | Row groups read |".to_string(),
+        "|---|---|--:|--:|".to_string(),
     ];
     for q in queries.as_array().ok_or("queries.json is not a list")? {
         let file = q.get("file").and_then(Json::as_str).ok_or("no file")?;
@@ -1994,18 +1964,21 @@ fn engine_answers(root: &Path) -> Result<String, String> {
                         (m, t) => m.to_json() == t.to_json(),
                     })
             });
+        if !same {
+            return Err(format!("the engine and pyarrow disagree on {sql}"));
+        }
         rows.push(format!(
-            "| `{}` | `{file}` | {} | {} of {} | {} |",
+            "| `{}` | `{file}` | {} | {} of {} |",
             cell(sql),
             a.rows.len(),
             a.row_groups_read,
             a.row_groups,
-            if same { "yes" } else { "**no**" }
         ));
     }
     Ok(format!(
         "{}\n\n*Every query in `fixtures/queries.json`, answered by the engine from the file's \
-         bytes and compared with the answer pyarrow computed when the fixtures were written.*\n",
+         bytes. Every answer is the one pyarrow computed when the fixtures were written; the \
+         figure fails to build otherwise.*\n",
         rows.join("\n")
     ))
 }

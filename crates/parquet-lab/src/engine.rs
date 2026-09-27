@@ -21,8 +21,8 @@
 //! 3. **Aggregate** groups rows and folds each group's values, when the query asks for it.
 //! 4. **Sort** and **Limit** order and cut the result.
 //!
-//! Each stage records how many rows went in and came out, and a few of them, so the laboratory
-//! can show the query at every step.
+//! Each stage records how many rows went in and came out, and a few of them, so that a query can
+//! be followed step by step.
 
 use std::cmp::Ordering;
 
@@ -401,7 +401,7 @@ impl Value {
 
 // ---- Running a query ----------------------------------------------------------------------
 
-/// One stage of the pipeline, as the laboratory shows it.
+/// One stage of the pipeline: what it did, and the rows it took in and gave out.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Stage {
     pub name: String,
@@ -637,45 +637,31 @@ pub fn run_sources(sources: &[Source], sql: &str) -> Result<Answer, String> {
     let (mut read, mut bytes, mut skipped_why) = (0, 0u64, Vec::new());
     let many = sources.len() > 1;
     for (source, md) in sources.iter().zip(&mds) {
+        let file = if many {
+            format!("{} ", source.name)
+        } else {
+            String::new()
+        };
         for (g, rg) in md.row_groups.iter().enumerate() {
-            // Skip the row group if any condition's comparison with its bounds rules it out.
-            let ruled_out = q
-                .conditions
-                .iter()
-                .zip(&predicates)
-                .find_map(|(c, (_, t))| {
-                    let (Test::Leaf(p), Ok(Col::Leaf(leaf))) = (t, find(&c.column)) else {
-                        return None;
-                    };
-                    let chunk = &rg.columns[leaf.column];
-                    let s = chunk.statistics.as_ref()?;
-                    let type_order = md
-                        .column_orders
-                        .as_ref()
-                        .and_then(|o| o.get(leaf.column))
-                        .is_some_and(|o| o == "TYPE_ORDER");
-                    let b = bounds(s, p.comparator, type_order).ok();
-                    let d = against_bounds(
-                        p,
-                        b.as_ref().map(|b| (&b.min[..], &b.max[..])),
-                        s.null_count,
-                        chunk.num_values,
-                    );
-                    d.skip.then(|| {
-                        format!(
-                            "{}row group {g}: {} {} {}: {}",
-                            if many {
-                                format!("{} ", source.name)
-                            } else {
-                                String::new()
-                            },
-                            c.column,
-                            c.op.symbol(),
-                            c.value,
-                            d.why
-                        )
-                    })
-                });
+            // Skip the row group if any condition's comparison rules it out.
+            let mut ruled_out = None;
+            for (c, (_, t)) in q.conditions.iter().zip(&predicates) {
+                let (Test::Leaf(p), Ok(Col::Leaf(leaf))) = (t, find(&c.column)) else {
+                    continue;
+                };
+                let chunk = &rg.columns[leaf.column];
+                let Some(s) = &chunk.statistics else { continue };
+                let order = md.column_orders.as_ref().and_then(|o| o.get(leaf.column));
+                let type_order = order.is_some_and(|o| o == "TYPE_ORDER");
+                let b = bounds(s, p.comparator, type_order).ok();
+                let found = b.as_ref().map(|b| (&b.min[..], &b.max[..]));
+                let d = against_bounds(p, found, s.null_count, chunk.num_values);
+                if d.skip {
+                    let condition = format!("{} {} {}", c.column, c.op.symbol(), c.value);
+                    ruled_out = Some(format!("{file}row group {g}: {condition}: {}", d.why));
+                    break;
+                }
+            }
             if let Some(why) = ruled_out {
                 skipped_why.push(why);
                 continue;

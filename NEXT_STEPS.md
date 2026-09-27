@@ -103,11 +103,11 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 
 ## Done: ch12, a tiny query engine
 
-- Reader: `engine.rs` (a tokenizer and parser for a small SQL; a scan that skips row groups by
+- Reader: `engine.rs` (a tokeniser and parser for a small SQL; a scan that skips row groups by
   every condition's statistics; filter, aggregate, project, sort and limit, each recording its
   rows). `fixtures/queries.json` holds pyarrow's answers to twelve queries, and the engine must
   match them.
-- Experiment: a query box with every stage shown. Problems 12.1 (hash aggregate) and 12.2 (top n)
+- Experiment: a query box with every stage shown, since replaced by code (below). Problems 12.1 (hash aggregate) and 12.2 (top n)
   graded against pyarrow; 12.3 open.
 
 ## Done: ch13, modular encryption
@@ -296,6 +296,14 @@ what it read after the footer. In `writing_with_a_library`, pyarrow rewrites the
 byte and changes one setting at a time; the crate reads the choices back from each footer. The
 writing panel is gone; *Building it* quotes the reader's index fetch and dictionary read.
 
+## Done: ch12 in code
+
+ch12 opens on `a_query_by_hand`, which skips row groups on `order_id`'s minimum, reads two columns
+with `read_column` and counts countries, and `run_a_query`, which runs the same SQL through
+`engine.run` and prints each stage. In `query_with_a_library`, pyarrow's dataset keeps the same row
+groups and groups with `count_all`; the crate keeps them with a predicate and counts its rows. The
+engine panel is gone; `pqlab query` stays for the Run buttons.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -322,7 +330,7 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch12 to ch14: a query in DuckDB or DataFusion only if
+1. ch13 and ch14: a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

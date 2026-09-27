@@ -133,8 +133,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .engine-grid { grid-template-columns: minmax(0, 1fr); }
-  .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
   .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
@@ -206,16 +204,13 @@
 .timeline .req.idx { background: var(--warn); }
 .timeline .req.data { background: var(--accent); }
 
-/* Ch12: the query engine. */
+/* A query's form (ch14), and the stages of a pipeline (ch14, ch15). */
 .engine-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); }
 .engine-form textarea { width: 100%; font: 13px/1.5 var(--mono); padding: .4rem .5rem; background: var(--code);
   color: var(--ink); border: 1px solid var(--edge); border-radius: 4px; resize: vertical; }
 .engine-form .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .4rem; font-size: 13px; }
-.engine-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); border-bottom: 1px solid var(--edge); }
-.engine-grid .p-pipeline { border-right: 1px solid var(--edge); }
 .pipeline { margin: 0; padding-left: 1.3rem; font-size: 12.5px; }
 .pipeline li { margin-bottom: .7rem; }
-.pipeline .stage-head { display: flex; gap: .6rem; align-items: baseline; }
 .pipeline .flow { color: var(--muted); font-variant-numeric: tabular-nums; }
 .pipeline .detail { margin: .15rem 0 .3rem; color: var(--muted); overflow-wrap: anywhere; }
 
@@ -271,8 +266,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .engine-grid { grid-template-columns: minmax(0, 1fr); }
-  .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
   .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }

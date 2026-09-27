@@ -122,12 +122,6 @@ def cases():
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))
-    for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
-        if q["file"] == "table":
-            continue
-        f = f"fixtures/{q['file']}"
-        calls.append({"call": "query", "file": f, "sql": q["sql"]})
-        native.append(("query", f, q["sql"]))
     listing = json.loads((ROOT / "fixtures" / "table.json").read_text())
     keys = [o["key"] for o in listing["objects"]]
     for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
@@ -154,8 +148,6 @@ def cases():
             native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--lookup", str(key)))
         calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "op": "compact", "options": {}})
         native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--compact"))
-    calls.append({"call": "query", "file": "fixtures/tiny.parquet", "sql": "SELECT nonsense FROM"})
-    native.append(("query", "fixtures/tiny.parquet", "SELECT nonsense FROM"))
     return calls, native
 
 

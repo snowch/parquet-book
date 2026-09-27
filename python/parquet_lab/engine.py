@@ -20,8 +20,8 @@ A query runs as a pipeline of stages, each a plain loop over rows:
 3. **Aggregate** groups rows and folds each group's values, when the query asks for it.
 4. **Sort** and **Limit** order and cut the result.
 
-Each stage records how many rows went in and came out, and a few of them, so the laboratory can
-show the query at every step.
+Each stage records how many rows went in and came out, and a few of them, so that a query can be
+followed step by step.
 
 A value in a result row is ``None``, a ``bool``, an ``int``, a ``float`` or a ``str``.
 """
@@ -312,7 +312,7 @@ SAMPLE = 5
 
 @dataclass
 class Stage:
-    """One stage of the pipeline, as the laboratory shows it."""
+    """One stage of the pipeline: what it did, and the rows it took in and gave out."""
 
     name: str
     detail: str
@@ -347,7 +347,8 @@ class Acc:
         self.total = 0.0
 
     def add(self, v: object, star: bool = False) -> None:
-        """Fold in one value. ``star`` is ``count(*)``'s row, which counts whatever it holds."""
+        """Fold in one value. ``star`` is ``count(*)``'s row, which counts whatever it
+        holds."""
         if star:
             if self.kind == "count":
                 self.count += 1
@@ -462,9 +463,10 @@ def run_sources(sources: list[Source], sql: str) -> Answer:
     skipped_why = []
     many = len(sources) > 1
     for source, md in zip(sources, mds, strict=True):
+        file = f"{source.name} " if many else ""
         for g, rg in enumerate(md.row_groups):
             why = None
-            # Skip the row group if any condition's comparison with its bounds rules it out.
+            # Skip the row group if any condition's comparison rules it out.
             for c, (_, t) in zip(q.conditions, predicates, strict=True):
                 col = find(c.column)
                 if not isinstance(t, Predicate) or not isinstance(col, Leaf):
@@ -473,8 +475,9 @@ def run_sources(sources: list[Source], sql: str) -> Answer:
                 s = chunk.statistics
                 if s is None:
                     continue
-                o = md.column_orders
-                type_order = o is not None and col.column < len(o) and o[col.column] == "TYPE_ORDER"
+                orders = md.column_orders or []
+                order = orders[col.column] if col.column < len(orders) else None
+                type_order = order == "TYPE_ORDER"
                 try:
                     b = bounds(s, t.comparator, type_order)
                     found = (b.min, b.max)
@@ -482,8 +485,8 @@ def run_sources(sources: list[Source], sql: str) -> Answer:
                     found = None
                 d = against_bounds(t, found, s.null_count, chunk.num_values)
                 if d.skip:
-                    where = f"{source.name} " if many else ""
-                    why = f"{where}row group {g}: {c.column} {c.op.symbol} {c.value}: {d.why}"
+                    condition = f"{c.column} {c.op.symbol} {c.value}"
+                    why = f"{file}row group {g}: {condition}: {d.why}"
                     break
             if why is not None:
                 skipped_why.append(why)

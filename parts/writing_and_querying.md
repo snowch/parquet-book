@@ -9,4 +9,4 @@ title: "Part IV: Writing and querying"
 
 [ch11](#writing-parquet-well) turns the reader's measurements back on the writer: which settings
 make a file cheap to read. [ch12](#a-tiny-query-engine) builds a small query engine on the reader
-and shows every stage of executing a query.
+and prints what every stage of a query does.
