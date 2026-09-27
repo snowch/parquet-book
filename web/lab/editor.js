@@ -16,7 +16,7 @@ import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 
 /** The module each lab's chapter builds, which the editor opens first. */
 const MODULE = {
-  layouts: "layout.py", footer: "reader.py", anatomy: "metadata.py", schema: "schema.py",
+  layouts: "layout.py", anatomy: "metadata.py", schema: "schema.py",
   levels: "column.py", encodings: "decode.py", pages: "pages.py", compression: "compress.py",
   statistics: "stats.py", skipping: "prune.py", scan: "scan.py", writing: "prune.py",
   engine: "engine.py", encryption: "crypto.py", table: "table.py", changes: "changes.py",

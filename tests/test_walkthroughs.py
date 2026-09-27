@@ -62,6 +62,16 @@ def facts(chapter: str, step: str) -> list[str]:
             data[start : start + 8].hex(" "),
         ],
         ("anatomy_of_a_parquet_file", "damaged_length"): [str(damaged_length), str(n - 8 - damaged_length)],
+        ("anatomy_of_a_parquet_file", "open_with_the_reader"): [
+            "HEAD",
+            f"GET bytes={n - 8}-{n - 1} -> 8 bytes",
+            f"GET bytes={start}-{n - 9} -> {length} bytes",
+            f"footer length: {length} rows: {manifest['num_rows']}",
+        ],
+        ("anatomy_of_a_parquet_file", "the_reader_refuses"): [
+            f"the reader refuses: the trailer claims a {damaged_length}-byte footer",
+            "after 2 requests",
+        ],
         ("anatomy_of_a_parquet_file", "footer_with_a_library"): [
             f"footer length: {length}",
             f"rows: {manifest['num_rows']} in {manifest['num_row_groups']} row group",

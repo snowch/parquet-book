@@ -138,7 +138,7 @@ _CHAPTERS = (
         "the_file",
         "Given only a file's bytes, how does a reader find anything in it?",
         "Footer discovery over a simulated object store: size, trailer, footer range, FileMetaData.",
-        ("footer", "anatomy"),
+        ("anatomy",),
         ("tiny.parquet", "multiple-row-groups.parquet"),
     ),
     (
@@ -304,7 +304,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
     "layouts",
-    "footer",
     "anatomy",
     "schema",
     "levels",

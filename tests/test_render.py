@@ -18,9 +18,9 @@ def test_text_is_escaped():
 
 
 def test_a_lab_block_becomes_a_mount_point_with_a_fallback():
-    html = render({"type": "code", "lang": "lab", "value": "experiment: footer\nfixture: tiny.parquet"})
+    html = render({"type": "code", "lang": "lab", "value": "experiment: anatomy\nfixture: tiny.parquet"})
     assert 'class="lab"' in html
-    assert 'data-experiment="footer"' in html and 'data-fixture="tiny.parquet"' in html
+    assert 'data-experiment="anatomy"' in html and 'data-fixture="tiny.parquet"' in html
     assert "needs JavaScript" in html
 
 

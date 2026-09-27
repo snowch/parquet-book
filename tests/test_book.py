@@ -131,7 +131,7 @@ def test_a_lab_block_naming_an_unknown_experiment_or_fixture_is_refused():
     with pytest.raises(LabBlockError):
         parse_lab_block("experiment: nonsense")
     with pytest.raises(LabBlockError):
-        parse_lab_block("experiment: footer\nfixture: missing.parquet")
+        parse_lab_block("experiment: anatomy\nfixture: missing.parquet")
 
 
 def test_every_mounted_experiment_has_a_module():

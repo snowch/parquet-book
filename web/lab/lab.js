@@ -17,7 +17,7 @@
 
 import { Lab } from "./wasm.js";
 import { PyLab } from "./python.js";
-import { mountFooter, mountAnatomy } from "./footer.js";
+import { mountAnatomy } from "./footer.js";
 import { mountLayouts } from "./layouts.js";
 import { mountSchema } from "./schema.js";
 import { mountLevels } from "./levels.js";
@@ -37,7 +37,7 @@ import { mountWorkbench } from "./workbench.js";
 import { mountCommands } from "./commands.js";
 
 const EXPERIMENTS = {
-  footer: mountFooter, anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
+  anatomy: mountAnatomy, layouts: mountLayouts, schema: mountSchema, levels: mountLevels,
   encodings: mountEncodings, pages: mountPages, compression: mountCompression,
   statistics: mountStatistics,
   skipping: mountSkipping,

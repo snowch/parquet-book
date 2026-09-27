@@ -144,37 +144,54 @@ refuses this very damage.
 Try changes of your own with **Edit**: read the first eight bytes, print the whole footer, or
 open another fixture, such as `fixtures/multiple-row-groups.parquet`.
 
-### Open a file from its last byte
+### Open a file with the book's reader
 
-Now watch the book's reader do what you have done. The panel below runs it on the same file. The
-reader sees the file only through a simulated object store, which logs every request.
+Now let the book's reader do what you have done. It sees the file only through a store that logs
+every request, as an object store would bill them, so it cannot cheat by reading the whole file:
 
-```lab
-experiment: footer
-fixture: tiny.parquet
-fixtures: tiny.parquet, multiple-row-groups.parquet
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/open_with_the_reader.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/open_with_the_reader.rs
+:language: rust
+```
+:::
+::::
 
-Nothing on the panel is drawn from a script of what should happen. Each control runs the book's
-reader again and the panel shows what it returned. The reader is the Rust one compiled to
-WebAssembly, or, if you choose Python above the panel, the Python one run in your browser by
-Pyodide; they return the same answers. Try these, in order:
+Three requests: the size, then the trailer, then the footer, each waiting for the one before.
+Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
+learned the schema, the row count and where every column lives without reading a single value.
+Change the call and run it again. Ask with a suffix range instead of `HEAD`, and the first request
+disappears, because the response to a suffix range says how large the file is. Raise `prefetch`
+until the first read takes in the footer too, and the third request disappears; the trace shows
+what the bigger read cost in bytes.
 
-1. **Click the footer-length bytes** in the step list. The byte view marks four bytes near the
-   end of the file. Select the first of them in the byte view: the inspector shows the same four
-   bytes read as a little-endian integer, with the weight of each byte.
-2. **Look at the dim bytes.** Everything dim is a byte the reader never asked for. Most of the
-   file is dim. The reader has learned the schema, the row count and the position of every
-   column without reading a single value.
-3. **Move the first-read slider** to the right. At some point the third request disappears: the
-   first read now covers the footer as well as the trailer. The trace shows the cost of that
-   change in bytes and in time.
-4. **Choose the suffix range.** The `HEAD` request disappears, because a suffix range response
-   says how large the object is.
-5. **Damage the file.** Select the very last byte and change it to `32`. The reader stops at the
-   magic check and says why. Restore the file, then change the second footer-length byte to
-   `ff`. Now the trailer claims a footer larger than the file, and the reader refuses it before
-   asking the store for a byte of it.
+The reader also checks what it reads before it trusts it. Hand it the file you damaged by hand
+above:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/the_reader_refuses.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/the_reader_refuses.rs
+:language: rust
+```
+:::
+::::
+
+It stops after the trailer, before asking the store for a byte of a footer that cannot exist, and
+says why. Damage the magic instead, `data[-1]`, and it refuses for a different reason.
 
 ### What the trailer says
 
@@ -200,7 +217,7 @@ Every request waits for the one before it, because each needs a number the previ
 returned. On object storage the wait is the expensive part. A request takes a long time to start
 and then moves bytes quickly, so three small requests cost far more than one large one.
 
-Real readers shorten the chain in two ways, and the experiment has a control for each:
+Real readers shorten the chain in two ways, the two changes you made to the call above:
 
 - **The size is often known already.** A directory listing or a table format's manifest records
   each file's size ([ch14](#lakehouse-and-beyond)). A suffix range, `Range: bytes=-n`, asks for
@@ -219,9 +236,10 @@ shows files where it does not.
 
 ### The whole file
 
-The footer is a map. This second panel draws what it describes: every region of the file, as the
-reader parsed it. Click a region in the structure view to see its bytes, or click a byte to see
-which structure it belongs to.
+The footer is a map. This panel draws what it describes: every region of the file, as the reader
+parsed it. Click a region in the structure view to see its bytes, or click a byte to see which
+structure it belongs to. The dim bytes are the ones the reader never asked for when it opened
+the file above.
 
 ```lab
 experiment: anatomy
@@ -263,10 +281,9 @@ none of it can be read.
 
 ## Building it
 
-The reader in the panels is the book's reader, which exists in Python (`python/parquet_lab`) and
-in Rust (`crates/parquet-lab`). The panels run the Rust one unless you switch them to Python; the
-tests hold the two to the same answers. This section builds the part of the reader the experiment
-used, in the order it ran. Each piece is quoted from the source, so what you read here is what ran
+The reader you called above is the book's reader, which exists in Python (`python/parquet_lab`)
+and in Rust (`crates/parquet-lab`), and the tests hold the two to the same answers. This section
+builds the part of it the experiment used, in the order it ran. Each piece is quoted from the source, so what you read here is what ran
 above, and the tabs switch every excerpt on the page between the languages.
 
 ### Little-endian integers
@@ -438,7 +455,7 @@ low four bits are its type.
 
 Because every field names itself, the decoder can walk a footer without knowing Parquet's schema,
 and a field it has never heard of still decodes. The `parquet_thrift` module then gives the fields
-their names. Select any byte of the footer in the second panel and the inspector
+their names. Select any byte of the footer in the panel above and the inspector
 reads it as a field header, so you can check the decoder by hand. [ch03](#the-type-system) reads
 the schema out of this structure.
 

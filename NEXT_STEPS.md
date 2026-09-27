@@ -199,7 +199,21 @@ file by hand; the library step applies the deletes with pyarrow and the `parquet
 Could follow: equality deletes and deletion vectors beside position deletes; snapshot expiry and
 what it frees; two writers racing a compaction, with one commit retried.
 
+## Done: ch02's panel of controls, as code
+
+The footer panel's controls (how the size is learned, how much of the tail is read first, bytes
+to damage) were parameters of one call, so ch02 now makes the call: `open_with_the_reader` opens
+`tiny.parquet` through a store that logs every request and prints the trace, and
+`the_reader_refuses` hands it the damaged copy. The byte map stays, as the picture, and dims the
+bytes the reader never asked for. The footer lab is gone; `report::footer_lab` still serves the
+CLI's `footer` command and the byte map.
+
 ## Now: every chapter in the new shape
+
+Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
+ch12's SQL box), make it a code step with the parameters in the call, as ch02 did; keep panels
+whose value is a picture (ch01's layouts, ch02's byte map, ch04's levels, ch07's tokens, the
+request timelines of ch10 and ch15).
 
 In order, each a walkthrough by hand at the start of the experiment and an "Ask a library" step
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only

@@ -15,7 +15,6 @@ FILES: list[tuple[str, bytearray]] = []
 
 EXPERIMENTS = (
     "layouts",
-    "footer",
     "anatomy",
     "schema",
     "levels",

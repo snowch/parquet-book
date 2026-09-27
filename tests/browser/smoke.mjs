@@ -99,52 +99,24 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 if (shots) await mkdir(shots, { recursive: true });
 
-// ch02: the footer laboratory.
+// ch02: the whole file, as the reader parsed it, with the bytes it never asked for dimmed.
 await page.goto(base + "anatomy-of-a-parquet-file.html");
-const lab = page.locator('.lab[data-experiment="footer"]');
-await lab.locator('[data-ready="true"]').or(lab).first().waitFor();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]')?.dataset.state === "ok");
 const expected = native(["footer", "fixtures/tiny.parquet", "--json"]);
-check(await lab.getAttribute("data-footer-length") === String(expected.trailer.footer_length),
-  `footer length on the page is the reader's (${expected.trailer.footer_length})`);
-check(await lab.getAttribute("data-requests") === String(expected.requests.length),
-  `request count on the page is the reader's (${expected.requests.length})`);
-const traceRanges = await lab.locator("table.trace tbody tr td:nth-child(3)").allInnerTexts();
-check(JSON.stringify(traceRanges) === JSON.stringify(expected.requests.map((r) => r.range || "·")),
-  `trace ranges match: ${traceRanges.join(", ")}`);
-
-// Click the footer-length step: exactly its four bytes are highlighted.
-await lab.locator(".steps li.key-step button.span").click();
-const lit = await lab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
-const [ls, le] = expected.trailer.length_span;
-check(JSON.stringify(lit) === JSON.stringify(Array.from({ length: le - ls }, (_, i) => ls + i)),
-  `the footer-length step highlights bytes [${ls}, ${le})`);
-const inspector = await lab.locator(".inspector").innerText();
-check(inspector.includes(expected.trailer.footer_length.toLocaleString("en-GB")),
-  "the inspector reads the selected bytes as the footer length");
-if (shots) await lab.screenshot({ path: path.join(shots, "footer-lab.png") });
-
-// Unfetched bytes are dimmed: everything outside the trailer and the footer.
-const dim = await lab.locator(".hex .b.unfetched").count();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.state === "ok");
+const whole = page.locator('.lab[data-experiment="anatomy"]');
+check(await whole.getAttribute("data-footer-length") === String(expected.trailer.footer_length),
+  `the byte map's reader finds the footer length the native reader does (${expected.trailer.footer_length})`);
+const dim = await whole.locator(".hex .b.unfetched").count();
 check(dim === expected.file_size - expected.totals.bytes_returned,
-  `${dim} bytes dimmed as never requested`);
-
-// A prefetch large enough for the footer removes the third request.
-await lab.locator('input[name="size"][value="suffix"]').check();
-await lab.locator('input[name="prefetch"]').fill("13");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.requests === "1");
-const one = native(["footer", "fixtures/tiny.parquet", "--size", "suffix", "--prefetch", "65536", "--json"]);
-check(one.requests.length === 1, "a 64 KiB suffix read opens the file in one request, on the page and natively");
-
-// Damage the closing magic: the reader refuses, and says why.
-await lab.locator(`.hex .b[data-o="${expected.file_size - 1}"]`).click();
-await lab.locator('.inspector input[name="byte"]').fill("32");
-await lab.locator(".inspector form.edit button[type=submit]").click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.state === "error");
-check((await lab.locator(".steps li.failed").innerText()).includes("PAR1"), "a damaged magic is reported");
-await lab.locator(".inspector .restore").click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.state === "ok");
-check(true, "restoring the file restores the reader");
+  `${dim} bytes dimmed: the ones the reader never asked for when it opened the file`);
+// Damage the closing magic: the reader refuses the file, and nothing is dimmed; restore it.
+await whole.locator(`.hex .b[data-o="${expected.file_size - 1}"]`).click();
+await whole.locator('.inspector input[name="byte"]').fill("32");
+await whole.locator(".inspector form.edit button[type=submit]").click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]').dataset.state === "error");
+check(await whole.locator(".hex .b.unfetched").count() === 0, "a damaged file dims nothing: the reader refused it");
+await whole.locator(".inspector .restore").click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]').dataset.state === "ok");
 
 // The anatomy panel maps the whole file.
 const anatomy = page.locator('.lab[data-experiment="anatomy"]');
@@ -180,28 +152,19 @@ await page.locator('.tab-bar button[data-code="python"]').first().click();
 
 // The same labs on the Python engine: the book's Python reader, run by Pyodide, must show what
 // the Rust reader computes natively.
-const footerLab = page.locator('.lab[data-experiment="footer"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]')?.dataset.state === "ok");
-await footerLab.locator('.engine-bar button[data-engine="python"]').click();
+const pyAnatomy = page.locator('.lab[data-experiment="anatomy"]');
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.state === "ok");
+await pyAnatomy.locator('.engine-bar button[data-engine="python"]').click();
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="footer"]');
+  const el = document.querySelector('.lab[data-experiment="anatomy"]');
   return el.dataset.engine === "python" && el.dataset.state === "ok";
 }, null, { timeout: 180000 });
-check(await footerLab.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
-  await footerLab.getAttribute("data-requests") === String(expected.requests.length),
-  `on the Python engine, the footer lab shows the native reader's footer length and ${expected.requests.length} requests`);
-const pyRanges = await footerLab.locator("table.trace tbody tr td:nth-child(3)").allInnerTexts();
-check(JSON.stringify(pyRanges) === JSON.stringify(expected.requests.map((r) => r.range || "·")), "and the same trace");
-await footerLab.locator('input[name="size"][value="suffix"]').check();
-await footerLab.locator('input[name="prefetch"]').fill("13");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="footer"]').dataset.requests === "1");
-check(true, "a large prefetch opens the file in one request on the Python engine too");
-const pyAnatomy = page.locator('.lab[data-experiment="anatomy"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.engine === "python");
 await pyAnatomy.locator(".tree .node-row").first().waitFor();
 const pyLabels = await pyAnatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
-check(JSON.stringify(pyLabels) === JSON.stringify(labels), "every lab on the page follows the engine choice, and maps the same regions");
-if (shots) await footerLab.screenshot({ path: path.join(shots, "footer-lab-python.png") });
+check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
+  await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
+  await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
+  "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
 await page.goto(base + "the-type-system.html");
 await page.waitForFunction(() => {
   const el = document.querySelector('.lab[data-experiment="schema"]');
@@ -585,6 +548,9 @@ if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png
   const out = await runStep(length);
   check(out.includes(`read little-endian: ${native.trailer.footer_length}`),
     `the walkthrough reads the footer length by hand in the page: ${native.trailer.footer_length}, as the reader decodes it`);
+  const opened = await runStep(page.locator('figure.walkthrough[data-file$="open_with_the_reader.py"]'));
+  check(opened.includes(`footer length: ${native.trailer.footer_length}`) && opened.split("\n").filter((l) => l.includes(" -> ")).length === native.requests.length,
+    `the book's reader, called in the page, opens the file in ${native.requests.length} requests`);
   const first = page.locator('figure.walkthrough[data-file$="first_bytes.py"]');
   await first.locator(".edit-button").click();
   const area = first.locator("textarea");
@@ -607,18 +573,18 @@ if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png
   await page.goto(base + "anatomy-of-a-parquet-file.html");
   await page.evaluate(() => localStorage.setItem("lab-engine", "python"));
   await page.reload();
-  const footer = page.locator('.lab[data-experiment="footer"]');
+  const footer = page.locator('.lab[data-experiment="anatomy"]');
   await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 180000 });
   const length = await footer.getAttribute("data-footer-length");
   await footer.locator("button[data-edit]").click();
   const editor = page.locator(".reader-editor");
-  check(await editor.locator("select").inputValue() === "reader.py", "Edit the code opens the module the lab's chapter builds");
+  check(await editor.locator("select").inputValue() === "metadata.py", "Edit the code opens the module the lab's chapter builds");
   const text = await editor.locator("textarea").inputValue();
   await editor.locator("textarea").fill(`${text}\nraise RuntimeError("an edit that breaks the reader")\n`);
   await editor.locator('button[data-act="run"]').click();
   await footer.and(page.locator('[data-ready="error"]')).waitFor({ timeout: 30000 });
   check((await footer.locator(".lab-error").innerText()).includes("RuntimeError: an edit that breaks the reader")
-    && (await footer.locator(".engine-bar .edited").innerText()).includes("reader.py"),
+    && (await footer.locator(".engine-bar .edited").innerText()).includes("metadata.py"),
     "an edit that breaks the reader shows Python's error in the lab, which says it runs the edit");
   await editor.locator('button[data-act="restore"]').click();
   await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 30000 });
