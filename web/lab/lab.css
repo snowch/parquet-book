@@ -157,7 +157,7 @@
 .bar-row .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }
 .bar-row .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
 
-/* A table of pages or rows (ch07 and the later panels). */
+/* A table of pages or rows (the later panels). */
 .pages-list { border-collapse: collapse; font-size: 12.5px; width: 100%; }
 .pages-list th, .pages-list td { padding: .22rem .45rem; border-bottom: 1px solid var(--edge); text-align: left; white-space: nowrap; }
 .pages-list th { font-size: 10.5px; }
@@ -167,16 +167,12 @@
 
 /* Ch07: compression. */
 .comp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-             grid-template-areas: "chunks chunks" "pages pages" "tokens output"; border-bottom: 1px solid var(--edge); }
-.comp-grid .p-chunks { grid-area: chunks; border-bottom: 1px solid var(--edge); }
+             grid-template-areas: "pages pages" "tokens output"; border-bottom: 1px solid var(--edge); }
 .comp-grid .p-comp-pages { grid-area: pages; border-bottom: 1px solid var(--edge); }
 .comp-grid .p-tokens { grid-area: tokens; border-right: 1px solid var(--edge); }
 .comp-grid .p-output { grid-area: output; }
-.comp-grid .pages-list .bar { display: inline-block; width: 8rem; height: .7rem; vertical-align: middle;
-  background: var(--panel); border: 1px solid var(--edge); border-radius: 2px; }
-.comp-grid .pages-list .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
-.comp-grid .pages-list tr.chosen td { background: var(--wash); }
-.comp-grid button.span, .comp-grid .pages-list button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.comp-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
+.comp-columns { margin-bottom: .5rem; }
 .page-picks { display: flex; flex-wrap: wrap; gap: .3rem; }
 .page-picks button { font-size: 12.5px; }
 .comp-tokens li.k-copy button.span { border-color: var(--warn); }

@@ -258,10 +258,28 @@ check(await compLab.locator(".out-bytes i.out").count() === 2 * (copy.output[1] 
   "stepping to the first copy marks the bytes it wrote");
 check(await compLab.locator(".out-bytes i.src").count() === 2 * (copy.output[1] - copy.output[0]),
   "and outlines the earlier bytes it copied");
-await compLab.locator(".lab-head select").selectOption("codec-zstd.parquet");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.decompressed === "none");
-check((await compLab.locator(".out-bytes").innerText()).includes("does not decompress ZSTD"),
-  "a ZSTD page is reported as one the reader cannot decompress");
+// The panel offers the files whose tokens it can draw, and no table of sizes: the steps and the
+// generated tables print those.
+const offered = await compLab.locator(".lab-head select option").allInnerTexts();
+check(offered.join(",") === "codec-snappy.parquet,codec-lz4.parquet,codec-gzip.parquet,pages-v2-snappy.parquet",
+  `the compression panel offers the four files it can draw: ${offered.join(", ")}`);
+check(await compLab.locator(".comp-grid table").count() === 0, "and draws no table of column chunk sizes");
+const gzip = native(["compression", "fixtures/codec-gzip.parquet", "1"]);
+await compLab.locator(".lab-head select").selectOption("codec-gzip.parquet");
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.codec === "GZIP");
+check(await compLab.getAttribute("data-tokens") === String(gzip.decompressed.tokens.length),
+  `country's GZIP page decompresses in the reader's ${gzip.decompressed.tokens.length} tokens`);
+{
+  // The book's Python reader decompresses the page under each codec in the page, as at a desk.
+  const step = page.locator('figure.walkthrough[data-file$="every_codec_one_page.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "GZIP:" }).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const pages = [snappy, native(["compression", "fixtures/codec-lz4.parquet", "1"]), gzip];
+  check(pages.every((r) => out.includes(`${r.codec}: ${r.pages[r.page].compressed_page_size} bytes become ` +
+    `${r.pages[r.page].uncompressed_page_size} in ${r.decompressed.tokens.length} tokens, the same: True`)),
+    "ch07's second step decompresses each codec's page in the page as the native reader does");
+}
 if (shots) {
   await compLab.locator(".lab-head select").selectOption("codec-snappy.parquet");
   await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.codec === "SNAPPY");

@@ -1,10 +1,9 @@
-// The compression laboratory (ch07): what a codec did to every column chunk, and one page
-// decompressed token by token.
+// The compression laboratory (ch07): one page decompressed token by token.
 //
-// The sizes are the footer's, so every codec has them. The tokens are the Rust decompressor's own
-// record of what it read and wrote (`compress::Token`): stepping through them highlights the
-// compressed bytes in the byte view and the bytes they became in the decompressed page, and for a
-// copy, the earlier bytes it copied.
+// The tokens are the Rust decompressor's own record of what it read and wrote (`compress::Token`):
+// stepping through them highlights the compressed bytes in the byte view and the bytes they became
+// in the decompressed page, and for a copy, the earlier bytes it copied. The chapter's steps and
+// tables print the sizes, so the panel draws only what a table cannot.
 
 import { FileViews, fileChooser } from "./footer.js";
 import { escapeHtml } from "./hexview.js";
@@ -20,8 +19,8 @@ export function mountCompression(root, lab, files, initial, config) {
   const grid = document.createElement("div");
   grid.className = "comp-grid";
   grid.innerHTML = `
-    <section class="panel p-chunks"><h4>Every column chunk, before and after the codec</h4><div class="chunks"></div></section>
-    <section class="panel p-comp-pages"><h4>Pages of this column chunk</h4><div class="comp-pages"></div></section>
+    <section class="panel p-comp-pages"><h4>A column, and a page of it to decompress</h4>
+      <div class="page-picks comp-columns"></div><div class="comp-pages"></div></section>
     <section class="panel p-tokens"><h4>How the decompressor rebuilt the page</h4>
       <div class="stepper"><button type="button" data-step="-1">Previous token</button>
       <button type="button" data-step="1">Next token</button><span class="where"></span></div>
@@ -58,12 +57,12 @@ export function mountCompression(root, lab, files, initial, config) {
     const r = lab.compression(views.id, column, page);
     root.dataset.state = r.ok ? "ok" : "error";
     if (!r.ok) {
-      grid.querySelector(".chunks").innerHTML = `<p class="lab-error">${escapeHtml(r.error)}</p>`;
+      grid.querySelector(".comp-columns").innerHTML = `<p class="lab-error">${escapeHtml(r.error)}</p>`;
       return;
     }
     page = r.page;
     root.dataset.codec = r.codec;
-    drawChunks(grid.querySelector(".chunks"), r, column);
+    drawColumns(grid.querySelector(".comp-columns"), r, column);
     drawPages(grid.querySelector(".comp-pages"), r);
     const d = r.decompressed;
     tokens = d.ok ? d.tokens : [];
@@ -74,7 +73,7 @@ export function mountCompression(root, lab, files, initial, config) {
       grid.querySelector(".comp-tokens").innerHTML = "";
       grid.querySelector(".where").textContent = "";
       grid.querySelector(".out-bytes").innerHTML =
-        `<p class="note">${escapeHtml(d.error)}. The sizes above come from the footer, which every reader can read.</p>`;
+        `<p class="note">${escapeHtml(d.error)}.</p>`;
       return;
     }
     grid.querySelector(".comp-tokens").innerHTML = tokens.map((t, i) =>
@@ -125,19 +124,10 @@ function rows(bytes) {
   return out;
 }
 
-function drawChunks(box, r, column) {
-  const total = r.chunks.reduce((a, c) => [a[0] + c.uncompressed, a[1] + c.compressed], [0, 0]);
-  box.innerHTML = `<div class="table-wrap"><table class="pages-list"><thead><tr><th>Column</th><th>Codec</th>` +
-    `<th class="num">Before</th><th class="num">After</th><th>After, as a share of before</th></tr></thead><tbody>` +
-    r.chunks.map((c) => {
-      const pct = c.uncompressed ? Math.round((c.compressed / c.uncompressed) * 100) : 0;
-      return `<tr${c.column === column ? ' class="chosen"' : ""}><td><button type="button" data-column="${c.column}"` +
-        `${c.column === column ? ' aria-pressed="true"' : ""}><code>${escapeHtml(c.path)}</code></button></td>` +
-        `<td>${escapeHtml(c.codec || "")}</td><td class="num">${fmt(c.uncompressed)}</td><td class="num">${fmt(c.compressed)}</td>` +
-        `<td><span class="bar"><i style="width:${Math.min(100, pct)}%"></i></span> ${pct}%</td></tr>`;
-    }).join("") +
-    `</tbody></table></div><p class="note">Column chunks: ${fmt(total[0])} bytes before, ${fmt(total[1])} after, in a ` +
-    `${fmt(r.file_size)}-byte file. Both sizes include page headers, which are never compressed.</p>`;
+function drawColumns(box, r, column) {
+  box.innerHTML = r.chunks.map((c) =>
+    `<button type="button" data-column="${c.column}"${c.column === column ? ' aria-pressed="true"' : ""}>` +
+    `<code>${escapeHtml(c.path)}</code></button>`).join("");
 }
 
 function drawPages(box, r) {

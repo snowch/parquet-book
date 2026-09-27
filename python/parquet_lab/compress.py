@@ -126,7 +126,7 @@ def snappy(data: bytes, base: int) -> Decompressed:
     """Raw Snappy: a varint giving the output length, then elements. Each element starts with a
     tag byte whose low two bits say what it is::
 
-        00  literal             length - 1 in the tag's top six bits; 60..63 mean "in the next 1..4 bytes"
+        00  literal             length - 1 in the top six bits, or 60..63: in the next 1..4 bytes
         01  copy, 1-byte offset length 4..11 in three bits, offset in three bits and the next byte
         10  copy, 2-byte offset length 1..64 in the top six bits, offset in the next two bytes
         11  copy, 4-byte offset length 1..64 in the top six bits, offset in the next four bytes
@@ -303,9 +303,9 @@ class Huffman:
         self.symbols = [s for n in range(1, 16) for s, m in enumerate(lengths) if m == n]
 
     def decode(self, bits: Bits) -> int:
-        """Read one code a bit at a time. The codes of each length are consecutive integers, so
-        after ``n`` bits the code is either among the ``count[n]`` codes of that length or
-        longer."""
+        """Read one code a bit at a time. The codes of each length are consecutive
+        integers, so after ``n`` bits the code is either among the ``count[n]`` codes of
+        that length or longer."""
         code = first = index = 0
         for n in range(1, 16):
             code |= bits.bit()

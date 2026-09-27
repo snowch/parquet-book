@@ -91,6 +91,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(nested_facts())
     known.update(encodings_facts())
     known.update(pages_facts())
+    known.update(compression_facts())
     known.update(statistics_facts())
     known.update(skipping_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
@@ -322,6 +323,49 @@ def pages_facts() -> dict:
                 "refused: ",
                 "CRC checksum mismatch",
             ],
+        },
+    }
+
+
+def compression_facts() -> dict:
+    """What ch07's steps must print: the country page's PLAIN bytes, built from the manifest's
+    rows; the first literal and copy a compressor must make of them; each codec's compressed page,
+    from the two sizes pyarrow reports for the chunk, which count the same page header; and the
+    codec names pyarrow and the crate give."""
+    import pyarrow.parquet as pq
+
+    def chunk(name: str):
+        return pq.read_metadata(ROOT / "fixtures" / f"codec-{name}.parquet").row_group(0).column(1)
+
+    rows = json.loads((ROOT / "fixtures" / "codec-none.json").read_text())["rows"]
+    plain = b"".join(len(v).to_bytes(4, "little") + v for v in (r["country"].encode() for r in rows))
+    # Snappy's shortest copy is four bytes, so the page is a literal up to the first four bytes
+    # seen before, then a copy of them that runs as long as the bytes keep matching.
+    at = next(i for i in range(1, len(plain)) if plain[i : i + 4] in plain[: i + 3])
+    back = at - plain.index(plain[at : at + 4])
+    n = next(k for k in range(4, len(plain) - at) if plain[at + k] != plain[at + k - back])
+    # pyarrow calls the file's LZ4_RAW LZ4, as the book's fixture tests note.
+    in_the_file = {"SNAPPY": "SNAPPY", "LZ4": "LZ4_RAW", "GZIP": "GZIP"}
+    lines, library, setting = [], [], {"GZIP": "GZIP(GzipLevel(6))"}
+    for name in ["snappy", "lz4", "gzip"]:
+        c = chunk(name)
+        codec = in_the_file[c.compression]
+        # Both totals count the page's one header, so they differ by what the codec saved.
+        body = len(plain) - (c.total_uncompressed_size - c.total_compressed_size)
+        lines.append(f"{codec}: {body} bytes become {len(plain)} in ")
+        sizes = f"{c.total_compressed_size} of {c.total_uncompressed_size} bytes"
+        library.append((f"country: {c.compression}, {sizes}", f"country: {codec}, {sizes}"))
+        library.append((None, f"as a writer's setting: {setting.get(codec, codec)}\n"))
+    return {
+        ("compression", "snappy_by_hand"): [
+            f"the varint says {len(plain)} will come out",
+            f"literal {at} bytes\ncopy {n} from {back} back\n",
+            f"wrote {len(plain)} bytes; the page header says {len(plain)}",
+        ],
+        ("compression", "every_codec_one_page"): [*lines, "the same: true"],
+        ("compression", "compression_with_a_library"): {
+            "python": [py for py, _ in library if py],
+            "rust": [rs for _, rs in library],
         },
     }
 

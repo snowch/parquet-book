@@ -143,7 +143,7 @@ fn le(input: &[u8], at: usize, n: usize) -> Result<usize, String> {
 /// byte whose low two bits say what it is:
 ///
 /// ```text
-/// 00  literal             length - 1 in the tag's top six bits; 60..63 mean "in the next 1..4 bytes"
+/// 00  literal             length - 1 in the top six bits, or 60..63: in the next 1..4 bytes
 /// 01  copy, 1-byte offset length 4..11 in three bits, offset in three bits and the next byte
 /// 10  copy, 2-byte offset length 1..64 in the top six bits, offset in the next two bytes
 /// 11  copy, 4-byte offset length 1..64 in the top six bits, offset in the next four bytes

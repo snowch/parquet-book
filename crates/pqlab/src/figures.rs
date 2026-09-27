@@ -202,10 +202,6 @@ const FIGURES: &[Figure] = &[
         file: "codec-country-page.md",
         render: codec_country_page,
     },
-    Figure {
-        file: "snappy-tokens-country.md",
-        render: snappy_tokens_country,
-    },
 ];
 
 pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
@@ -1021,9 +1017,9 @@ const CODECS: [&str; 6] = ["none", "snappy", "lz4", "gzip", "zstd", "brotli"];
 
 fn codec_files(root: &Path) -> Result<String, String> {
     let mut rows = vec![
-        "| File | Codec in the footer | File bytes | Column chunk bytes | Share of uncompressed |"
+        "| Codec in the footer | File bytes | Column chunk bytes | Share of uncompressed |"
             .to_string(),
-        "|---|---|--:|--:|--:|".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     let mut base = 0i64;
     for codec in CODECS {
@@ -1036,7 +1032,7 @@ fn codec_files(root: &Path) -> Result<String, String> {
             base = compressed;
         }
         rows.push(format!(
-            "| `{name}` | `{}` | {} | {} | {}% |",
+            "| `{}` | {} | {} | {}% |",
             cs[0].codec,
             thousands(bytes.len() as u64),
             thousands(compressed as u64),
@@ -1044,9 +1040,10 @@ fn codec_files(root: &Path) -> Result<String, String> {
         ));
     }
     Ok(format!(
-        "{}\n\n*Computed by the reader from the footers of the `fixtures/codec-*.parquet` files: \
-         256 orders, PLAIN-encoded, one row group, one data page per column chunk. Column chunk \
-         bytes include page headers.*\n",
+        "{}\n\n*Computed by the reader from the footers of `fixtures/codec-none.parquet`, \
+         `codec-snappy.parquet`, `codec-lz4.parquet`, `codec-gzip.parquet`, `codec-zstd.parquet` \
+         and `codec-brotli.parquet`: 256 orders, PLAIN-encoded, one row group, one data page per \
+         column chunk. Column chunk bytes include page headers.*\n",
         rows.join("\n")
     ))
 }
@@ -1064,18 +1061,27 @@ fn codec_columns(root: &Path) -> Result<String, String> {
                 .collect::<Vec<_>>(),
         );
     }
-    let mut rows = vec![
-        format!("| Column | {} |", CODECS.join(" | ")),
-        format!("|---|{}", "--:|".repeat(CODECS.len())),
-    ];
-    for (i, path) in paths.iter().enumerate() {
-        let cells: Vec<String> = sizes.iter().map(|s| thousands(s[i] as u64)).collect();
-        rows.push(format!("| `{path}` | {} |", cells.join(" | ")));
+    // Two tables of four columns, so that each fits a phone: the codecs that only copy earlier
+    // bytes, beside the uncompressed file, then the codecs that also code frequent bytes briefly.
+    let mut tables = Vec::new();
+    for group in [0..3, 3..6] {
+        let mut rows = vec![
+            format!("| Column | {} |", CODECS[group.clone()].join(" | ")),
+            format!("|---|{}", "--:|".repeat(group.len())),
+        ];
+        for (i, path) in paths.iter().enumerate() {
+            let cells: Vec<String> = sizes[group.clone()]
+                .iter()
+                .map(|s| thousands(s[i] as u64))
+                .collect();
+            rows.push(format!("| `{path}` | {} |", cells.join(" | ")));
+        }
+        tables.push(rows.join("\n"));
     }
     Ok(format!(
         "{}\n\n*Column chunk bytes, including page headers, from the footers of the \
-         `fixtures/codec-*.parquet` files.*\n",
-        rows.join("\n")
+         `fixtures/codec-*.parquet` files, named by their codec.*\n",
+        tables.join("\n\n")
     ))
 }
 
@@ -1116,9 +1122,9 @@ fn codec_split(root: &Path) -> Result<String, String> {
 /// One page, the three decoders' tokens counted.
 fn codec_country_page(root: &Path) -> Result<String, String> {
     let mut rows = vec![
-        "| Codec | Compressed bytes | Tokens | Bytes written as literals | Bytes copied from earlier | Longest copy |"
+        "| Codec | Bytes written as literals | Bytes copied from earlier | Longest copy |"
             .to_string(),
-        "|---|--:|--:|--:|--:|--:|".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     let mut size = 0;
     for codec in ["snappy", "lz4", "gzip"] {
@@ -1136,10 +1142,8 @@ fn codec_country_page(root: &Path) -> Result<String, String> {
             }
         }
         rows.push(format!(
-            "| {} | {} | {} | {} | {} | {} |",
+            "| {} | {} | {} | {} |",
             page.0,
-            thousands(page.1),
-            d.tokens.len(),
             thousands(literal),
             thousands(copied),
             thousands(longest)
@@ -1148,45 +1152,9 @@ fn codec_country_page(root: &Path) -> Result<String, String> {
     Ok(format!(
         "{}\n\n*The `country` column's data page, {} bytes before compression, decompressed by \
          the reader from `fixtures/codec-snappy.parquet`, `codec-lz4.parquet` and \
-         `codec-gzip.parquet`. Tokens include headers and trailers.*\n",
+         `codec-gzip.parquet`.*\n",
         rows.join("\n"),
         thousands(size as u64)
-    ))
-}
-
-fn snappy_tokens_country(root: &Path) -> Result<String, String> {
-    let name = "codec-snappy.parquet";
-    let bytes = fixture(root, name)?;
-    let (_, d) = first_page(root, name, 1)?;
-    let mut rows = vec![
-        "| Compressed bytes | Token | Writes output | What it says |".to_string(),
-        "|---|---|--:|---|".to_string(),
-    ];
-    let shown = 9;
-    for t in d.tokens.iter().take(shown) {
-        let hexed =
-            parquet_lab::encoding::hex(&bytes[t.input.start as usize..t.input.end as usize]);
-        rows.push(format!(
-            "| `{hexed}` | {} | {} | {} |",
-            t.label,
-            if t.output.is_empty() {
-                "·".to_string()
-            } else {
-                format!("{}–{}", t.output.start, t.output.end - 1)
-            },
-            t.detail
-        ));
-    }
-    let rest = &d.tokens[shown.min(d.tokens.len())..];
-    let copies = rest
-        .iter()
-        .filter(|t| matches!(t.kind, TokenKind::Copy { .. }))
-        .count();
-    Ok(format!(
-        "{}\n\n{} more tokens follow, {copies} of them copies.\n{}",
-        rows.join("\n"),
-        rest.len(),
-        conditions(name, &bytes, None)
     ))
 }
 

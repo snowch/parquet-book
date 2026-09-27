@@ -182,7 +182,9 @@ def decode_pages(file: bytes, chunk: ColumnChunk, leaf: Leaf, pages: list[Page])
         # Version 1 compresses the whole body as one block. Decompress it, and read the levels
         # and values from the copy.
         whole = page.v2 is None and codec != "UNCOMPRESSED"
-        levels_bytes = _decompress(codec, body, page, page.uncompressed_page_size) if whole else body
+        levels_bytes = body
+        if whole:
+            levels_bytes = _decompress(codec, body, page, page.uncompressed_page_size)
         levels_base = page.body_span.start
         r = ByteReader(levels_bytes, levels_base)
         # Version 2 moves the level lengths into the header, and never compresses the
