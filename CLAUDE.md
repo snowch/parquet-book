@@ -131,10 +131,10 @@ whose every command the page can run gets a Run button (`web/lab/commands.js`): 
 pytest` on `python/tests` or `exercises/python` and `PYTHONPATH=python python3 -m parquet_lab` run
 in that worker, and `cargo run -p pqlab -- …` runs through `pl_cli` in the WebAssembly reader,
 printing what the binary prints (`tests/test_wasm.py` holds it to the byte). A block of commands
-that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, never Run. What
-the reader types, answers and edited steps, lives in the browser's storage, never on the server. Rust cannot compile in a page, so
-`.devcontainer/` gives a Codespace with the pinned toolchain instead, where `make && make serve`
-shows the panels drawn by an edited Rust reader. A walkthrough step (a `{literalinclude}` of a file in
+that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, never Run. The
+reader's answers and edited steps live in the browser's storage, never on the server. Rust
+cannot compile in a page, so `.devcontainer/` gives a Codespace with the pinned toolchain instead,
+where `make && make serve` shows the panels drawn by an edited Rust reader. A walkthrough step (a `{literalinclude}` of a file in
 `walkthroughs/`, labelled "Try it") gets Edit and Run in Python, in the same worker, and Open in
 Codespaces in Rust. The browser test runs a workbench, Run buttons in both languages against the
 same commands at a desk, and walkthrough steps, one of them edited; it checks every panel draws
