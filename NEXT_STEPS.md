@@ -77,7 +77,7 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Fixtures `pruning-sorted.parquet` and `pruning-shuffled.parquet`. Tests: the OffsetIndex
   matches the walked pages, the ColumnIndex matches each page's decoded values, every value
   passes its filter, and no plan skips a matching row, over hundreds of conditions.
-- Experiment: the skipping panel. Problems 9.1 (can this be skipped?) and 9.2 (probe a filter);
+- Experiment: the skipping panel, since replaced by code (below). Problems 9.1 (can this be skipped?) and 9.2 (probe a filter);
   9.3 open.
 
 ## Done: ch10, how readers read
@@ -261,6 +261,16 @@ ways, and `the_reader_decides` asks `stats.bounds` about every column chunk. In
 maximum, though the crate reports the column order as unsigned. `report::statistics` stays for
 `pqlab statistics` and the figures; the grid figure is gone.
 
+## Done: ch09 in code
+
+ch09 opens on four steps instead of its skipping panel: `row_group_bounds` reads `order_id`'s
+range per row group by hand, `pages_of_one_group` reads the ColumnIndex and OffsetIndex,
+`probe_a_bloom_filter` tests customer 424242's eight bits, and `plan_a_read` calls `prune.plan`
+with `Mechanisms`. In `skipping_with_a_library`, pyarrow's dataset fragments keep row groups by
+statistics only (it reads no filter or page index), and the crate's predicate, page index and
+`Sbbf::check` answer the rest. `report::skipping` stays for `pqlab skipping`, problem 9.3 and the
+figures; the page index figure is gone.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -280,8 +290,7 @@ at the end of *Building it*, both in both languages, tested against the manifest
 where a picture beats printed output, and trimmed or cut elsewhere:
 
 1. ch07: a compressed page by hand; column chunk `compression` and sizes from both libraries.
-2. ch09 and ch10: statistics against a condition; a filtered
-   `pq.read_table` compared with the reader's plan.
+2. ch10: a filtered `pq.read_table` compared with the reader's plan.
 3. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 

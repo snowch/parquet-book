@@ -115,10 +115,6 @@ const FIGURES: &[Figure] = &[
         render: skipping_mechanisms,
     },
     Figure {
-        file: "page-index-order-id.md",
-        render: page_index_order_id,
-    },
-    Figure {
         file: "bloom-rate.md",
         render: bloom_rate,
     },
@@ -1388,9 +1384,8 @@ fn skipping_compare(root: &Path) -> Result<String, String> {
     let sorted = fixture(root, SORTED)?;
     let shuffled = fixture(root, SHUFFLED)?;
     let mut rows = vec![
-        "| Condition | Matching rows | Sorted: bytes read | Sorted: rows decoded | Shuffled: bytes read | Shuffled: rows decoded |"
-            .to_string(),
-        "|---|--:|--:|--:|--:|--:|".to_string(),
+        "| Condition | Matching rows | Sorted: bytes read | Shuffled: bytes read |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     let (mut full_a, mut full_b, mut total_rows) = (0, 0, 0);
     for (column, op, value) in skipping_conditions(root)? {
@@ -1406,13 +1401,11 @@ fn skipping_compare(root: &Path) -> Result<String, String> {
             num(&ta, "rows"),
         );
         rows.push(format!(
-            "| `{}` | {} | {} | {} | {} | {} |",
+            "| `{}` | {} | {} | {} |",
             text_of(a.get("condition")),
             num(&ta, "rows_matching"),
             thousands(num(&ta, "bytes_read")),
-            thousands(num(&ta, "rows_read")),
             thousands(num(&tb, "bytes_read")),
-            thousands(num(&tb, "rows_read")),
         ));
     }
     Ok(format!(
@@ -1428,11 +1421,6 @@ fn skipping_compare(root: &Path) -> Result<String, String> {
 }
 
 fn skipping_mechanisms(root: &Path) -> Result<String, String> {
-    let mut rows = vec![
-        "| File | Condition | Mechanisms | Row groups skipped | Bytes read | Bytes fetched to decide |"
-            .to_string(),
-        "|---|---|---|--:|--:|--:|".to_string(),
-    ];
     let conditions = skipping_conditions(root)?;
     let cases = [
         (SORTED, &conditions[0], [0u32, 1, 5]),
@@ -1450,8 +1438,16 @@ fn skipping_mechanisms(root: &Path) -> Result<String, String> {
             v.join(", ")
         }
     };
+    // One table per condition, each with the file it is planned on in its caption.
+    let mut tables = Vec::new();
     for (file, (column, op, value), masks) in cases {
         let bytes = fixture(root, file)?;
+        let mut rows = vec![
+            "| Mechanisms | Row groups skipped | Bytes read | Bytes fetched to decide |"
+                .to_string(),
+            "|---|--:|--:|--:|".to_string(),
+        ];
+        let mut condition = String::new();
         for m in masks {
             let r = parquet_lab::report::skipping(&bytes, *column, op, value, m);
             let t = r.get("totals").cloned().unwrap_or(Json::Null);
@@ -1459,69 +1455,35 @@ fn skipping_mechanisms(root: &Path) -> Result<String, String> {
                 .iter()
                 .filter(|g| matches!(g.get("skipped"), Some(Json::Bool(true))))
                 .count();
+            condition = text_of(r.get("condition"));
             rows.push(format!(
-                "| `{file}` | `{}` | {} | {skipped} of {} | {} | {} |",
-                text_of(r.get("condition")),
+                "| {} | {skipped} of {} | {} | {} |",
                 names(m),
                 arr(r.get("row_groups")).len(),
                 thousands(num(&t, "bytes_read")),
                 thousands(num(&t, "index_bytes")),
             ));
         }
+        tables.push(format!(
+            "{}\n\n*`{condition}`, planned on `fixtures/{file}`.*",
+            rows.join("\n")
+        ));
     }
     Ok(format!(
         "{}\n\n*Computed by the reader from the pruning fixtures, with each set of mechanisms \
          allowed in turn.*\n",
-        rows.join("\n")
-    ))
-}
-
-fn page_index_order_id(root: &Path) -> Result<String, String> {
-    let mut cols = Vec::new();
-    for file in [SORTED, SHUFFLED] {
-        let bytes = fixture(root, file)?;
-        let md = open_bytes(&bytes)?;
-        let chunk = &md.row_groups[2].columns[0];
-        let ci = parquet_lab::page_index::column_index(&bytes, chunk)?.ok_or("no column index")?;
-        let oi = parquet_lab::page_index::offset_index(&bytes, chunk)?.ok_or("no offset index")?;
-        let rows = oi.row_ranges(md.row_groups[2].num_rows);
-        let int = |b: &[u8]| i64::from_le_bytes(b.try_into().unwrap_or([0; 8]));
-        cols.push((
-            ci.boundary_order.clone(),
-            (0..rows.len())
-                .map(|i| (rows[i], int(&ci.min_values[i]), int(&ci.max_values[i])))
-                .collect::<Vec<_>>(),
-        ));
-    }
-    let mut out = vec![
-        format!("| Page | Rows | Sorted: `order_id` min … max | Shuffled: `order_id` min … max |"),
-        "|--:|---|---|---|".to_string(),
-    ];
-    for i in 0..cols[0].1.len() {
-        let (r, a0, a1) = cols[0].1[i];
-        let (_, b0, b1) = cols[1].1[i];
-        out.push(format!(
-            "| {i} | {}–{} | {a0} … {a1} | {b0} … {b1} |",
-            r.0,
-            r.1 - 1
-        ));
-    }
-    Ok(format!(
-        "{}\n\n*The ColumnIndex of `order_id` in row group 2 of each pruning fixture, read by the \
-         reader. Its boundary order is `{}` in the sorted file and `{}` in the shuffled one.*\n",
-        out.join("\n"),
-        cols[0].0,
-        cols[1].0
+        tables.join("\n\n")
     ))
 }
 
 fn bloom_rate(root: &Path) -> Result<String, String> {
     let mut rows = vec![
-        "| File | Row group | Filter bytes | Values in the chunk | Absent values tested | Passed anyway |"
-            .to_string(),
-        "|---|--:|--:|--:|--:|--:|".to_string(),
+        "| Row group | Absent values tested | Passed anyway |".to_string(),
+        "|--:|--:|--:|".to_string(),
     ];
     let (mut tested, mut passed) = (0u64, 0u64);
+    // Every row group's filter and chunk has the same size, which the caption gives once.
+    let mut sizes = std::collections::BTreeSet::new();
     for file in [SHUFFLED] {
         let bytes = fixture(root, file)?;
         let md = open_bytes(&bytes)?;
@@ -1548,19 +1510,22 @@ fn bloom_rate(root: &Path) -> Result<String, String> {
             }
             tested += t;
             passed += p;
-            rows.push(format!(
-                "| `{file}` | {g} | {} | {} | {} | {} |",
+            sizes.insert((
                 filter.bitset_span.end - filter.header_span.start,
                 values.len(),
-                thousands(t),
-                thousands(p)
             ));
+            rows.push(format!("| {g} | {} | {} |", thousands(t), thousands(p)));
         }
     }
+    let [(filter_bytes, values)] = sizes.into_iter().collect::<Vec<_>>()[..] else {
+        return Err("the Bloom filters differ in size".into());
+    };
     Ok(format!(
-        "{}\n\n*Computed by the reader: every customer number from 100,000 in steps of 97 that the \
-         row group does not hold, probed against its `customer_id` Bloom filter. {} of {} passed, \
-         {:.1}%. The writer was asked for a false positive rate of 5% at 200 distinct values.*\n",
+        "{}\n\n*Computed by the reader from `fixtures/{SHUFFLED}`: every customer number from \
+         100,000 in steps of 97 that the row group does not hold, probed against its \
+         `customer_id` Bloom filter, of {filter_bytes} bytes for {values} values. {} of {} \
+         passed, {:.1}%. The writer was asked for a false positive rate of 5% at 200 distinct \
+         values.*\n",
         rows.join("\n"),
         thousands(passed),
         thousands(tested),

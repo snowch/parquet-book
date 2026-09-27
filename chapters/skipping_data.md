@@ -24,34 +24,42 @@ match" on a guess.
 ### The same orders, sorted and shuffled
 
 `pruning-sorted.parquet` and `pruning-shuffled.parquet` hold the same orders, written the same
-way: four row groups, small pages, a page index for every column, and a Bloom filter for
+way: four row groups, pages of forty rows, a page index for every column, and a Bloom filter for
 `customer_id`. The first is in `order_id` order; the second is shuffled.
-[Appendix B](#the-fixtures) says how they were written.
+[Appendix B](#the-fixtures) says how pyarrow wrote them.
 
-```lab
-experiment: skipping
-fixture: pruning-sorted.parquet
-fixtures: pruning-sorted.parquet, pruning-shuffled.parquet
-column: 0
-op: =
-value: 431
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+[ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
+`decode_file_metadata` from [ch03](#the-type-system).
+
+**Ranges in the footer.** The query is `order_id = 431`. Every row group's statistics give the
+smallest and largest `order_id` it holds. Read them, and ask of each row group whether `431` could
+be in it:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/skipping_data/row_group_bounds.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/row_group_bounds.rs
+:language: rust
+```
+:::
+::::
 
-The panel plans `SELECT *` with the condition, row group by row group, and says what each
-mechanism decided and why. It also reads the whole column to count the matching rows, so every
-plan is checked against the answer. Try these:
+Each row group covers its own band of order numbers, and only row group 2's band holds `431`. The
+other three are skipped on the footer's word alone, before a byte of their data is fetched. The
+test compares `431` with a minimum and a maximum, and nothing else.
 
-1. **As loaded.** Statistics rule out three row groups and keep row group 2. There the page
-   index keeps one page, and the reader reads that page of every column.
-2. **Untick the page index.** The reader now reads the whole of the remaining row group.
-3. **Switch to `pruning-shuffled.parquet`.** Every row group and every page covers nearly the
-   whole range of order numbers, and nothing is skipped.
-4. **Ask for `customer_id = 424242`** in the shuffled file. Statistics cannot help: customer
-   numbers are random in both files. The Bloom filters rule out every row group. Look at the bits
-   each probe tested.
-5. **Try `country is null`.** Every page holds a few nulls, so nothing can be skipped.
-6. **Try `amount_cents > 9800`.** Amounts are random too, but some pages happen to have no
-   amount that high.
+Change `wanted` to `200`, then to `201`: each lands in one row group, the last of one band or the
+first of the next. Then change the file to `pruning-shuffled.parquet`. Every row group now spans
+nearly every order number, and every one must be read.
 
 ### When a range rules a condition out
 
@@ -72,7 +80,8 @@ Null satisfies no comparison. A chunk whose values are all null is skipped for a
 
 ### Sorted data
 
-The same conditions, planned on both files:
+The reader planned `SELECT *` on both files with each of the conditions below, using every
+mechanism this chapter describes:
 
 ```{include} _generated/skipping-compare.md
 ```
@@ -89,14 +98,31 @@ to it.
 Row group statistics decide whole row groups. The page index decides pages. It is written after
 the row groups, in two structures per column chunk: a **ColumnIndex** with each page's minimum,
 maximum and null count, and an **OffsetIndex** with each page's position, size and first row.
-This is the ColumnIndex of `order_id` in one row group of each file:
+The reader's `page_index` module reads both. Ask them about `order_id` in row group 2, the one
+row group the first step kept:
 
-```{include} _generated/page-index-order-id.md
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/skipping_data/pages_of_one_group.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/pages_of_one_group.rs
+:language: rust
+```
+:::
+::::
 
-The sorted file's pages cover disjoint bands, and the index records that its bounds are in
-ascending order, which lets a reader binary-search them. The shuffled file's pages each cover
-nearly everything.
+The row group's pages cover disjoint bands of forty order numbers, and only the first can hold
+`431`. The ColumnIndex also records that its bounds are in `ASCENDING` order, which lets a reader
+binary-search them rather than test every page. The OffsetIndex says where each page's bytes are
+and which row it starts at, so the reader can fetch that page without the pages after it.
+
+Change the file to `pruning-shuffled.parquet`. The boundary order is `UNORDERED`, each page
+covers nearly every order number, and every page must be read.
 
 A page skipped in the condition's column means rows skipped, not bytes skipped in every column.
 The reader turns the kept pages into row ranges using their first rows, then asks each other
@@ -112,19 +138,82 @@ filter answers a different question: was this exact value ever added?
 
 The filter is a bitset of 32-byte blocks. To add a value, the writer hashes its PLAIN bytes with
 xxHash64. The hash's high half picks a block; its low half, multiplied by eight fixed constants,
-picks one bit in each of the block's eight words; the writer sets those bits. To test a value, the
-reader computes the same hash and checks the same bits. One clear bit proves the value was never
-added. All set means it may have been: other values may have set those bits.
+picks one bit in each of the block's eight 32-bit words; the writer sets those bits. To test a
+value, the reader computes the same hash and checks the same bits. One clear bit proves the value
+was never added. All set means it may have been: other values may have set those bits.
+
+Probe each row group's filter in the shuffled file for customer `424242` with the reader's `bloom`
+module:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/skipping_data/probe_a_bloom_filter.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/probe_a_bloom_filter.rs
+:language: rust
+```
+:::
+::::
+
+Every row group gets the same hash and, since every filter has the same number of blocks, the
+same block. The bits differ, because each row group's customers set different ones. In every row
+group at least one of the eight bits is clear, so `424242` was never added to any of them, and the
+reader skips the whole file for it.
+
+Change `424242` to `426545`, the customer in the shuffled file's first row: row group 0's
+filter has all eight bits set, as it must, since a filter never forgets a value it was given.
+Then change the file to `pruning-sorted.parquet` and probe `424242` again. One row group's filter
+has all eight bits set, although no order in the file is from that customer. That is a false
+positive.
+
+The reader measured how often that happens. It probed every filter in the shuffled file with
+thousands of customer numbers its row group does not hold:
 
 ```{include} _generated/bloom-rate.md
 ```
 
 The writer sized each filter for the false-positive rate the table's note gives, and the
 measured rate is lower, because the filter's size is rounded up. False positives cost a read and
-nothing else: in the first table, the sorted file's filter passed `424242` in one row group, so
-the reader read a row group with no match in it. A filter never produces a false negative, so it never costs a row.
+nothing else: the sorted file's false positive makes the reader read a row group with no match in
+it. That is why, in the table under *Sorted data*, the sorted file reads bytes for
+`customer_id = 424242` and the shuffled one reads none. A filter never produces a false negative, so it never costs a row.
 
 ### What each mechanism adds
+
+The reader's `prune.plan` puts the three mechanisms together. It takes a condition, the columns
+to read, and which mechanisms it may use, and decides row group by row group, saying why:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/skipping_data/plan_a_read.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/plan_a_read.rs
+:language: rust
+```
+:::
+::::
+
+Statistics skip three row groups, as the first step did by hand. In row group 2, the page index
+keeps one page of five, and the reader reads that page's rows from every column. The last line
+counts the bytes of column chunks the plan reads, and the bytes of page index it fetched to
+decide.
+
+Set `page_index=False` (`page_index: false` in Rust): the reader keeps all of row group 2, and
+reads several times as many bytes. Then take `leaves[1]`, which is `customer_id`, with `"424242"`
+on `pruning-shuffled.parquet`. Statistics keep every row group, and the Bloom filters skip every
+one, so the plan reads nothing but the filters. `prune.Op` has the other comparisons. Try
+`amount_cents > 9800`, which is `leaves[3]` with `Op.GT` (`Op::Gt` in Rust), or `country is null`,
+which is `leaves[2]` with `Op.IS_NULL` (`Op::IsNull`), whose value the reader ignores.
 
 The same two conditions, with the mechanisms allowed one at a time:
 
@@ -138,9 +227,15 @@ many requests they add, which [ch10](#how-readers-read) measures.
 
 ## Building it
 
+The steps read the statistics by hand, then asked the reader's `page_index` and `bloom` modules,
+then called `prune.plan`. This section builds the parts of the plan: the test of a condition
+against a range, the probe of a filter, and the step from kept rows to the pages of every column.
+The tabs switch every excerpt on the page between the two languages.
+
 ### A condition against a range
 
-Each comparison, and the fact that rules it out:
+`against_bounds` answers the null conditions first, from the null count alone, and skips a chunk
+whose values are all null for any comparison:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -148,7 +243,7 @@ Each comparison, and the fact that rules it out:
 ```{literalinclude} ../python/parquet_lab/prune.py
 :language: python
 :start-at: def against_bounds(
-:end-before: @dataclass(frozen=True)
+:end-before: if p.value is None or found is None:
 ```
 :::
 :::{tab-item} Rust
@@ -156,10 +251,36 @@ Each comparison, and the fact that rules it out:
 ```{literalinclude} ../crates/parquet-lab/src/prune.rs
 :language: rust
 :start-at: pub fn against_bounds(
+:end-before: let (Some(x), Some((min, max))) = (&p.value, bounds) else {
+```
+:::
+::::
+
+For a comparison, `against_bounds` needs a usable minimum and maximum, which
+[ch08](#metadata-and-statistics)'s `bounds` decided. It places the value against each, and rules
+the comparison out by the fact in the table above:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/prune.py
+:language: python
+:start-at: if p.value is None or found is None:
+:end-before: @dataclass(frozen=True)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/prune.rs
+:language: rust
+:start-at: let (Some(x), Some((min, max))) = (&p.value, bounds) else {
 :end-before: /// Which mechanisms a plan may use.
 ```
 :::
 ::::
+
+The plan calls the same function in two places: with a column chunk's statistics, and with each
+page's entry in the ColumnIndex.
 
 ### Probing a Bloom filter
 
@@ -189,12 +310,38 @@ strings.
 
 ### From kept rows to the pages of every column
 
+A page's rows run from its first row to the next page's first row, or to the end of the row
+group:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/page_index.py
+:language: python
+:start-at: def row_ranges(self, num_rows: int)
+:end-before: def _read_at(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/page_index.rs
+:language: rust
+:start-at: impl OffsetIndex {
+:end-before: fn read_at(
+```
+:::
+::::
+
+`column_read` then takes the rows the condition's column kept and one column chunk. With the
+chunk's OffsetIndex, `oi`, it reads the dictionary page, if the chunk has one, and every data page
+whose rows overlap the kept rows. Without an OffsetIndex, it reads the whole chunk, `whole`:
+
 ::::{tab-set}
 :::{tab-item} Python
 :sync: python
 ```{literalinclude} ../python/parquet_lab/prune.py
 :language: python
-:start-at: def column_read(
+:start-at: spans = []
 :end-before: def plan(
 ```
 :::
@@ -202,7 +349,7 @@ strings.
 :sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/prune.rs
 :language: rust
-:start-at: /// The bytes of `chunk` needed for `rows`
+:start-at: let mut spans = Vec::new();
 :end-before: /// Plan a read of `projection`
 ```
 :::
@@ -231,11 +378,54 @@ cargo test -p parquet-lab --test fixtures
 :::
 ::::
 
+### Ask a library
+
+pyarrow and the `parquet` crate can both skip row groups. Ask each the questions the steps asked:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/skipping_data/skipping_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/skipping_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+pyarrow's dataset reader splits the file into row groups and keeps those whose statistics leave
+room for the condition. For `order_id = 431` on the sorted file it keeps row group 2, as the
+first step did. For `customer_id = 424242` on the shuffled file it keeps all four, where the
+reader's Bloom filters ruled out every one. pyarrow skips by statistics only. It uses neither the
+Bloom filters nor the page index to skip, and its Python API cannot read either. It says whether a
+column chunk has a ColumnIndex and an OffsetIndex, and versions newer than the one the page loads
+also say where a chunk's Bloom filter is, but no more. Within a kept row group, it reads every
+page of the columns it needs.
+
+The crate does nothing unless you ask. Its row group predicate is a function you write, here one
+that reads `order_id`'s minimum and maximum, and it keeps row group 2 as well. Asked for the page
+index, it returns the kept row group's ColumnIndex: the order and the pages' bounds the second
+step printed. Asked for the Bloom filters, its `check` says, for every row group, that `424242` is
+not there. The crate's Arrow reader skips pages by the page index, with row selections and row
+filters. It needs the crate's `arrow` feature, which this workspace does not build.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin skipping_with_a_library
+```
+
 ## What this cannot tell you
 
-**How conditions combine.** The panel takes one condition. Each condition yields row ranges, and
-`AND` intersects them while `OR` joins them; a row group is skipped only when the combined ranges
-are empty.
+**How conditions combine.** The reader's plan takes one condition. Each condition yields row
+ranges, and `AND` intersects them while `OR` joins them; a row group is skipped only when the
+combined ranges are empty.
 
 **How to skip within repeated columns.** In a column that repeats, a page's values are not its
 rows, and a reader needs the level histograms to map one to the other. This reader does not use

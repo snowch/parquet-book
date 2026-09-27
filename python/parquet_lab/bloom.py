@@ -122,10 +122,11 @@ class BloomFilter:
         return self.probe_hash(xxh64(value, 0))
 
     def probe_hash(self, hash: int) -> Probe:
-        # The high 32 bits choose the block, scaled to the number of blocks without a division.
+        # The high 32 bits choose the block, scaled to the number of blocks without a
+        # division.
         block = ((hash >> 32) * self.num_blocks()) >> 32
-        # The low 32 bits, multiplied by each salt, choose one bit in each word: the top five bits
-        # of the product are a bit position from 0 to 31.
+        # The low 32 bits, multiplied by each salt, choose one bit in each word: the top
+        # five bits of the product are a bit position from 0 to 31.
         key = hash & 0xFFFF_FFFF
         bits = []
         for w, salt in enumerate(SALT):

@@ -306,28 +306,32 @@ if (shots) {
     `ch08's bounds are decided in the page: ${chunks.filter((c) => c.usable).length} of ${chunks.length} chunks usable, as the reader decides`);
 }
 
-// ch09: skipping. Every plan is the reader's.
-await page.goto(base + "skipping-data.html");
-const skipLab = page.locator('.lab[data-experiment="skipping"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]')?.dataset.state === "ok");
-const plan431 = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431"]);
-check(await skipLab.getAttribute("data-bytes-read") === String(plan431.totals.bytes_read),
-  `order_id = 431 reads the reader's ${plan431.totals.bytes_read} bytes`);
-check(await skipLab.getAttribute("data-skipped") === plan431.row_groups.map((g) => (g.skipped ? "skip" : "read")).join(","),
-  "and skips the row groups the reader skips");
-await skipLab.locator('input[name="m"][value="4"]').uncheck();
-const noIndex = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431", "--use", "statistics,bloom"]);
-await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="skipping"]').dataset.bytesRead === String(n), noIndex.totals.bytes_read);
-check(true, `without the page index it reads ${noIndex.totals.bytes_read} bytes`);
-await skipLab.locator('input[name="m"][value="4"]').check();
-await skipLab.locator(".lab-head select").selectOption("pruning-shuffled.parquet");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]').dataset.state === "ok");
-await skipLab.locator('select[name="column"]').selectOption("1");
-await skipLab.locator('input[name="value"]').fill("424242");
-await skipLab.locator('button[type="submit"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="skipping"]').dataset.skipped === "skip,skip,skip,skip");
-check(true, "an absent customer number is ruled out in every row group by its Bloom filter");
-if (shots) await skipLab.screenshot({ path: path.join(shots, "skipping-lab.png") });
+// ch09: skipping. The book's Python reader plans `order_id = 431` in the page, and every row
+// group's verdict, its kept rows and the bytes it reads are the native reader's. The library step
+// runs pyarrow's dataset module in the page, and keeps the row groups the statistics keep.
+{
+  await page.goto(base + "skipping-data.html");
+  check(await page.locator(".lab").count() === 0, "ch09 has no panels: its steps print the plans");
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const plan = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431"]);
+  const lines = await runStep("plan_a_read", "to decide");
+  const verdict = (g) => g.skipped
+    ? `row group ${g.index}: skip`
+    : `row group ${g.index}: read rows [${g.rows.map(([a, b]) => `(${a}, ${b})`).join(", ")}]`;
+  check(plan.row_groups.every((g) => lines.includes(verdict(g))) &&
+    lines.includes(`${plan.totals.bytes_read} bytes of column chunks, ${plan.totals.index_bytes} to decide`),
+    `ch09's plan is made in the page: ${plan.row_groups.filter((g) => g.skipped).length} row groups skipped and ${plan.totals.bytes_read} bytes read, as the reader plans`);
+  const byStatistics = native(["skipping", "fixtures/pruning-sorted.parquet", "0", "=", "431", "--use", "statistics"]);
+  const kept = byStatistics.row_groups.filter((g) => !g.skipped).map((g) => g.index);
+  const library = await runStep("skipping_with_a_library", "an offset index");
+  check(library.includes(`order_id = 431: kept row groups [${kept.join(", ")}]`),
+    `pyarrow's dataset module runs in the page and keeps row groups [${kept}], as the reader's statistics do`);
+}
 
 // ch10: the read path. Requests and times are the reader's and the simulated store's.
 await page.goto(base + "how-readers-read.html");

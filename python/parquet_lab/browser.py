@@ -16,7 +16,6 @@ FILES: list[tuple[str, bytearray]] = []
 EXPERIMENTS = (
     "anatomy",
     "compression",
-    "skipping",
     "scan",
     "writing",
     "engine",
@@ -82,15 +81,6 @@ def compression(id: int, column: int, page: int) -> str:
         return _no_such_file(id)
     chosen = None if page >= 0xFFFF_FFFF else int(page)
     return report.dumps(report.compression(data, int(column), chosen))
-
-
-def skipping(id: int, column: int, op: int, value: str, mechanisms: int) -> str:
-    """``op`` is an index into ``report.OPS``, as in the Rust export."""
-    data = _file(id)
-    if data is None:
-        return _no_such_file(id)
-    name = report.OPS[op] if 0 <= op < len(report.OPS) else "?"
-    return report.dumps(report.skipping(data, int(column), name, value, int(mechanisms)))
 
 
 def scan(

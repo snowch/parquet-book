@@ -116,31 +116,6 @@ def cases():
                         [where["value"]] if where["value"] else []
                     )
                 native.append(tuple(args))
-        if "pruning" in f or f.endswith("statistics.parquet"):
-            for column, op, value, mechanisms in (
-                (0, "=", "431", 7),
-                (0, ">", "700", 1),
-                (1, "=", "424242", 3),
-                (1, "=", "7", 7),
-                (2, "is null", "", 7),
-                (2, "=", "SE", 5),
-                (3, "<=", "150", 4),
-                (0, "!=", "5", 0),
-            ):
-                calls.append(
-                    {
-                        "call": "skipping",
-                        "file": f,
-                        "column": column,
-                        "op": op,
-                        "value": value,
-                        "mechanisms": mechanisms,
-                    }
-                )
-                flags = ",".join(
-                    n for bit, n in ((1, "statistics"), (2, "bloom"), (4, "page-index")) if mechanisms & bit
-                )
-                native.append(("skipping", f, str(column), op, value, "--use", flags))
         for page in range(4):
             calls.append({"call": "compression", "file": f, "column": 1, "page": page})
             native.append(("compression", f, "1", str(page)))

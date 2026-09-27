@@ -158,8 +158,9 @@ SKIPPING = [
 ]
 
 
-def test_the_skipping_lab_matches(tmp_path):
-    """ch09: conditions of every kind, with each mechanism, on every fixture."""
+def test_the_skipping_report_matches(tmp_path):
+    """ch09: conditions of every kind, with each mechanism, on every fixture. The skipping report
+    has no panel, and stays for the command line, problem 9.3 and the figures."""
     for path in files(tmp_path):
         data = path.read_bytes()
         for column, op, value, mechanisms in SKIPPING:

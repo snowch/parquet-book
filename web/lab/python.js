@@ -124,11 +124,6 @@ importlib.invalidate_caches()
     return this.#run(() => this.api.compression(id, column, page === null ? 0xffffffff : page));
   }
 
-  /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
-  skipping(id, column, op, value, mechanisms = 7) {
-    return this.#run(() => this.api.skipping(id, column, OPS.indexOf(op), value ?? "", mechanisms));
-  }
-
   /** The same arguments as the WebAssembly Lab's `scan`. */
   scan(id, columns, where, s) {
     const mask = (columns || []).reduce((m, c) => m | (1 << c), 0);

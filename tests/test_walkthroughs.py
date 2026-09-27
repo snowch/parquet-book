@@ -92,6 +92,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(encodings_facts())
     known.update(pages_facts())
     known.update(statistics_facts())
+    known.update(skipping_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -437,6 +438,151 @@ def statistics_facts() -> dict:
                     for c, s in first
                 ),
                 f"customer_id: Some({stats[customer][0].min_raw}) to Some({stats[customer][0].max_raw})",
+            ],
+        },
+    }
+
+
+def xxh64_of_eight(data: bytes) -> int:
+    """xxHash64 with seed 0 of exactly eight bytes, as its specification computes it: one lane,
+    then the final mixing. Written here so that the Bloom filter steps are checked against a hash
+    the book's reader did not compute."""
+    mask, p1, p2, p3, p4, p5 = (
+        2**64 - 1, 0x9E3779B185EBCA87, 0xC2B2AE3D27D4EB4F, 0x165667B19E3779F9,
+        0x85EBCA77C2B2AE63, 0x27D4EB2F165667C5,
+    )  # fmt: skip
+
+    def rotl(x: int, r: int) -> int:
+        return ((x << r) | (x >> (64 - r))) & mask
+
+    assert len(data) == 8
+    h = (p5 + 8) & mask
+    h ^= rotl(int.from_bytes(data, "little") * p2 & mask, 31) * p1 & mask
+    h = (rotl(h, 27) * p1 + p4) & mask
+    for shift, prime in ((33, p2), (29, p3)):
+        h = (h ^ (h >> shift)) * prime & mask
+    return h ^ (h >> 32)
+
+
+def skipping_facts() -> dict:
+    """What ch09's steps must print: each row group's range of order_id, from pyarrow's
+    statistics; the pages of row group 2, from the rows the manifest lists and the page size the
+    writer was given; and each Bloom filter's answer for customer 424242, probed here with the
+    format's hash and salts on the bytes pyarrow says the filter occupies."""
+    import pyarrow.parquet as pq
+
+    sorted_path = ROOT / "fixtures" / "pruning-sorted.parquet"
+    shuffled_path = ROOT / "fixtures" / "pruning-shuffled.parquet"
+    md = pq.read_metadata(sorted_path)
+    manifest = json.loads(sorted_path.with_suffix(".json").read_text())
+    options = manifest["generator"]["options"]
+    group, page = options["row_group_size"], options["max_rows_per_page"]
+    wanted = 431
+
+    bounds = []
+    for g in range(md.num_row_groups):
+        s = md.row_group(g).column(0).statistics
+        bounds.append((s.min, s.max, "read" if s.min <= wanted <= s.max else "skip"))
+    kept = [g for g, (_, _, verdict) in enumerate(bounds) if verdict == "read"]
+
+    # Row group 2's pages, from the rows the manifest lists in file order.
+    ids = [row["order_id"] for row in manifest["rows"]][2 * group : 3 * group]
+    pages = [ids[i : i + page] for i in range(0, len(ids), page)]
+    first = md.row_group(2).column(0)
+    end = first.data_page_offset + first.total_compressed_size
+    # ASCENDING, as the format defines it: the minimums in order, and the maximums in order.
+    ascending = all(min(a) <= min(b) and max(a) <= max(b) for a, b in zip(pages, pages[1:], strict=False))
+    walk = [
+        f"{len(pages)} pages, boundary order {'ASCENDING' if ascending else 'UNORDERED'}\n",
+        *(
+            f"page {i}: order_id {min(p)} to {max(p)}, "
+            f"{'read' if min(p) <= wanted <= max(p) else 'skip'}; rows from {i * page}, bytes "
+            for i, p in enumerate(pages)
+        ),
+        f"bytes {first.data_page_offset} to ",
+        f" to {end}\n",
+    ]
+    matching = next(i for i, x in enumerate(ids) if x == wanted) // page * page
+
+    # Customer 424242 against each row group's filter in the shuffled file.
+    data = shuffled_path.read_bytes()
+    shuffled = pq.read_metadata(shuffled_path)
+    customers = {
+        row["customer_id"] for row in json.loads(shuffled_path.with_suffix(".json").read_text())["rows"]
+    }
+    assert 424242 not in customers
+    value = (424242).to_bytes(8, "little", signed=True)
+    h = xxh64_of_eight(value)
+    salts = [0x47B6137B, 0x44974D91, 0x8824AD5B, 0xA2B7289D, 0x705495C7, 0x2DF1424B, 0x9EFC4947, 0x5C6BFB31]
+    probes = []
+    for g in range(shuffled.num_row_groups):
+        c = shuffled.row_group(g).column(1)
+        end = c.bloom_filter_offset + c.bloom_filter_length
+        blocks = c.bloom_filter_length // 32  # the Thrift header before the bitset is shorter
+        bitset = data[end - 32 * blocks : end]
+        block = ((h >> 32) * blocks) >> 32
+        bits = []
+        for w, salt in enumerate(salts):
+            at = ((h & 0xFFFFFFFF) * salt & 0xFFFFFFFF) >> 27
+            word = int.from_bytes(bitset[32 * block + 4 * w : 32 * block + 4 * w + 4], "little")
+            bits.append((at, bool(word >> at & 1)))
+        # Printed as Python writes a list of tuples, and as Rust's Debug writes an array of them.
+        probes.append((f"row group {g}: block {block} of {blocks}, bits {bits}\n", all(on for _, on in bits)))
+
+    plan = []
+    for g, (_, high, verdict) in enumerate(bounds):
+        if verdict == "skip":
+            above = wanted > high
+            plan.append(f"row group {g}: skip\n")
+            plan.append(
+                f"  statistics: skip, the value is {'above the maximum' if above else 'below the minimum'}\n"
+            )
+        else:
+            plan.append(f"row group {g}: read rows [({matching}, {matching + page})]\n")
+            plan.append("  statistics: read, the range may hold a match\n")
+            plan.append(f"  page index: read, 1 of {len(pages)} pages may hold a match\n")
+
+    c = shuffled.row_group(0).column(1)
+    in_range = [
+        g
+        for g in range(shuffled.num_row_groups)
+        if (s := shuffled.row_group(g).column(1).statistics).min <= 424242 <= s.max
+    ]
+    return {
+        ("skipping_data", "row_group_bounds"): [
+            f"row group {g}: order_id {low} to {high}, {verdict}\n"
+            for g, (low, high, verdict) in enumerate(bounds)
+        ],
+        ("skipping_data", "pages_of_one_group"): walk,
+        ("skipping_data", "probe_a_bloom_filter"): {
+            "python": [f": {h:016x}\n", *(x for line, may in probes for x in (line, f"it: {may}\n"))],
+            "rust": [
+                f": {h:016x}\n",
+                *(
+                    x
+                    for line, may in probes
+                    for x in (
+                        line.replace("True", "true").replace("False", "false"),
+                        f"it: {str(may).lower()}\n",
+                    )
+                ),
+            ],
+        },
+        ("skipping_data", "plan_a_read"): [*plan, " bytes of column chunks, "],
+        ("skipping_data", "skipping_with_a_library"): {
+            "python": [
+                f"order_id = {wanted}: kept row groups {kept}\n",
+                f"customer_id = 424242: kept row groups {in_range}\n",
+                f"a column index: {c.has_column_index}; an offset index: {c.has_offset_index}\n",
+            ],
+            "rust": [
+                *(f"order_id = {wanted}: kept row group Some({g})\n" for g in kept),
+                f"  pages in {'ASCENDING' if ascending else 'UNORDERED'} order: "
+                f"[{', '.join(str(min(p)) for p in pages)}] to [{', '.join(str(max(p)) for p in pages)}]\n",
+                *(
+                    f"customer_id = 424242: row group {g}, may contain it: Some({str(a).lower()})\n"
+                    for g, (_, a) in enumerate(probes)
+                ),
             ],
         },
     }

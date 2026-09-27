@@ -139,14 +139,6 @@ export class Lab {
       s.connections, s.gap === null || s.gap === undefined ? 0xffffffff : s.gap, flags, s.latencyUs, s.bandwidth));
   }
 
-  /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
-  skipping(id, column, op, value, mechanisms = 7) {
-    const OPS = ["=", "!=", "<", "<=", ">", ">=", "is null", "is not null"];
-    const text = encoder.encode(value ?? "");
-    const ptr = this.#copyIn(text);
-    return this.#result(this.exports.pl_skipping(id, column, OPS.indexOf(op), ptr, text.length, mechanisms));
-  }
-
   /** `page` omitted or null: the first data page. */
   compression(id, column, page = null) {
     return this.#result(this.exports.pl_compression(id, column, page === null ? 0xffffffff : page));

@@ -39,7 +39,6 @@ const out = calls.map((c) => {
     case "encryption": return lab.encryption(id(c.file));
     case "query": return lab.query(id(c.file), c.sql);
     case "scan": return lab.scan(id(c.file), c.columns, c.where, c.strategy);
-    case "skipping": return lab.skipping(id(c.file), c.column, c.op, c.value, c.mechanisms);
     case "compression": return lab.compression(id(c.file), c.column, c.page ?? null);
     case "interpret": return lab.interpret(id(c.file), c.offset);
     case "cli": loadEveryFixture(); return lab.cli(c.args);

@@ -137,10 +137,11 @@ impl BloomFilter {
     }
 
     pub fn probe_hash(&self, hash: u64) -> Probe {
-        // The high 32 bits choose the block, scaled to the number of blocks without a division.
+        // The high 32 bits choose the block, scaled to the number of blocks without a
+        // division.
         let block = (((hash >> 32) * self.num_blocks() as u64) >> 32) as usize;
-        // The low 32 bits, multiplied by each salt, choose one bit in each word: the top five
-        // bits of the product are a bit position from 0 to 31.
+        // The low 32 bits, multiplied by each salt, choose one bit in each word: the top
+        // five bits of the product are a bit position from 0 to 31.
         let key = hash as u32;
         let mut bits = [(0u32, false); 8];
         for (w, bit) in bits.iter_mut().enumerate() {

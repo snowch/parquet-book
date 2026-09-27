@@ -210,7 +210,7 @@ _CHAPTERS = (
         "reading_less",
         "Given a predicate, which bytes can a reader prove it does not need?",
         "Conditions judged against statistics, Bloom filters and the page index, with the bytes each saves.",
-        ("skipping",),
+        (),
         ("pruning-sorted.parquet", "pruning-shuffled.parquet"),
     ),
     (
@@ -305,7 +305,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 EXPERIMENTS = (
     "anatomy",
     "compression",
-    "skipping",
     "scan",
     "writing",
     "engine",

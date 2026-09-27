@@ -57,10 +57,8 @@ class OffsetIndex:
 
     def row_ranges(self, num_rows: int) -> list[tuple[int, int]]:
         """The rows each page holds, as ``[first, end)``, given the row group's row count."""
-        return [
-            (p.first_row_index, self.pages[i + 1].first_row_index if i + 1 < len(self.pages) else num_rows)
-            for i, p in enumerate(self.pages)
-        ]
+        ends = [p.first_row_index for p in self.pages[1:]] + [num_rows]
+        return [(p.first_row_index, end) for p, end in zip(self.pages, ends, strict=True)]
 
 
 def _read_at(file: bytes, span: Span, what: str) -> Node:

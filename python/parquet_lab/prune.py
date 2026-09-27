@@ -176,8 +176,10 @@ def against_bounds(
     }[p.op]
     if not ruled_out:
         return read("the range may hold a match")
+    if p.op is Op.EQ and vs_min == -1:
+        return skip("the value is below the minimum")
     if p.op is Op.EQ:
-        return skip("the value is below the minimum" if vs_min == -1 else "the value is above the maximum")
+        return skip("the value is above the maximum")
     if p.op is Op.NOT_EQ:
         return skip("every value equals it")
     if p.op in (Op.LT, Op.LT_EQ):
