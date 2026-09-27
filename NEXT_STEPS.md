@@ -324,6 +324,14 @@ statistics, since it does not read Delta logs; the crate walks the directories a
 footer. The table panel is gone; `pqlab table` and `pqlab query` stay. The discovery table is one
 small table per query.
 
+## Done: ch15's costs in code
+
+ch15 adds `look_up_an_order` (the reader's `changes.lookup`, every request grouped by round trip,
+with the snapshot, order and prefetch in the call) and `plan_a_compaction` (`plan_compaction`'s
+groups for `after-a-day`). The panel is a lookup (snapshot and order) and its request timeline;
+scan, compaction, connections and the tail-read setting are gone from it and from `pl_changes`.
+The lookup and scan tables are four columns; the compaction figure keeps only its cost table.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than

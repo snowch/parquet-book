@@ -188,28 +188,20 @@ pub extern "C" fn pl_interpret(id: u32, offset: f64) -> usize {
     }
 }
 
-/// Ch15's experiment: an operation on a snapshot of a changing table. `ids` is a `pl_alloc`
-/// buffer of `count` little-endian `u32` file ids, each file loaded under its object key;
-/// `snapshot` is another, the snapshot's id. This call takes and frees both. `op`: 0 scan,
-/// 1 look up `key`, 2 plan a compaction with `target_rows` and `small_rows`.
+/// Ch15's experiment: a lookup of one `order_id` in a snapshot of a changing table. `ids` is a
+/// `pl_alloc` buffer of `count` little-endian `u32` file ids, each file loaded under its object
+/// key; `snapshot` is another, the snapshot's id. This call takes and frees both. The lookup
+/// reads each file's trailer first, over four connections, as `pqlab changes --lookup` does.
 ///
 /// # Safety
 /// Both buffers must come from `pl_alloc` with exactly these lengths.
 #[no_mangle]
-#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn pl_changes(
     ids_ptr: *mut u8,
     count: usize,
     snapshot_ptr: *mut u8,
     snapshot_len: usize,
-    op: u32,
     key: u32,
-    target_rows: u32,
-    small_rows: u32,
-    prefetch: u32,
-    connections: u32,
-    latency_us: u32,
-    bandwidth: u32,
 ) -> usize {
     use parquet_lab::changes::Operation;
     let ids = Box::from_raw(std::ptr::slice_from_raw_parts_mut(ids_ptr, count * 4));
@@ -225,25 +217,14 @@ pub unsafe extern "C" fn pl_changes(
             with_file(id, |f| (f.name.clone(), f.bytes.clone()))
         })
         .collect();
-    let op = match op {
-        1 => Operation::Lookup(i64::from(key)),
-        2 => Operation::Compact {
-            target_rows: i64::from(target_rows),
-            small_rows: i64::from(small_rows),
-        },
-        _ => Operation::Scan,
-    };
-    let model = NetworkModel {
-        latency_us: u64::from(latency_us),
-        bandwidth_bytes_per_sec: u64::from(bandwidth),
-    };
+    let op = Operation::Lookup(i64::from(key));
     emit(report::changes(
         objects,
         &snapshot,
         op,
-        u64::from(prefetch),
-        connections.max(1) as usize,
-        model,
+        0,
+        4,
+        NetworkModel::default(),
     ))
 }
 

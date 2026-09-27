@@ -1080,6 +1080,17 @@ def changes_facts() -> dict:
     gone = [p for d in names for p in pq.read_table(table / d["path"])["pos"].to_pylist()]
     amounts = pq.read_table(table / part["path"])["amount_cents"].to_pylist()
     live = [a for i, a in enumerate(amounts) if i not in gone]
+    size = (table / part["path"]).stat().st_size
+    footer = pq.ParquetFile(table / part["path"]).metadata.serialized_size
+    at = pq.read_table(table / part["path"])["order_id"].to_pylist().index(300)
+    # The compaction pyarrow wrote replaced some of after-a-day's data files with new ones; the
+    # plan must rewrite those, and every delete file with them.
+    compacted = next(s for s in snapshots if s["id"] == "compacted")
+    kept = {f["path"] for f in compacted["data_files"]}
+    dropped = [f["path"] for f in day["data_files"] if f["path"] not in kept]
+    written = [f for f in compacted["data_files"] if f["path"] not in {f["path"] for f in day["data_files"]}]
+    rewritten = dropped + [d["path"] for d in day["delete_files"]]
+    read = sum((table / p).stat().st_size for p in rewritten)
     return {
         ("changing_a_table", "table_files"): [
             f"{len(day['data_files'])} data files and {len(day['delete_files'])} delete files",
@@ -1096,6 +1107,20 @@ def changes_facts() -> dict:
         ("changing_a_table", "read_a_delete_file"): [
             f"row {first['pos']} of {first['file_path']} is deleted: order {ids[first['pos']]}",
             f"order {deleted[0]}",
+        ],
+        ("changing_a_table", "look_up_an_order"): [
+            "round trip 1:\n",
+            "GET _snapshots.json · read the table's snapshots\n",
+            *(f"GET {d['path']} · read a delete file" for d in names),
+            f"GET {part['path']} bytes={size - 8}-{size - 1} read the trailer\n",
+            f"GET {part['path']} bytes={size - 8 - footer}-{size - 9} read the footer",
+            f"order 300 is row {at} of {part['path']}\n",
+            f"  amount_cents: {amounts[at]}\n",
+        ],
+        ("changing_a_table", "plan_a_compaction"): [
+            *(f" rows in, {f['record_count']} out, " for f in written),
+            *(f"  {path}\n" for path in rewritten),
+            f"{len(written)} files to write, from {read} bytes read",
         ],
         ("changing_a_table", "deletes_with_a_library"): [
             f"{part['path']} holds {len(amounts)} rows; {len(gone)} are deleted; {len(live)} are live",

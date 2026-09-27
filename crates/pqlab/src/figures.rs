@@ -2235,10 +2235,10 @@ fn changes_snapshot_list(root: &Path) -> Result<String, String> {
 fn changes_scans(root: &Path) -> Result<String, String> {
     use parquet_lab::changes::scan_table;
     let mut rows = vec![
-        "| Snapshot | Data files | Delete files | Requests | Bytes fetched | Time | Rows decoded | Rows in the table |"
-            .to_string(),
-        "|---|--:|--:|--:|--:|--:|--:|--:|".to_string(),
+        "| Snapshot | Requests | Bytes fetched | Time |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
+    let mut decoded = String::new();
     for id in [
         "written",
         "merge-on-read-1",
@@ -2256,20 +2256,23 @@ fn changes_scans(root: &Path) -> Result<String, String> {
             NetworkModel::default(),
         )?;
         rows.push(format!(
-            "| `{id}` | {} | {} | {} | {} | {} | {} | {} |",
-            r.snapshot.data_files.len(),
-            r.snapshot.delete_files.len(),
+            "| `{id}` | {} | {} | {} |",
             r.requests.len(),
             thousands(r.bytes_fetched),
             ms_of(r.elapsed_us),
-            r.rows_decoded,
-            r.live_rows
         ));
+        if id == "merge-on-read-8" {
+            decoded = format!(
+                "`{id}` decodes {} rows to return {}",
+                r.rows_decoded, r.live_rows
+            );
+        }
     }
     Ok(format!(
-        "{HEADER}{}\n\n{}",
+        "{HEADER}{}\n\n{} A scan decodes every row of its data files, deleted ones included: \
+         {decoded}.*\n",
         rows.join("\n"),
-        changes_note(4)
+        changes_note(4).trim_end().trim_end_matches('*')
     ))
 }
 
@@ -2277,9 +2280,8 @@ fn changes_lookup(root: &Path) -> Result<String, String> {
     use parquet_lab::changes::lookup;
     let model = NetworkModel::default();
     let mut rows = vec![
-        "| Snapshot | `order_id` | Tail read first | Requests | Round trips | Bytes fetched | Time | Found |"
-            .to_string(),
-        "|---|--:|--:|--:|--:|--:|--:|---|".to_string(),
+        "| Lookup | Round trips (requests) | Bytes fetched | Time |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     let mut kv = (0, 0);
     for (id, key, prefetch) in [
@@ -2303,32 +2305,32 @@ fn changes_lookup(root: &Path) -> Result<String, String> {
             let share = f.file_size.div_ceil(f.record_count as u64);
             kv = (share, model.cost_us(share));
         }
-        let found = match (&r.found, &r.deleted_by) {
-            (Some(_), Some(by)) => format!("deleted by `{by}`"),
-            (Some((path, pos)), None) => format!("`{path}`, row {pos}"),
-            (None, _) => "no".to_string(),
-        };
+        let mut label = format!("order {key} in `{id}`");
+        if prefetch > 0 {
+            label += &format!(", {} KiB of the tail first", prefetch / 1024);
+        }
+        match (&r.found, &r.deleted_by) {
+            (Some(_), Some(by)) => label += &format!(", then deleted by `{by}`"),
+            (Some(_), None) => {}
+            (None, _) => return Err(format!("{label}: the lookup found nothing")),
+        }
         rows.push(format!(
-            "| `{id}` | {key} | {} | {} | {} | {} | {} | {found} |",
-            if prefetch == 0 {
-                "the trailer".to_string()
-            } else {
-                format!("{} KiB", prefetch / 1024)
-            },
-            r.requests.len(),
+            "| {label} | {} ({}) | {} | {} |",
             round_trips(&r.requests),
+            r.requests.len(),
             thousands(r.bytes_fetched),
             ms_of(r.elapsed_us),
         ));
     }
     rows.push(format!(
-        "| a key-value store | 300 | · | 1 | 1 | {} | {} | the row |",
+        "| order 300 in a key-value store | 1 (1) | {} | {} |",
         thousands(kv.0),
         ms_of(kv.1)
     ));
     Ok(format!(
-        "{HEADER}{}\n\n{} The key-value store's row is the share of `data/part-1.parquet` one row \
-         takes up: its size divided by its rows.*\n",
+        "{HEADER}{}\n\n{} Unless the row says otherwise, a lookup reads a data file's trailer \
+         first. The key-value store's row is the share of `data/part-1.parquet` one row takes \
+         up: its size divided by its rows.*\n",
         rows.join("\n"),
         changes_note(4).trim_end().trim_end_matches('*')
     ))
@@ -2438,46 +2440,26 @@ fn changes_compaction(root: &Path) -> Result<String, String> {
     let (target, small) = (200, 100);
     let plan = plan_compaction(before, target, small);
     let cost = compaction_cost(before, after, &plan, model)?;
-    let name = |files: &[String]| match files {
-        [] => "none".to_string(),
-        [one] => format!("`{one}`"),
-        [first, .., last] => format!("{} files, `{first}` to `{last}`", files.len()),
-    };
-    let mut rows = vec![
-        "| Group | Data files | Delete files | Rows in | Rows out | Bytes read |".to_string(),
-        "|--:|---|---|--:|--:|--:|".to_string(),
-    ];
-    for (i, g) in plan.iter().enumerate() {
-        rows.push(format!(
-            "| {} | {} | {} | {} | {} | {} |",
-            i + 1,
-            name(&g.data_files),
-            name(&g.delete_files),
-            g.rows_in,
-            g.rows_out,
-            thousands(g.bytes_in)
-        ));
-    }
     let scan = |id: &str| scan_table(changes_store(root)?, "changes/", id, 4, model);
     let (slow, fast) = (scan("after-a-day")?, scan("compacted")?);
     let saving = slow.elapsed_us.saturating_sub(fast.elapsed_us).max(1);
     Ok(format!(
-        "{HEADER}{}\n\n| Compacting `after-a-day` | |\n|---|--:|\n\
+        "{HEADER}| Compacting `after-a-day` | |\n|---|--:|\n\
          | Bytes read | {} |\n| Bytes written, in {} files | {} |\n\
          | Time, one file at a time | {} |\n| Time saved by each later scan | {} |\n\
          | Scans until it has paid for itself | {} |\n\n\
-         *Planned by the reader's `plan_compaction`, with a target of {target} rows a file and \
-         files under {small} live rows counted as small. The files written are the ones pyarrow \
-         wrote for the `compacted` snapshot, which the reader checks against the plan. Simulated \
-         network: {} before each request's first byte and {} after it; a write is priced as a \
-         read of the same size.*\n",
-        rows.join("\n"),
+         *Planned by the reader's `plan_compaction` in {} groups, with a target of {target} \
+         rows a file and files under {small} live rows counted as small. The files written are \
+         the ones pyarrow wrote for the `compacted` snapshot, which the reader checks against \
+         the plan. Simulated network: {} before each request's first byte and {} after it; a \
+         write is priced as a read of the same size.*\n",
         thousands(cost.bytes_read),
         cost.outputs.len(),
         thousands(cost.bytes_written),
         ms_of(cost.elapsed_us),
         ms_of(saving),
         cost.elapsed_us.div_ceil(saving),
+        plan.len(),
         ms(model.latency_us),
         rate(model.bandwidth_bytes_per_sec)
     ))

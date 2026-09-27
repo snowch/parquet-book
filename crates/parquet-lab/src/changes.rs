@@ -165,7 +165,7 @@ fn find(snapshots: Vec<Snapshot>, id: &str) -> Result<Snapshot, String> {
         .ok_or(format!("no snapshot {id}"))
 }
 
-/// What a reader is asked to do with a table (ch15's laboratory).
+/// What a reader is asked to do with a table (ch15, and `pqlab changes`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Operation {
     /// Read every live row.

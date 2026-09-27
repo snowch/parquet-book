@@ -125,21 +125,9 @@ def cases():
     listing = json.loads((ROOT / "fixtures" / "changes.json").read_text())
     keys = [o["key"] for o in listing["objects"]]
     for snapshot in listing["snapshots"]:
-        calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "op": "scan", "options": {}})
-        native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot))
         for key in (250, 300, 805):
-            calls.append(
-                {
-                    "call": "changes",
-                    "keys": keys,
-                    "snapshot": snapshot,
-                    "op": "lookup",
-                    "options": {"key": key},
-                }
-            )
+            calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "key": key})
             native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--lookup", str(key)))
-        calls.append({"call": "changes", "keys": keys, "snapshot": snapshot, "op": "compact", "options": {}})
-        native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--compact"))
     return calls, native
 
 

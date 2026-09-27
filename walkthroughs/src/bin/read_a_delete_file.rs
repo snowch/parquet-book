@@ -1,4 +1,4 @@
-//! A position delete file is a Parquet file of (file_path, pos): read one with the book's reader.
+//! A position delete file is a Parquet file of (file_path, pos): read it with the reader.
 
 use parquet_lab::engine::{run, Value};
 

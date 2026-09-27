@@ -1,10 +1,9 @@
-//! The same deletes applied with the `parquet` crate, which reads Parquet files but not tables:
-//! you apply them.
+//! The `parquet` crate reads Parquet files, not tables: the deletes are yours to apply.
 
 use parquet::file::reader::{FileReader, SerializedFileReader};
 use parquet::record::{Row, RowAccessor};
 
-fn rows(path: &std::path::Path) -> Vec<Row> {
+fn rows(path: impl AsRef<std::path::Path>) -> Vec<Row> {
     let file = std::fs::File::open(path).expect("run this from the repository's root");
     let reader = SerializedFileReader::new(file).expect("a Parquet file");
     let rows = reader.get_row_iter(None).expect("rows");
@@ -13,29 +12,22 @@ fn rows(path: &std::path::Path) -> Vec<Row> {
 
 fn main() {
     let path = "data/part-1.parquet";
-    let data = rows(format!("fixtures/changes/{path}").as_ref());
+    let data = rows(format!("fixtures/changes/{path}"));
     let mut gone = Vec::new();
-    let mut deletes: Vec<_> = std::fs::read_dir("fixtures/changes/deletes")
-        .unwrap()
-        .map(|e| e.unwrap().path())
-        .collect();
-    deletes.sort();
-    for d in deletes {
-        for named in rows(&d) {
+    for d in std::fs::read_dir("fixtures/changes/deletes").unwrap() {
+        for named in rows(d.unwrap().path()) {
             if named.get_string(0).unwrap() == path {
-                gone.push(named.get_long(1).unwrap());
+                gone.push(named.get_long(1).unwrap() as usize);
             }
         }
     }
 
-    let live: Vec<&Row> = (0..data.len())
-        .filter(|i| !gone.contains(&(*i as i64)))
-        .map(|i| &data[i])
+    let live: Vec<&Row> = (data.iter().enumerate())
+        .filter_map(|(i, r)| (!gone.contains(&i)).then_some(r))
         .collect();
+    let (n, deleted) = (data.len(), gone.len());
     println!(
-        "{path} holds {} rows; {} are deleted; {} are live",
-        data.len(),
-        gone.len(),
+        "{path} holds {n} rows; {deleted} are deleted; {} are live",
         live.len()
     );
     let sum: i64 = live.iter().map(|r| r.get_long(5).unwrap()).sum();

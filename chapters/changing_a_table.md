@@ -36,8 +36,10 @@ snapshots deleted orders by writing small *position delete files* instead, each 
 one data file. `after-a-day` adds new orders the way a stream of small batches does, one file per
 batch, and `compacted` is what a compaction job made of it.
 
-Before any reader opens the table, read its metadata yourself. The steps below run in the page in
-Python, and in a Codespace or at a desk in Rust. First, what the latest snapshot holds:
+Before the reader looks anything up, read the table's metadata yourself: in Python with the
+`json` module, in Rust with the reader's `changes::read_snapshots`, which parses the same file.
+The steps below run in the page in Python, and in a Codespace or at a desk in Rust. First, what
+the latest snapshot holds:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -54,7 +56,7 @@ Python, and in a Codespace or at a desk in Rust. First, what the latest snapshot
 :::
 ::::
 
-Compare the bytes a row costs in the four original files with the bytes a row costs in the
+Compare the bytes a row costs in the original files with the bytes a row costs in the
 appended ones. Each small file carries its own footer, page headers and magic numbers for a
 handful of rows, so a row in a small file costs several times what it costs in a large one.
 
@@ -101,44 +103,61 @@ The delete file names a position, not an order: the row's place in its data file
 zero. The data file still holds the order; the delete file says it is gone. Change the path to
 another delete file and run it again.
 
-### Find one order, then change the table
+### Find one order
 
-The panel runs the reader on any snapshot: a scan of every row, a lookup of one order, or a plan
-for compacting the table. Every request goes through the simulated object store.
+Now let the book's reader look up order `300` in `after-a-day`, as a query engine would, through
+the simulated object store. The step prints every request, grouped by round trip: the requests
+in one round trip go out together, and each round trip waits for the one before it.
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/changing_a_table/look_up_an_order.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/look_up_an_order.rs
+:language: rust
+```
+:::
+::::
+
+Read the round trips from the top. The snapshots come first, since nothing else can be chosen
+without them. Then the delete files that name the one data file the order can be in, alongside
+that file's trailer. Then its footer, which the trailer located; then the page indexes the
+footer located; then the pages the index chose in every column, to put the whole row back
+together. Each round trip needed a number the last one returned, so none could be sent sooner.
+
+Change the order to `250`. The reader finds it in its data file, decodes it, and only then finds
+that a delete file removes it: it read the data to learn that the answer is nothing. Then change
+the snapshot to `written`, which has no delete files, and set `prefetch` to `65536`. The first
+read of the data file now asks for that much of its tail, which is the whole file: the chain
+shrinks to two round trips, and the bytes grow to the whole file, for one row.
+
+The panel draws the same lookup's requests over time, one lane per connection. Change the
+snapshot and the order. Whenever a file can hold the order, the chain has the same steps, and
+delete files widen only the second. Order `805` is past the end of `written`, so the snapshots
+alone answer; in `after-a-day` it is in a small append, and the whole chain is paid for a file of
+a few rows.
 
 ```lab
 experiment: changes
 fixture: changes.json
 ```
 
-Try these:
-
-1. **Keep the defaults**, a lookup of order `300` in `after-a-day`. Read the timeline from the
-   left: the snapshots, then the data file's trailer with the delete files alongside it, then its
-   footer, then its page index, then the pages. Each round trip waits for the one before, because
-   it needs a number the last one returned. Compare the time with the key-value line above it.
-2. **Set Tail read first to its largest.** The file is small enough that the first read holds all of
-   it. The chain shortens, and the bytes grow to the whole file, for one row.
-3. **Look up order `250`.** The reader finds it in its data file, then finds that a delete file
-   removes it. It had to read the data to learn that the answer is nothing.
-4. **Choose scan every row**, then step through `written`, the `merge-on-read` snapshots,
-   `after-a-day` and `compacted`. Watch the requests and the time.
-5. **Choose plan a compaction** on `after-a-day`. Then lower the target, and raise the size a
-   file must reach before it stops counting as small.
-
 ### What one lookup costs
 
-The same lookups, run by the build:
+The same lookups, and what a key-value store would pay for the same row:
 
 ```{include} _generated/changes-lookup.md
 ```
 
 A Parquet table has no index from a key to a row. Statistics narrow the search to a file, a row
-group and a page, and each narrowing is a round trip that needs the one before it: the snapshots
-say which file, the trailer says where the footer is, the footer says where the page index is,
-and the page index says which pages. Then the pages are decoded, and to return the whole row the
-reader needs the matching page of every column, which is [ch01](#why-parquet-exists)'s cost of
-reconstructing a row, paid in requests.
+group and a page, and each narrowing is a round trip that needs the one before it. Then the
+pages are decoded, and to return the whole row the reader needs the matching page of every
+column, which is [ch01](#why-parquet-exists)'s cost of reconstructing a row, paid in requests.
 
 This is the best case. The files are sorted by `order_id`, so one file and one page of each
 column hold the answer. On a table written in arrival order, every file's range would span most
@@ -164,22 +183,47 @@ amplification*, and it grows with every delete.
 
 ### What deletes and small files do to every scan
 
+A scan of every row reads the snapshots, then every data file and every delete file at once,
+since none depends on another:
+
 ```{include} _generated/changes-scans.md
 ```
 
 Each delete file is one more request for every scan. While the requests fit the connections, the
 extra requests overlap and cost little; once they do not, the scan takes another round of the
 store's latency. The small appends of `after-a-day` are worse: each file is a request, and each
-brings its own footer, so the table carries many more bytes for a few more rows. The rows decoded
-include the deleted ones, since a position delete file removes a row only after the reader has
-decoded its page.
+brings its own footer, so the table carries many more bytes for a few more rows. And a position
+delete file removes a row only after the reader has decoded its page, so the deleted rows are
+decoded all the same.
 
 ### Compaction
 
 Compaction repairs both. It reads the files that have deletes, and runs of small files, and
-writes them back as a few whole files with the deleted rows gone. The reader's planner, below,
-chose three groups for `after-a-day`: the two files with deletes, each on its own, and the sixteen
-small appends together.
+writes them back as a few whole files with the deleted rows gone. The reader's planner chooses
+the files for `after-a-day`:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/changing_a_table/plan_a_compaction.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/plan_a_compaction.rs
+:language: rust
+```
+:::
+::::
+
+Each data file with deletes is a group of its own, with its delete files, since two of them
+together would pass the target. The small appends go together into one group. Lower the target to
+`100` rows, and the appends split into two groups. Then set the small size to `10` rows instead:
+no append is small any more, and only the files with deletes are rewritten. On `merge-on-read-8`
+the plan rewrites the files its delete files name and nothing else.
+
+What carrying out the first plan costs, from the files pyarrow wrote for `compacted`:
 
 ```{include} _generated/changes-compaction.md
 ```
@@ -194,8 +238,9 @@ commits must fail and retry.
 ## Building it
 
 The reader's `changes` module (`python/parquet_lab/changes.py`, or
-`crates/parquet-lab/src/changes.rs`) reads a table through its snapshots. A snapshot is two
-lists, and the rows a data file still holds are its rows less the rows its delete files name:
+`crates/parquet-lab/src/changes.rs`) reads a table through its snapshots, which
+`read_snapshots` parses out of `_snapshots.json`. A snapshot is two lists, and the rows a data
+file still holds are its rows less the rows its delete files name:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -314,7 +359,7 @@ position removes it:
 ::::
 
 Which files a lookup opens, and how the compaction planner groups files, are the problems below;
-the reader's own versions are in the same module.
+the reader's own versions, which the steps ran, are in the same module.
 
 ### Checking it
 
@@ -362,7 +407,11 @@ files name:
 
 The live rows and their sum are the ones the book's reader reports for that file. A table
 format's own libraries apply delete files for you when they read a snapshot; the work they do is
-this. In Rust the step needs the `parquet` crate, so it runs in a Codespace or at a desk:
+this. Change the path to `data/part-2.parquet`, and the other delete files apply instead.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin deletes_with_a_library

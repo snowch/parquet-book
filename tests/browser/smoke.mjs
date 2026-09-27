@@ -496,23 +496,46 @@ await page.goto(base + "writing-parquet-well.html");
     "pyarrow's dataset in the page reads the partition from the paths, and keeps the file the log keeps");
 }
 
-// ch15: a changing table. A lookup's chain of requests is the native reader's, and a scan of
-// every snapshot counts the rows the native reader counts.
-await page.goto(base + "changing-a-table.html");
-const changesLab = page.locator('.lab[data-experiment="changes"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]')?.dataset.state === "ok", null, { timeout: 60000 });
-const lookup = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"]);
-check(await changesLab.getAttribute("data-requests") === String(lookup.totals.requests) &&
-  await changesLab.getAttribute("data-round-trips") === String(lookup.totals.round_trips) &&
-  await changesLab.getAttribute("data-answer") === "found",
-  `finding order 300 takes ${lookup.totals.requests} requests in ${lookup.totals.round_trips} round trips, as the native reader's lookup does`);
-await changesLab.locator('input[name="op"][value="scan"]').check();
-await changesLab.locator('select[name="snapshot"]').selectOption("merge-on-read-8");
-const mor = native(["changes", "fixtures/changes.json", "--snapshot", "merge-on-read-8"]);
-await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="changes"]').dataset.answer === String(n), mor.answer.live_rows);
-check(await changesLab.getAttribute("data-requests") === String(mor.totals.requests),
-  `a scan of merge-on-read-8 applies its delete files: ${mor.answer.live_rows} rows in ${mor.totals.requests} requests`);
-if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png") });
+// ch15: a changing table. The panel is a lookup, and its chain of requests is the native reader's;
+// the steps print the same chain in the page, and pyarrow applies the deletes there too.
+{
+  await page.goto(base + "changing-a-table.html");
+  const changesLab = page.locator('.lab[data-experiment="changes"]');
+  await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]')?.dataset.state === "ok", null, { timeout: 60000 });
+  const lookup = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"]);
+  check(await changesLab.getAttribute("data-requests") === String(lookup.totals.requests) &&
+    await changesLab.getAttribute("data-round-trips") === String(lookup.totals.round_trips) &&
+    await changesLab.getAttribute("data-answer") === "found" &&
+    await changesLab.locator(".timeline .req").count() === lookup.totals.requests,
+    `finding order 300 draws ${lookup.totals.requests} requests in ${lookup.totals.round_trips} round trips, as the native reader's lookup makes`);
+  check(await changesLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
+  check(await changesLab.locator("select, input").count() === 2 && await changesLab.locator("table").count() === 0,
+    "the panel asks for a snapshot and an order, and nothing else: no scan, no compaction, no tables");
+  await changesLab.locator('input[name="key"]').fill("250");
+  await changesLab.locator('input[name="key"]').dispatchEvent("change");
+  const gone = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "250"]);
+  await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]').dataset.answer === "deleted");
+  check(await changesLab.getAttribute("data-requests") === String(gone.totals.requests),
+    `order 250 is found and then deleted by ${gone.deleted_by}, in ${gone.totals.requests} requests`);
+  if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png") });
+
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const t = lookup.totals;
+  const lines = await runStep("look_up_an_order", "requests,");
+  check(lines.includes(`${t.requests} requests, ${t.bytes_fetched} bytes, ${Math.floor(t.elapsed_us / 1000)} ms`) &&
+    lines.filter((l) => l.startsWith("round trip ")).length === t.round_trips,
+    "the Python reader in the page makes the lookup the panel draws, round trip for round trip");
+  const plan = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--compact"]);
+  const part = plan.groups.find((g) => g.data_files.includes("data/part-1.parquet"));
+  const library = await runStep("deletes_with_a_library", "their amounts");
+  check(library.includes(`data/part-1.parquet holds ${part.rows_in} rows; ${part.rows_in - part.rows_out} are deleted; ${part.rows_out} are live`),
+    "pyarrow's compute functions run in the page and take out the rows the delete files name");
+}
 
 // Every panel is a picture drawn by the Rust reader in WebAssembly, on every page that has one:
 // it draws, and offers no choice of engine and no editor of the reader.

@@ -1,8 +1,7 @@
-# A position delete file is a Parquet file of (file_path, pos): read one with the book's reader.
+# A position delete file is a Parquet file of (file_path, pos): read it with the reader.
 import sys
-
 sys.path.insert(0, "python")  # the book's reader, from the repository's python/ directory
-from parquet_lab import engine  # noqa: E402
+from parquet_lab import engine
 
 deletes = open("fixtures/changes/deletes/delete-00.parquet", "rb").read()
 for path, pos in engine.run(deletes, "SELECT file_path, pos FROM deletes").rows:

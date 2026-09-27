@@ -185,7 +185,8 @@ def scan_table(store: MemoryStore, prefix: str, id: str, connections: int, model
         deleted.update(read_position_deletes(fetch(d.path, "read a delete file")))
     rows_decoded = live_rows = total = 0
     for f in snapshot.data_files:
-        amounts = engine.run(fetch(f.path, "read a data file"), "SELECT amount_cents FROM orders").rows
+        data = fetch(f.path, "read a data file")
+        amounts = engine.run(data, "SELECT amount_cents FROM orders").rows
         for pos, row in enumerate(amounts):
             rows_decoded += 1
             if (f.path, pos) in deleted:
@@ -243,7 +244,8 @@ def lookup(
     s.next_phase()
     deleted: list[tuple[str, int, str]] = []
     for d in deletes:
-        got = s.get(f"{prefix}{d.path}", All(), "read a delete file that names a file the key may be in")
+        why = "read a delete file that names a file the key may be in"
+        got = s.get(f"{prefix}{d.path}", All(), why)
         deleted += [(path, pos, d.path) for path, pos in read_position_deletes(got.data)]
     found = deleted_by = None
     row: list[tuple[str, object]] = []

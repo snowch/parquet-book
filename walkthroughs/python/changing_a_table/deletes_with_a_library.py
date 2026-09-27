@@ -1,4 +1,4 @@
-# The same deletes applied with pyarrow, which reads Parquet files but not tables: you apply them.
+# pyarrow reads Parquet files, not tables: the deletes are yours to apply.
 from pathlib import Path
 import pyarrow as pa, pyarrow.compute as pc, pyarrow.parquet as pq
 
@@ -9,7 +9,7 @@ for d in sorted(Path("fixtures/changes/deletes").glob("*.parquet")):
     named = pq.read_table(d).to_pylist()
     gone += [r["pos"] for r in named if r["file_path"] == path]
 
-keep = pc.invert(pc.is_in(pa.array(range(rows.num_rows)), value_set=pa.array(gone, pa.int64())))
-live = rows.filter(keep)
-print(f"{path} holds {rows.num_rows} rows; {len(gone)} are deleted; {live.num_rows} are live")
+positions = pa.array(range(len(rows)))
+live = rows.filter(pc.invert(pc.is_in(positions, value_set=pa.array(gone, pa.int64()))))
+print(f"{path} holds {len(rows)} rows; {len(gone)} are deleted; {len(live)} are live")
 print("their amounts sum to", pc.sum(live["amount_cents"]).as_py())
