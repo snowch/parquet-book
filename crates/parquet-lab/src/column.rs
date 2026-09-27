@@ -146,9 +146,9 @@ pub fn read_column_pages(
     refuse_encrypted(chunk)?;
     let range = chunk.byte_range();
     let one = |at: u64| -> Result<Page, ColumnError> {
-        let bytes = file
-            .get(at as usize..range.end as usize)
-            .ok_or_else(|| ColumnError(format!("no page at offset {at} in chunk {range}")))?;
+        let Some(bytes) = file.get(at as usize..range.end as usize) else {
+            return err(format!("no page at offset {at} in chunk {range}"));
+        };
         crate::pages::read_page(&mut ByteReader::new(bytes, at))
             .map_err(|e| ColumnError(format!("page at offset {at}: {e}")))
     };

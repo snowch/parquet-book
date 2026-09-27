@@ -131,8 +131,8 @@
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
-  .scan-grid .p-scan-sum { border-right: 0; }
+  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
+  .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
   .engine-grid { grid-template-columns: minmax(0, 1fr); }
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
@@ -187,14 +187,12 @@
 .out-row i.src { outline: 1px solid var(--warn); outline-offset: -1px; }
 
 /* Ch10: the read path. */
-.scan-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); font-size: 13px; }
-.scan-form .row { display: flex; flex-wrap: wrap; gap: .5rem .9rem; align-items: center; margin: .25rem 0; }
+.scan-pick label { white-space: normal; }
+.scan-pick select { max-width: 100%; }
 .scan-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-             grid-template-areas: "sum time" "reqs reqs" "rows rows"; border-bottom: 1px solid var(--edge); }
-.scan-grid .p-scan-sum { grid-area: sum; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.scan-grid .p-scan-time { grid-area: time; border-bottom: 1px solid var(--edge); }
-.scan-grid .p-scan-reqs { grid-area: reqs; border-bottom: 1px solid var(--edge); }
-.scan-grid .p-scan-rows { grid-area: rows; }
+             grid-template-areas: "sum time"; border-bottom: 1px solid var(--edge); }
+.scan-grid .p-scan-sum { grid-area: sum; border-right: 1px solid var(--edge); }
+.scan-grid .p-scan-time { grid-area: time; }
 .scan-costs { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .8rem; margin: 0; }
 .scan-costs dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .scan-costs dd { margin: 0; font: 600 18px/1.3 var(--chrome); font-variant-numeric: tabular-nums; }
@@ -207,7 +205,6 @@
 .timeline .req.foot { background: var(--muted); }
 .timeline .req.idx { background: var(--warn); }
 .timeline .req.data { background: var(--accent); }
-.scan-grid button.span { font: 11.5px var(--mono); padding: 0 .25rem; background: var(--code); border-color: var(--edge); }
 
 /* Ch11: writer settings. */
 .skip-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--edge); font-size: 13px; }
@@ -278,8 +275,8 @@
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time" "reqs" "rows"; }
-  .scan-grid .p-scan-sum { border-right: 0; }
+  .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
+  .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
   .engine-grid { grid-template-columns: minmax(0, 1fr); }
   .engine-grid .p-pipeline { border-right: 0; border-bottom: 1px solid var(--edge); }
   .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }

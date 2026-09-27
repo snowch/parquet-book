@@ -333,7 +333,8 @@ if (shots) {
     `pyarrow's dataset module runs in the page and keeps row groups [${kept}], as the reader's statistics do`);
 }
 
-// ch10: the read path. Requests and times are the reader's and the simulated store's.
+// ch10: the read path. Requests and times are the reader's and the simulated store's, and the
+// panel's strategies are the rows of the chapter's table of them.
 await page.goto(base + "how-readers-read.html");
 const scanLab = page.locator('.lab[data-experiment="scan"]');
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="scan"]')?.dataset.state === "ok");
@@ -342,12 +343,47 @@ check(await scanLab.getAttribute("data-requests") === String(scan1.totals.reques
   await scanLab.getAttribute("data-elapsed") === String(scan1.totals.elapsed_us),
   `order_id = 431 takes the reader's ${scan1.totals.requests} requests and ${scan1.totals.elapsed_us / 1000} ms`);
 check(await scanLab.getAttribute("data-matching") === "1", "and returns one row");
-await scanLab.locator('select[name="connections"]').selectOption("4");
-const scan4 = native(["scan", "fixtures/pruning-sorted.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8", "--connections", "4"]);
-await page.waitForFunction((t) => document.querySelector('.lab[data-experiment="scan"]').dataset.elapsed === String(t), scan4.totals.elapsed_us);
-check(true, `four connections: ${scan4.totals.elapsed_us / 1000} ms`);
-check(await scanLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
-if (shots) await scanLab.screenshot({ path: path.join(shots, "scan-lab.png") });
+{
+  // The step prints every request, so the panel offers one choice, of the table's strategies, and
+  // draws no table of requests or rows and no byte view.
+  const table = await readFile(new URL("../../chapters/_generated/scan-strategies.md", import.meta.url), "utf8");
+  const rows = table.split("\n").filter((l) => l.startsWith("| ") && !l.startsWith("| Strategy"))
+    .map((l) => l.split("|").slice(1, -1).map((c) => c.trim()));
+  const offered = await scanLab.locator('select[name="strategy"] option').allInnerTexts();
+  check(offered.join("\n") === rows.map((r) => r[0]).join("\n"),
+    `the panel offers the ${rows.length} strategies of the chapter's table, in its order`);
+  check(await scanLab.locator("select, input").count() === 1 && await scanLab.locator("table, .hex").count() === 0,
+    "and nothing else: no condition, no network, no table of requests or rows, no byte view");
+  for (const [i, [label, requests, , time]] of rows.entries()) {
+    await scanLab.locator('select[name="strategy"]').selectOption(String(i));
+    const drawn = Number(await scanLab.getAttribute("data-requests"));
+    const ms = `${Math.round(Number(await scanLab.getAttribute("data-elapsed")) / 1000)} ms`;
+    const bars = await scanLab.locator(".timeline .req").count();
+    check(`${drawn}` === requests && ms === time && bars === drawn,
+      `${label}: ${drawn} requests on the timeline in ${ms}, as the table says`);
+    if (label.includes("four connections")) {
+      check(await scanLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
+      if (shots) await scanLab.screenshot({ path: path.join(shots, "scan-lab.png") });
+    }
+  }
+  // pyarrow, in the page, reads row group 2 a column chunk at a time. The WebAssembly build the
+  // page loads does so with pre_buffer too, where pyarrow at a desk merges the chunks into one
+  // read (tests/test_walkthroughs.py checks that); the chapter says so.
+  const step = page.locator('figure.walkthrough[data-file$="reads_with_a_library.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "pre_buffer=True" }).filter({ hasText: /rows\s*$/ })
+    .waitFor({ timeout: 300000 });
+  const out = (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  const reads = (from) => {
+    const at = out.indexOf("read row group 2:", out.indexOf(from));
+    let n = 0;
+    while (out[at + 1 + n]?.startsWith("read ")) n += 1;
+    return n;
+  };
+  check(out.includes(`read ${scan1.file_size} bytes at 0`) && reads("open, pre_buffer=False:") === scan1.columns.length &&
+    reads("open, pre_buffer=True:") === scan1.columns.length,
+    `pyarrow runs in the page: it opens the file in one read, and reads row group 2 in ${scan1.columns.length}, with or without pre_buffer`);
+}
 
 // ch11: writer settings. Every file's cost is the reader's.
 await page.goto(base + "writing-parquet-well.html");

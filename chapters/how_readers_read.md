@@ -11,44 +11,62 @@ Why does a reader issue exactly the requests it does?
 
 [ch09](#skipping-data) decided which bytes a query needs. Knowing the bytes is not the same as
 fetching them well. Each request to an object store costs a round trip before the first byte
-arrives, and that cost does not shrink with the request. A reader that needs twenty small ranges
-can make twenty requests, one large request that covers them all, or something between, and it
-can make several at once. This chapter builds the reader's read path and measures those choices.
+arrives, and that cost does not shrink with the request. A reader that needs many small ranges
+can make one request for each, one large request that covers them all, or something between, and
+it can make several at once. This chapter builds the reader's read path and measures those
+choices.
 
 ## The experiment
 
-### One query, many ways to fetch it
+### One query, request by request
 
-The panel runs a query against a fixture held in the simulated object store from
-[ch02](#anatomy-of-a-parquet-file). Every request the reader makes is on the timeline, in the lane
-of the connection that carried it. The rows at the bottom were decoded from the bytes those
-requests returned, and from nothing else.
+The query is [ch09](#skipping-data)'s: `SELECT * WHERE order_id = 431` on
+`pruning-sorted.parquet`. There the reader planned it from a copy of the file on disk. Here its
+`scan` runs the plan against the simulated object store from
+[ch02](#anatomy-of-a-parquet-file), which logs every request, the connection that carried it, and
+when it started and ended. A `Strategy` says how to make the requests: how to find the footer and
+how much of the tail to read first, how close two ranges must be to merge into one request, and
+how many connections to use.
 
-```lab
-experiment: scan
-fixture: pruning-sorted.parquet
-fixtures: pruning-sorted.parquet, pruning-shuffled.parquet, tiny.parquet
-column: 0
-op: =
-value: 431
+The step is a few lines of code. In Python, run it in the page, change it with **Edit**, and run
+it again. In Rust, open it in a Codespace, or run it at a desk with
+`cargo run -p walkthroughs --bin read_with_a_strategy`. It continues ch02's
+`open_with_the_reader`, which stopped once the footer was read:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/how_readers_read/read_with_a_strategy.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/read_with_a_strategy.rs
+:language: rust
+```
+:::
+::::
 
-Try these:
+The first three requests are ch02's: the size, the trailer, the footer. Next come the indexes the
+plan needs, one request each: `order_id`'s ColumnIndex for row group 2, the one row group the
+statistics keep, and an OffsetIndex for each column. Last come the pages, one request each, with
+`country`'s dictionary page apart from its data page. Every request starts when the one before
+it ends. The bytes are a small share of the file, and they move in almost no time. The time is
+the latency, paid once per request.
 
-% number-ok: the panel's own settings, named as its controls name them; nothing here is measured.
-1. **As loaded.** Three sequential requests find the footer. Then come the page indexes for the
-   one row group the statistics keep, then the pages. Each phase waits for the one before it.
-2. **Read 8 KiB for the footer.** The indexes sit immediately before the footer, so the larger tail
-   brings them too, and their phase disappears.
-3. **Merge ranges within 4 KiB.** The pages of the four columns become one request, with a few
-   unwanted bytes between them.
-4. **Four connections.** Requests in the same phase now overlap. Requests in different phases
-   still cannot.
-5. **Read 64 KiB for the footer.** The file is smaller than that, so the tail read brings all
-   of it, and no other request is needed.
-6. **Change the network.** Set the latency to 1 ms and the bandwidth to 10 MB/s, the slowest the
-   panel offers, and compare the last two strategies again. The gap between them nearly closes.
-   On a slower link still, the table under *When bytes matter* shows the smaller read winning.
+Change the strategy one line at a time, and run the step after each change:
+
+- **Read more of the tail.** Find the footer with `SuffixRange()` and `prefetch=8192`
+  (`SizeSource::SuffixRange` and `prefetch: 8192` in Rust). The first request brings the trailer,
+  the footer and the indexes together, because the indexes sit immediately before the footer.
+  Every index request disappears.
+- **Merge ranges.** Add `coalesce_gap=4096` (`Some(4096)`). The pages of the four columns become
+  one request, which also reads the bytes between them.
+- **Use more connections.** Put the gap back to `None` and set `connections=4`. The pages go out
+  side by side, each on a connection of its own, but none starts before the footer has arrived.
+- **Read everything.** Set `prefetch=65536`, more than the file holds. The first request reads
+  all of it, and there is nothing left to ask for.
 
 ### Phases
 
@@ -64,6 +82,35 @@ requests fall into phases, each needing the answers to the one before:
 Within a phase the requests are independent, and a reader with several connections sends them
 together. Between phases it must wait. Latency is paid at least once per phase, however many
 connections there are.
+
+### The phases on a timeline
+
+The panel runs the same query with the Rust reader and draws each request in the lane of the
+connection that carried it. Pick a strategy from the list; the list is the rows of the table
+under *What each choice costs*, below.
+
+```lab
+experiment: scan
+fixture: pruning-sorted.parquet
+column: 0
+op: =
+value: 431
+```
+
+Try these:
+
+% number-ok: the panel's strategies, named as its list names them; nothing here is measured.
+1. **… and pages by the page index.** The step as you first ran it. Grey finds the footer, orange
+   fetches the indexes, blue fetches the pages, and each bar waits for the one before.
+2. **HEAD, trailer, footer; every column chunk**, then **… skipping row groups by statistics.**
+   Without the page index there is no orange phase. The statistics drop three row groups' chunks,
+   and the blue phase shrinks with them.
+3. **… with an 8 KiB suffix read for the footer.** The orange phase is gone: the tail read
+   brought the indexes with the footer.
+4. **… merging ranges within 4 KiB.** The blue phase is one bar.
+5. **… on four connections, without merging.** The blue bars stack in four lanes, and the phase
+   takes the time of the longest lane. The grey bar still comes first, alone.
+6. **One suffix read of 64 KiB: the whole file.** One bar, and nothing after it.
 
 ### What each choice costs
 
@@ -106,10 +153,12 @@ depends on the network:
 
 On a fast network with high latency, reading the whole file wins even though it moves many times
 the bytes. On a slow link with low latency, the careful plan wins, because moving the extra bytes
-takes longer than the round trips it saves. Real files are far larger than this one, which moves
-the balance toward the careful plan: nobody reads a gigabyte to find one row. Readers therefore
-merge ranges up to a threshold, and choose the threshold from the latency and bandwidth they
-expect.
+takes longer than the round trips it saves. Try it in the step: pass
+`NetworkModel(latency_us=1000, bandwidth_bytes_per_sec=1_000_000)` (the same fields in Rust's
+`NetworkModel { .. }`) and compare `prefetch=8192` with `prefetch=65536`. Real files are far
+larger than this one, which moves the balance toward the careful plan: nobody reads a gigabyte to
+find one row. Readers therefore merge ranges up to a threshold, and choose the threshold from the
+latency and bandwidth they expect.
 
 ### Only what was fetched
 
@@ -120,7 +169,15 @@ whole file, so a missed range cannot pass unnoticed.
 
 ## Building it
 
+The step called `scan`, which reads the footer with ch02's `read_footer`, plans with ch09's
+`prune.plan`, and fetches in phases. This section builds the fetching: how ranges merge, how one
+phase is sent, how the store's clock prices it, and how the reader decodes only the pages it
+fetched. The tabs switch every excerpt on the page between the two languages.
+
 ### Merging ranges
+
+`coalesce` sorts the ranges and merges each into the one before it when the gap between them is
+at most `gap` bytes. With no gap it merges only ranges that overlap:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -140,6 +197,33 @@ whole file, so a missed range cannot pass unnoticed.
 ```
 :::
 ::::
+
+### One phase
+
+`fetch` sends one phase. It drops the bytes the reader already holds, so a range the tail read
+brought is not fetched twice, merges what is left, and tells the store a new phase has begun:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/scan.py
+:language: python
+:start-at: def fetch(
+:end-before: class ScanError(ValueError):
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/scan.rs
+:language: rust
+:start-at: fn fetch<S: ObjectStore>(
+:end-before: /// Run `query` against `object`
+```
+:::
+::::
+
+`scan` calls it twice, once for the indexes and once for the pages, after `read_footer` has made
+the first phase's requests.
 
 ### A clock for every connection
 
@@ -168,7 +252,8 @@ before its phase:
 ### Reading chosen pages
 
 With the page index, the reader parses each wanted page where the OffsetIndex says it starts,
-without walking the pages before it:
+without walking the pages before it. The bytes between the pages were never fetched, and
+`read_column_pages` never looks at them:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -176,7 +261,7 @@ without walking the pages before it:
 ```{literalinclude} ../python/parquet_lab/column.py
 :language: python
 :start-at: def read_column_pages(
-:end-before: def decode_pages(
+:end-before: def refuse_encrypted(
 ```
 :::
 :::{tab-item} Rust
@@ -184,7 +269,7 @@ without walking the pages before it:
 ```{literalinclude} ../crates/parquet-lab/src/column.rs
 :language: rust
 :start-at: pub fn read_column_pages(
-:end-before: /// Decode pages already located
+:end-before: /// An encrypted column chunk's pages are encrypted modules
 ```
 :::
 ::::
@@ -208,6 +293,60 @@ cargo test -p parquet-lab --test fixtures every_strategy
 ```
 :::
 ::::
+
+### Ask a library
+
+A library makes the same choices, with its own defaults. Hand pyarrow a file that prints every
+read it is asked for, and ask the `parquet` crate for the footer and the page index from a tail
+of the file:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/how_readers_read/reads_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/reads_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+% number-ok: pyarrow's default footer read size, a setting rather than a measurement.
+To open the file, pyarrow reads a fixed amount from the end, 64 KiB by default. This file is
+smaller, so that first read is the whole file. pyarrow keeps only the footer from it, and reading
+row group 2 reads the row group's column chunks again.
+
+With `pre_buffer=False`, pyarrow makes one read per column chunk, the whole chunk each time, since
+it does not use the page index. With `pre_buffer=True`, its default, it merges the chunks, which
+touch, into one read. The gap it merges across is `hole_size_limit` in `pyarrow.CacheOptions`,
+which a dataset scan takes through `ParquetFragmentScanOptions(cache_options=...)`. The page runs
+a build of pyarrow for WebAssembly, which reads a chunk at a time either way; run the step at a
+desk to see the merged read.
+
+In place of `read_row_groups`, try `pq.read_table(file, filters=[("order_id", "==", 431)])`. The
+statistics skip three row groups, and the fourth is read whole: pyarrow does not use the page
+index to skip pages.
+
+The crate's `ParquetMetaDataReader` makes no requests of its own. Given the last eight bytes, it
+answers `NeedMoreData` with the size of tail it needs: the footer and its trailer. Given that, it
+parses the footer, finds the page index before it, and asks again, for a tail reaching back to the
+first index. Given that, it has everything. Those are the chapter's first two phases, with each
+answer needed before the next request can be made. Start from `8192` and it needs one read. The
+crate's asynchronous reader takes the same number through `with_prefetch_hint`, and hands a row
+group's ranges to the `object_store` crate's `get_ranges`, which merges ranges that lie close
+together. It needs the crate's `arrow` and `async` features, which this workspace does not build.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin reads_with_a_library
+```
 
 ## What this cannot tell you
 

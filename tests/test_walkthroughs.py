@@ -94,6 +94,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(compression_facts())
     known.update(statistics_facts())
     known.update(skipping_facts())
+    known.update(readers_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -627,6 +628,69 @@ def skipping_facts() -> dict:
                     f"customer_id = 424242: row group {g}, may contain it: Some({str(a).lower()})\n"
                     for g, (_, a) in enumerate(probes)
                 ),
+            ],
+        },
+    }
+
+
+def readers_facts() -> dict:
+    """What ch10's steps must print: the requests the reader makes for order_id = 431, from where
+    pyarrow says the footer and row group 2's column chunks are, and the indexes it says they
+    have; the reads pyarrow makes of the same file; and the tails the parquet crate asks for,
+    from the footer length in the manifest."""
+    import pyarrow.parquet as pq
+
+    path = ROOT / "fixtures" / "pruning-sorted.parquet"
+    md = pq.read_metadata(path)
+    manifest = json.loads(path.with_suffix(".json").read_text())
+    n, length = manifest["file_size"], manifest["footer_length"]
+    wanted = 431
+    kept = [
+        g
+        for g in range(md.num_row_groups)
+        if (s := md.row_group(g).column(0).statistics).min <= wanted <= s.max
+    ]
+    assert kept == [2], "the steps and the prose follow one row group"
+    group = md.row_group(2)
+    chunks = [group.column(c) for c in range(group.num_columns)]
+    # The first page of row group 2 holds order_id 431, so each column's first data page is read,
+    # and its dictionary page before it.
+    ids = [row["order_id"] for row in manifest["rows"]]
+    per_group, per_page = (
+        manifest["generator"]["options"][k] for k in ("row_group_size", "max_rows_per_page")
+    )
+    assert (ids.index(wanted) - 2 * per_group) // per_page == 0
+    starts = [s for c in chunks for s in (c.dictionary_page_offset, c.data_page_offset) if s is not None]
+    indexes = int(chunks[0].has_column_index) + sum(c.has_offset_index for c in chunks)
+    requests = 3 + indexes + len(starts)
+
+    tail = min(n, 64 * 1024)
+    each = "".join(
+        f"  read {c.total_compressed_size} bytes at {c.dictionary_page_offset or c.data_page_offset}\n"
+        for c in chunks
+    )
+    first = chunks[0].dictionary_page_offset or chunks[0].data_page_offset
+    whole = sum(c.total_compressed_size for c in chunks)
+    return {
+        ("how_readers_read", "read_with_a_strategy"): [
+            "on 1: HEAD",
+            f"on 1: GET bytes={n - 8}-{n - 1} read the trailer\n",
+            f"on 1: GET bytes={n - 8 - length}-{n - 9} read the footer",
+            *(f"on 1: GET bytes={s}-" for s in starts),
+            "read the indexes the plan needs\n",
+            f"{requests} requests, ",
+            f"rows matching: [{ids.index(wanted)}]\n",
+        ],
+        ("how_readers_read", "reads_with_a_library"): {
+            "python": [
+                f"open, pre_buffer=False:\n  read {tail} bytes at {n - tail}\nread row group 2:\n{each}"
+                f"{group.num_rows} rows\n",
+                f"open, pre_buffer=True:\n  read {tail} bytes at {n - tail}\nread row group 2:\n"
+                f"  read {whole} bytes at {first}\n{group.num_rows} rows\n",
+            ],
+            "rust": [
+                f"read the last 8 bytes\n  NeedMoreData({8 + length})\nread the last {8 + length} bytes\n",
+                f"{md.num_row_groups} row groups; the page index read: true\n",
             ],
         },
     }

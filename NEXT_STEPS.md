@@ -280,6 +280,14 @@ each with `codec-none`'s. In `compression_with_a_library`, pyarrow names the fil
 stepper stays, slimmed to four files and no size table; the Snappy token table is gone, and LZ4
 and Huffman sit in a note.
 
+## Done: ch10 in code
+
+ch10 opens on `read_with_a_strategy`, which runs `scan` for `order_id = 431` and prints every
+request with its connection and times; the invitations change the tail read, the gap and the
+connections. In `reads_with_a_library`, pyarrow reads row group 2 a chunk at a time, then in one
+read with `pre_buffer`, and the crate's `ParquetMetaDataReader` asks for the tail it needs with
+`NeedMoreData`. The timeline stays, slimmed to one list of the table's strategies.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -306,8 +314,7 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch10: a filtered `pq.read_table` compared with the reader's plan.
-2. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+1. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

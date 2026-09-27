@@ -220,7 +220,7 @@ _CHAPTERS = (
         "Why does a reader issue exactly the requests it does?",
         "The complete read path over the object store: footer, indexes and data in phases, with coalescing and concurrency.",
         ("scan",),
-        ("pruning-sorted.parquet", "pruning-shuffled.parquet", "tiny.parquet"),
+        ("pruning-sorted.parquet",),
     ),
     (
         "writing_parquet_well",

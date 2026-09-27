@@ -121,7 +121,12 @@ def read_column(file: bytes, chunk: ColumnChunk, leaf: Leaf) -> ColumnData:
     return decode_pages(file, chunk, leaf, pages)
 
 
-def read_column_pages(file: bytes, chunk: ColumnChunk, leaf: Leaf, offsets: list[int]) -> ColumnData:
+def read_column_pages(
+    file: bytes,
+    chunk: ColumnChunk,
+    leaf: Leaf,
+    offsets: list[int],
+) -> ColumnData:
     """Read only some pages of a column chunk: its dictionary page, if it has one, and the data
     pages starting at ``offsets``, each read where the page index says it is (ch10). The bytes
     between them are never looked at, so a reader need not have fetched them."""

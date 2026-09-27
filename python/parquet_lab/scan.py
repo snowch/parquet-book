@@ -97,16 +97,27 @@ class Fetched:
 def coalesce(spans: list[Span], gap: int | None) -> list[Span]:
     """Sort ranges and merge those whose gap is at most ``gap`` bytes. With no gap, only ranges
     that overlap are merged, since fetching the same byte twice is never useful."""
+
+    def merges(s: Span, last: Span) -> bool:
+        return s.start <= last.end + gap if gap is not None else s.start < last.end
+
     out: list[Span] = []
     for s in sorted(spans):
-        if out and (s.start <= out[-1].end + gap if gap is not None else s.start < out[-1].end):
+        if out and merges(s, out[-1]):
             out[-1] = Span(out[-1].start, max(out[-1].end, s.end))
         else:
             out.append(s)
     return out
 
 
-def fetch(store: ObjectStore, key: str, have: Fetched, wanted: list[Span], gap: int | None, why: str) -> int:
+def fetch(
+    store: ObjectStore,
+    key: str,
+    have: Fetched,
+    wanted: list[Span],
+    gap: int | None,
+    why: str,
+) -> int:
     """Fetch every range the reader does not already have, coalesced, as one phase."""
     # Only the bytes not already held: a merged request must not fetch the tail again.
     missing = [part for s in wanted for part in have.missing(s)]

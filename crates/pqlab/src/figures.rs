@@ -1726,8 +1726,8 @@ fn scan_networks(root: &Path) -> Result<String, String> {
         ("far and slow", 100_000, 1_000_000),
     ];
     let mut rows = vec![
-        "| Network | Latency | Bandwidth | Pages the plan needs | The whole file |".to_string(),
-        "|---|--:|--:|--:|--:|".to_string(),
+        "| Network | Latency, bandwidth | Pages the plan needs | The whole file |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     for (label, latency_us, bw) in nets {
         let m = NetworkModel {
@@ -1738,7 +1738,7 @@ fn scan_networks(root: &Path) -> Result<String, String> {
         let (_, _, t2, _) = scan_cost(&bytes, &q, whole, m)?;
         let mark = |a: u64, b: u64| if a <= b { "**" } else { "" };
         rows.push(format!(
-            "| {label} | {} | {} | {}{} in {n1} requests{} | {}{}{} |",
+            "| {label} | {}, {} | {}{} in {n1} requests{} | {}{}{} |",
             ms(latency_us),
             rate(bw),
             mark(t1, t2),
