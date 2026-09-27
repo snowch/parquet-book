@@ -1787,18 +1787,14 @@ fn after_footer(bytes: &[u8], q: &Query) -> Result<(u64, usize), String> {
 
 fn writing_files(root: &Path) -> Result<String, String> {
     let mut rows = vec![
-        "| File | Change | File bytes | Footer bytes | Row groups | Data pages | `country` bytes | `order_id` bytes |"
-            .to_string(),
-        "|---|---|--:|--:|--:|--:|--:|--:|".to_string(),
+        "| File | File bytes | `country` bytes | `order_id` bytes |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
+    // Every file cuts the same rows into pages of the same size, so the count goes in the caption.
+    let mut data_pages = std::collections::BTreeSet::new();
     for (name, change) in WRITING {
         let bytes = fixture(root, name)?;
         let md = open_bytes(&bytes)?;
-        let size = bytes.len() as u64;
-        let last8: [u8; 8] = bytes[bytes.len() - 8..].try_into().unwrap();
-        let footer = parse_trailer(last8, size)
-            .map_err(|e| e.to_string())?
-            .footer_length;
         let mut pages = 0;
         for rg in &md.row_groups {
             for c in &rg.columns {
@@ -1813,6 +1809,7 @@ fn writing_files(root: &Path) -> Result<String, String> {
                 .count();
             }
         }
+        data_pages.insert(pages);
         let column_bytes = |path: &str| -> u64 {
             md.row_groups
                 .iter()
@@ -1822,18 +1819,19 @@ fn writing_files(root: &Path) -> Result<String, String> {
                 .sum()
         };
         rows.push(format!(
-            "| `{name}` | {change} | {} | {} | {} | {pages} | {} | {} |",
-            thousands(size),
-            thousands(footer as u64),
-            md.row_groups.len(),
+            "| {change} | {} | {} | {} |",
+            thousands(bytes.len() as u64),
             thousands(column_bytes("country")),
             thousands(column_bytes("order_id")),
         ));
     }
+    let [pages] = data_pages.into_iter().collect::<Vec<_>>()[..] else {
+        return Err("the writing-* files differ in their number of data pages".into());
+    };
     Ok(format!(
         "{}\n\n*Computed by the reader from the `fixtures/writing-*.parquet` files: the same 800 \
-         orders, Snappy-compressed. Column bytes are summed over row groups and include page \
-         headers.*\n",
+         orders, Snappy-compressed. Every file has {pages} data pages. Column bytes are summed over \
+         row groups and include page headers.*\n",
         rows.join("\n")
     ))
 }
@@ -1841,12 +1839,11 @@ fn writing_files(root: &Path) -> Result<String, String> {
 fn writing_queries(root: &Path) -> Result<String, String> {
     // A label, and a condition as column, comparison and value.
     type Condition<'a> = Option<(usize, Op, &'a str)>;
-    let queries: [(&str, Condition); 5] = [
-        ("`order_id = 431`", Some((0, Op::Eq, "431"))),
+    // `order_id = 431` is what the chapter's second step prints for every file.
+    let queries: [(&str, Condition); 3] = [
         ("`country = 'FR'`", Some((3, Op::Eq, "FR"))),
         ("`status = 'refunded'`", Some((4, Op::Eq, "refunded"))),
         ("`amount_cents > 9900`", Some((5, Op::Gt, "9900"))),
-        ("everything", None),
     ];
     let mut rows = vec![
         format!(
@@ -1870,10 +1867,9 @@ fn writing_queries(root: &Path) -> Result<String, String> {
         rows.push(format!("| {change} | {} |", cells.join(" | ")));
     }
     Ok(format!(
-        "{}\n\n*`SELECT *` with each condition, run by the reader against each file. Each cell is \
-         bytes and requests after the footer, which every query reads first. The reader \
-         uses statistics, Bloom filters where written and the page index, and merges only ranges \
-         that touch.*\n",
+        "{}\n\n*`SELECT *` with each condition, run by the reader against each file with the \
+         second step's strategy. Each cell is bytes and requests after the footer, which every \
+         query reads first.*\n",
         rows.join("\n")
     ))
 }

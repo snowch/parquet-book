@@ -288,6 +288,14 @@ connections. In `reads_with_a_library`, pyarrow reads row group 2 a chunk at a t
 read with `pre_buffer`, and the crate's `ParquetMetaDataReader` asks for the tail it needs with
 `NeedMoreData`. The timeline stays, slimmed to one list of the table's strategies.
 
+## Done: ch11 in code
+
+ch11 opens on `row_groups_per_lookup`, which counts the row groups of each `writing-*` file that
+could hold `order_id = 431`, and `query_every_file`, which runs `scan` on every file and prints
+what it read after the footer. In `writing_with_a_library`, pyarrow rewrites the baseline to the
+byte and changes one setting at a time; the crate reads the choices back from each footer. The
+writing panel is gone; *Building it* quotes the reader's index fetch and dictionary read.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -314,7 +322,7 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+1. ch12 to ch14: a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

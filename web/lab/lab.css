@@ -206,12 +206,6 @@
 .timeline .req.idx { background: var(--warn); }
 .timeline .req.data { background: var(--accent); }
 
-/* Ch11: writer settings. */
-.skip-form { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; padding: .6rem 1rem; border-bottom: 1px solid var(--edge); font-size: 13px; }
-.p-writing { border-bottom: 1px solid var(--edge); }
-.p-writing tr.chosen td { background: var(--wash); }
-.p-writing td button { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
-
 /* Ch12: the query engine. */
 .engine-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); }
 .engine-form textarea { width: 100%; font: 13px/1.5 var(--mono); padding: .4rem .5rem; background: var(--code);

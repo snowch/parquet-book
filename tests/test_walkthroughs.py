@@ -95,6 +95,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(statistics_facts())
     known.update(skipping_facts())
     known.update(readers_facts())
+    known.update(writing_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -692,6 +693,75 @@ def readers_facts() -> dict:
                 f"read the last 8 bytes\n  NeedMoreData({8 + length})\nread the last {8 + length} bytes\n",
                 f"{md.num_row_groups} row groups; the page index read: true\n",
             ],
+        },
+    }
+
+
+WRITING = ["baseline", "one-group", "small-groups", "by-country", "shuffled", "plain", "no-index"]
+
+
+def writing_facts() -> dict:
+    """What ch11's steps must print: each file's footer length from its manifest and the row
+    groups whose order_id statistics hold 431, from pyarrow's; the rows that match it, and what a
+    file without a page index reads for it, its whole row group; and the files pyarrow
+    writes from the baseline's rows, which are the fixtures to the byte."""
+    import pyarrow.parquet as pq
+
+    wanted = 431
+    lookups, queries, crate, files = [], [], [], {}
+    for name in WRITING:
+        path = ROOT / "fixtures" / f"writing-{name}.parquet"
+        md, manifest = pq.read_metadata(path), json.loads(path.with_suffix(".json").read_text())
+        files[name] = (md, manifest)
+        holding = [
+            g
+            for g in range(md.num_row_groups)
+            if (s := md.row_group(g).column(0).statistics).min <= wanted <= s.max
+        ]
+        lookups.append(
+            f"writing-{name}: footer {manifest['footer_length']} bytes, "
+            f"{len(holding)} of {md.num_row_groups} row groups may hold it\n"
+        )
+        ids = pq.read_table(path, columns=["order_id"]).column(0).to_pylist()
+        matching = f"{ids.count(wanted)} rows matching\n"
+        if name == "no-index":
+            # Without a page index the reader reads the whole row group, in one merged request.
+            (g,) = holding
+            whole = sum(md.row_group(g).column(c).total_compressed_size for c in range(md.num_columns))
+            queries.append(f"writing-{name}: {whole} bytes in 1 requests, {matching}")
+        else:
+            queries.append(f"writing-{name}: ")
+            queries.append(f" requests, {matching}")
+        c = md.row_group(0).column(0)
+        crate.append(f"writing-{name}: {md.num_row_groups} row groups, {c.compression}\n")
+        crate.append(
+            f"  dictionary {str(c.has_dictionary_page).lower()}, "
+            f"column index {str(c.has_column_index).lower()}, sorted by None\n"
+        )
+        assert md.row_group(0).sorting_columns == (), "the fixtures do not declare their sort"
+
+    def rewritten(change: str, name: str, sorted_by: str = "()") -> list[str]:
+        md, manifest = files[name]
+        c = md.row_group(0).column(0)
+        return [
+            f"{change}: {manifest['file_size']} bytes, footer {manifest['footer_length']}, "
+            f"{md.num_row_groups} row groups\n",
+            f"  dictionary {c.has_dictionary_page}, column index {c.has_column_index}, sorted by {sorted_by}\n",
+        ]
+
+    declared = pq.SortingColumn(0)
+    return {
+        ("writing_parquet_well", "row_groups_per_lookup"): lookups,
+        ("writing_parquet_well", "query_every_file"): queries,
+        ("writing_parquet_well", "writing_with_a_library"): {
+            "python": [
+                *rewritten("the baseline", "baseline"),
+                *rewritten("row groups of 40", "small-groups"),
+                *rewritten("no dictionary", "plain"),
+                *rewritten("no page index", "no-index"),
+                f"sorted by ({declared!r},)\n",
+            ],
+            "rust": crate,
         },
     }
 

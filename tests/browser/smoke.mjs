@@ -385,15 +385,27 @@ check(await scanLab.getAttribute("data-matching") === "1", "and returns one row"
     `pyarrow runs in the page: it opens the file in one read, and reads row group 2 in ${scan1.columns.length}, with or without pre_buffer`);
 }
 
-// ch11: writer settings. Every file's cost is the reader's.
+// ch11: writer settings. The page runs the reader's query on every file, and pyarrow writes the
+// baseline again, to the byte.
 await page.goto(base + "writing-parquet-well.html");
-const writeLab = page.locator('.lab[data-experiment="writing"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="writing"]')?.dataset.state === "ok", null, { timeout: 60000 });
-const baseline = native(["scan", "fixtures/writing-baseline.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8", "--gap", "0"]);
-check((await writeLab.getAttribute("data-bytes")).split(",")[0] === String(baseline.totals.bytes_after_footer),
-  `order_id = 431 reads the reader's ${baseline.totals.bytes_after_footer} bytes after the footer of the baseline`);
-check((await writeLab.getAttribute("data-bytes")).split(",").length === 7, "and the query runs against all seven files");
-if (shots) await writeLab.screenshot({ path: path.join(shots, "writing-lab.png") });
+{
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const baseline = native(["scan", "fixtures/writing-baseline.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8", "--gap", "0"]);
+  const lines = await runStep("query_every_file", "writing-no-index:");
+  const { bytes_after_footer: bytes, requests_after_footer: requests } = baseline.totals;
+  check(lines.some((l) => l.startsWith(`writing-baseline: ${bytes} bytes in ${requests} requests, `)) &&
+    lines.filter((l) => l.startsWith("writing-")).length === 7,
+    `order_id = 431 reads the reader's ${bytes} bytes in ${requests} requests after the baseline's footer, and runs on all seven files`);
+  const size = (await readFile(new URL("../../fixtures/writing-baseline.parquet", import.meta.url))).length;
+  const library = await runStep("writing_with_a_library", "the sort declared");
+  check(library.some((l) => l.startsWith(`the baseline: ${size} bytes,`)),
+    `pyarrow writes Snappy in the page, and rebuilds writing-baseline.parquet to the byte: ${size} bytes`);
+}
 
 // ch12: the query engine. The answer is the engine's.
 await page.goto(base + "a-tiny-query-engine.html");

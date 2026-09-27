@@ -228,7 +228,7 @@ _CHAPTERS = (
         "writing_and_querying",
         "Which writer settings decide how cheap a file is to read?",
         "The same rows written seven ways, each measured by what the reader must fetch to query it.",
-        ("writing",),
+        (),
         (
             "writing-baseline.parquet",
             "writing-one-group.parquet",
@@ -306,7 +306,6 @@ EXPERIMENTS = (
     "anatomy",
     "compression",
     "scan",
-    "writing",
     "engine",
     "encryption",
     "table",

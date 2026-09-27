@@ -18,7 +18,6 @@ import { Lab } from "./wasm.js";
 import { mountAnatomy } from "./footer.js";
 import { mountCompression } from "./compression.js";
 import { mountScan } from "./scan.js";
-import { mountWriting } from "./writing.js";
 import { mountEngine } from "./engine.js";
 import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
@@ -30,7 +29,6 @@ const EXPERIMENTS = {
   anatomy: mountAnatomy,
   compression: mountCompression,
   scan: mountScan,
-  writing: mountWriting,
   engine: mountEngine,
   encryption: mountEncryption,
   table: mountTable,

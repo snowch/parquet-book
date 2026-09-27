@@ -20,27 +20,92 @@ the same rows seven ways and measures each by what queries against it cost.
 
 The `writing-*.parquet` files hold the same orders. `writing-baseline.parquet` is
 sorted by `order_id`, dictionary-encoded, compressed with Snappy, and written in four row groups
-of small pages with a page index. Each other file changes one of those settings.
+of small pages with a page index. Each other file changes one of those settings: one row group,
+many small ones, sorted by country, shuffled, no dictionary, or no page index.
 [Appendix B](#the-fixtures) lists them.
 
-```lab
-experiment: writing
-fixture: writing-baseline.parquet
-fixtures: writing-baseline.parquet, writing-one-group.parquet, writing-small-groups.parquet, writing-by-country.parquet, writing-shuffled.parquet, writing-plain.parquet, writing-no-index.parquet
-column: 0
-op: =
-value: 431
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name.
+
+**Row groups a lookup reads.** The query is `order_id = 431`. A reader reads every row group whose
+footer range could hold the value. Read each file's footer, as [ch09](#skipping-data) did, and
+count those row groups:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/writing_parquet_well/row_groups_per_lookup.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/row_groups_per_lookup.rs
+:language: rust
+```
+:::
+::::
+
+Every file sorted by `order_id` sends the lookup to one row group, however many row groups it
+has. The file sorted by country and the shuffled one send it to all of theirs, because each of
+their row groups spans nearly every order number. The footers differ too: the file of small row
+groups has one many times larger than the file of one row group.
+
+Change `column` to `2`, which is `customer_id`, and `wanted` to `500000`. Nobody sorted by
+customer, so every file sends that lookup to every row group it has. Small row groups do not
+help a column nobody sorted by; they only add row groups to read.
+
+One value can be lucky. Averaged over every value of the two columns, the reader counted:
+
+```{include} _generated/writing-lookups.md
 ```
 
-The panel runs one query against every file, with the same reader each time, and reports what
-it read after the footer. Try these:
+### What a query reads
 
-1. **As loaded, a lookup by `order_id`.** Compare the sorted files with the shuffled one and the
-   one sorted by country.
-2. **`country = FR`.** Now the file sorted by country reads least.
-3. **`status = refunded`.** No file does well. Refunds are rare and spread through every row
-   group, and no single sort order serves every column.
-4. **No condition.** Every file reads everything. Compare the sizes and the footers instead.
+**One query, every file.** The book's reader from [ch10](#how-readers-read) runs
+`SELECT * WHERE order_id = 431` against each file in turn. It finds the footer exactly, uses
+every skipping mechanism, and merges only ranges that touch. What it reads after the footer is
+then what the file's layout made it read:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/writing_parquet_well/query_every_file.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/query_every_file.rs
+:language: rust
+```
+:::
+::::
+
+Every file returns the same order. What it cost differs:
+
+- **Sorting decides.** The file sorted by country and the shuffled one read most of their bytes,
+  as the first step predicted. The small row groups read least, since the one row group they
+  read is small.
+- **Dictionaries make point lookups dearer.** To decode one page of a dictionary-encoded column,
+  the reader must first read that column's dictionary page, which for a column of unique values
+  holds every value in the row group. The baseline read several times more than the file without
+  dictionaries.
+- **The page index trades bytes for requests.** The file without one read its whole row group in
+  one request. The baseline read fewer bytes in more requests. Against object storage, as
+  [ch10](#how-readers-read) measured, the requests can cost more than the bytes saved.
+
+Change the condition to `country = 'FR'`, with column `3` and `"FR"`: now the file sorted by
+country reads least. Then try `status = 'refunded'`, with column `4`. No file does well. Refunds
+are rare and spread through every row group, and no single sort order serves every column. The
+reader ran those conditions, and one on amounts, against every file:
+
+```{include} _generated/writing-queries.md
+```
+
+Sorting makes lookups cheap only for the column sorted by. A rare value spread through every row
+group, such as a refund, costs nearly a full read whatever the layout.
 
 ### What each setting changed
 
@@ -52,8 +117,9 @@ The files themselves, before any query:
 Every setting has a price somewhere:
 
 - **Row group size.** Each row group repeats the metadata for every column: a column chunk entry
-  in the footer, statistics, page index entries, and a dictionary page per column. Small row
-  groups made the footer many times larger than one row group did, and the file larger with it.
+  in the footer, statistics, page index entries, and a dictionary page per column. The first
+  step printed the footer of the small row groups many times larger than the footer of one row
+  group, and the file is larger with it.
 - **Dictionary encoding.** It shrank `country`, which repeats a few values, and grew `order_id`,
   whose values are all different: [ch05](#encodings)'s lesson, at the scale of a file.
 - **Sort order.** Sorting by country gathered each country's rows together, and the country
@@ -61,41 +127,6 @@ Every setting has a price somewhere:
 - **The page index.** Turning it off made the column chunks larger, not smaller. pyarrow writes
   each page's statistics into the page index when there is one, and into every page header when
   there is not.
-
-### How many row groups a lookup reads
-
-For a query on one value, a reader reads every row group whose footer range includes it. Averaged
-over every value of two columns:
-
-```{include} _generated/writing-lookups.md
-```
-
-A lookup by `order_id` reads one row group in every file sorted by `order_id`, however many row
-groups there are. Shuffle the rows, or sort them by something else, and a lookup reads nearly
-every row group. `customer_id` was never sorted, so its lookups read nearly every row group in
-every file. Smaller row groups do not help a column nobody sorted by; they only add row groups to
-read.
-
-### What queries cost
-
-The same five queries against every file, counting what the reader fetched after the footer:
-
-```{include} _generated/writing-queries.md
-```
-
-Some results were expected. Sorting decides which lookups are cheap, and only for the column
-sorted by. A rare value spread through every row group, such as a refund, costs nearly a full
-read whatever the layout.
-
-Two were not:
-
-- **Dictionaries make point lookups dearer.** To decode one page of a dictionary-encoded column,
-  the reader must first read that column's dictionary page, which for a column of unique values
-  holds every value in the row group. The lookup by `order_id` read several times more from the
-  dictionary-encoded baseline than from the file without dictionaries.
-- **The page index trades bytes for requests.** Without it the reader fetched whole column
-  chunks in one request; with it, fewer bytes in more requests. Against object storage, as
-  [ch10](#how-readers-read) measured, the requests can cost more than the bytes saved.
 
 ### Choosing
 
@@ -116,6 +147,12 @@ No setting is right for every table, but the measurements point one way:
 
 ## Building it
 
+The steps read each footer by hand, then called the reader's `scan`, which
+[ch10](#how-readers-read) built. The reader is the same for every file; only the files differ.
+This section shows the settings the files were written with, and the two places in the reader
+where a file's layout turns into bytes read: the indexes a lookup fetches, and the dictionary
+page it cannot skip.
+
 ### The writer's settings
 
 The fixtures are written by pyarrow, never by this repository's code. These are the settings
@@ -127,16 +164,65 @@ every `writing-*` file starts from:
 :end-before: def _writing(
 ```
 
-### Measuring a file by its queries
+### The indexes a lookup fetches
 
-Each figure runs the query through the read path from [ch10](#how-readers-read), and counts the
-requests after the footer:
+Before it reads any data, `scan` fetches the indexes its plan will consult. A row group the
+footer's statistics rule out needs none. For every other row group, it fetches the condition
+column's Bloom filter if the writer wrote one, that column's ColumnIndex, and the OffsetIndex of
+every column the query touches:
 
-```{literalinclude} ../crates/pqlab/src/figures.rs
-:language: rust
-:start-at: /// Bytes and requests after the footer
-:end-before: fn writing_files(
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/scan.py
+:language: python
+:start-at: # Phase 2: the indexes the plan will consult.
+:end-before: # Phase 3: the data.
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/scan.rs
+:language: rust
+:start-at: // Phase 2: the indexes the plan will consult.
+:end-before: // Phase 3: the data.
+```
+:::
+::::
+
+A file sorted by the condition's column leaves one row group, and so fetches one row group's
+indexes. A shuffled file leaves every row group and fetches every row group's indexes, before it
+reads a page. A file without a page index has nothing to fetch here, and reads whole column
+chunks instead.
+
+### The dictionary page a lookup cannot skip
+
+The plan then reads the pages of each column that hold the kept rows. [ch09](#skipping-data)'s
+`column_read` adds the chunk's dictionary page to any read of its data pages, since a
+dictionary-encoded page cannot be decoded without it:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/prune.py
+:language: python
+:start-at: # The dictionary page sits before the first data page
+:end-before: spans += [oi.pages[i].span() for i in wanted]
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/prune.rs
+:language: rust
+:start-at: // The dictionary page sits before the first data page
+:end-before: spans.extend(wanted.iter().map(|&i| oi.pages[i].span()));
+```
+:::
+::::
+
+For `country`, the dictionary page is a few values. For `order_id`, whose values are all
+different, it is every value in the row group, which is why the lookup read more from the
+dictionary-encoded baseline than from the plain file.
 
 ### Checking it
 
@@ -158,11 +244,55 @@ cargo test -p parquet-lab --test fixtures
 :::
 ::::
 
+### Ask a library
+
+At work you choose these settings in a writer, and read them back from the footer. pyarrow
+writes the baseline's rows again with the fixtures' settings, then with one changed at a time.
+The `parquet` crate reads the choices back from each file's footer:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/writing_parquet_well/writing_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/writing_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+With the fixtures' settings, pyarrow writes `writing-baseline.parquet` again, to the byte: the
+same size and the same footer. The pyarrow the page loads is older than the one that wrote the
+fixtures, and has no `max_rows_per_page`, so the step cuts its pages another way, as its comment
+says. Each change shows in the footer as the steps found it: more row
+groups and a larger footer, no dictionary page, no ColumnIndex. The last change declares the
+sort. `sorting_columns` records in each row group that it is sorted by `order_id`, for a few
+bytes of footer. The fixtures do not declare it, so the crate finds no sort order in any of
+them. A reader can infer the order from the statistics, but the footer never states it.
+
+The crate writes too. Its `WriterProperties` set the same choices: `set_max_row_group_row_count`,
+`set_dictionary_enabled`, `set_statistics_enabled` with `EnabledStatistics::Page` for the page
+index, `set_sorting_columns` and `set_column_bloom_filter_enabled`. Writing rows with it needs
+either a column writer fed value by value, or the `arrow` feature's `ArrowWriter`, which this
+workspace does not build, so the step reads instead.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin writing_with_a_library
+```
+
 ## What this cannot tell you
 
 **How the settings behave at scale.** The fixtures hold few enough rows that every row group is
 small, and the proportions change with size. A footer that is a large share of a small file, as
-in the table of files above, is a rounding error in a large one. The direction of each effect
+the first step printed, is a rounding error in a large one. The direction of each effect
 holds; the sizes do not.
 
 **What the settings cost the writer.** Larger row groups need more memory while writing, and
