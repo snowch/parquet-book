@@ -417,44 +417,21 @@ cost is the real bill.
 Three, in `exercises/python/changing_a_table.py`, or in Rust in
 `exercises/src/changing_a_table.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: changing_a_table
+```
+
 **15.1 The files a lookup opens.** Given a snapshot and an `order_id`, return the data files whose
 range holds it and the delete files that name them. The test compares your answer with the
 reader's for every order in every snapshot, and for made-up snapshots whose ranges overlap.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_changing_a_table.py --problems -k problem_15_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test changing_a_table problem_15_1 -- --ignored
-```
-:::
-::::
 
 **15.2 Plan a compaction.** Choose the files to rewrite, those with deletes and those too small,
 and pack them into groups of at most a target number of rows, in order of `order_id`. The rules
 are in the stub. The test compares your plan with the reader's across many targets and
 snapshots, and checks that for `after-a-day` it rewrites exactly the files `compacted` replaced.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_changing_a_table.py --problems -k problem_15_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test changing_a_table problem_15_2 -- --ignored
-```
-:::
-::::
 
 **15.3 Your own table.** No test: the table is yours. Take a table you write to every day. Count
 its files, how many are small, and, if it uses merge-on-read, how many delete files it holds.
@@ -464,9 +441,23 @@ reads, how often to compact it, and how many scans a compaction takes to pay for
 of the table's reads are lookups of single rows, it should say which store would serve those
 better.
 
-```problems
-chapter: changing_a_table
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_15_1` in Python, or `problem_15_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_changing_a_table.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test changing_a_table -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

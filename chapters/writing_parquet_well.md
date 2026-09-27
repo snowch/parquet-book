@@ -191,41 +191,18 @@ writers choose differently, and a file's `created_by` says which one wrote it.
 Three, in `exercises/python/writing_parquet_well.py`, or in Rust in
 `exercises/src/writing_parquet_well.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: writing_parquet_well
+```
+
 **11.1 Row groups per lookup.** From each row group's bounds, count the row groups a lookup for a
 value must read. The test compares your count with the reader's plans for values in every file.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_writing_parquet_well.py --problems -k problem_11_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test writing_parquet_well problem_11_1 -- --ignored
-```
-:::
-::::
-
 **11.2 What order costs.** From a column's values in file order and a row group size, compute the
 mean number of row groups a lookup reads. The test checks every ch11 file's integer columns.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_writing_parquet_well.py --problems -k problem_11_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test writing_parquet_well problem_11_2 -- --ignored
-```
-:::
-::::
 
 **11.3 Your own writer.** No test: the data is yours. Rewrite one of your files three ways,
 changing one setting each time: the sort column, the row group size, or dictionary encoding for
@@ -234,9 +211,23 @@ one column. Measure each with `PYTHONPATH=python python3 -m parquet_lab scan FIL
 often. A good answer reports the file sizes, what each query read, and which setting you would
 change in production, with the cost that change puts on writing.
 
-```problems
-chapter: writing_parquet_well
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_11_1` in Python, or `problem_11_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_writing_parquet_well.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test writing_parquet_well -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

@@ -212,41 +212,18 @@ is the natural next step, and problem 12.3 asks what it would change.
 Three, in `exercises/python/a_tiny_query_engine.py`, or in Rust in
 `exercises/src/a_tiny_query_engine.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: a_tiny_query_engine
+```
+
 **12.1 A hash aggregate.** Sum values by group. The test compares your sums with pyarrow's for
 the baseline file's statuses, and with many generated cases.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_a_tiny_query_engine.py --problems -k problem_12_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test a_tiny_query_engine problem_12_1 -- --ignored
-```
-:::
-::::
-
 **12.2 The top `n`.** Return the `n` largest amounts, ties broken by order number. The test
 compares your answer with pyarrow's sort, and with many generated cases.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_a_tiny_query_engine.py --problems -k problem_12_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test a_tiny_query_engine problem_12_2 -- --ignored
-```
-:::
-::::
 
 **12.3 Your own queries.** No test: the queries are yours. Run three queries you use against one
 of your files with `PYTHONPATH=python python3 -m parquet_lab query FILE "SQL"` or
@@ -255,9 +232,23 @@ trust. Record whether the answers agree and how many row groups the scan read. T
 that read the most, and say how page-level skipping from [ch09](#skipping-data) would change its
 scan. A good answer estimates the rows it would no longer decode, using the page index.
 
-```problems
-chapter: a_tiny_query_engine
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_12_1` in Python, or `problem_12_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_a_tiny_query_engine.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test a_tiny_query_engine -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

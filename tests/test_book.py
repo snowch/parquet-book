@@ -168,7 +168,7 @@ def test_a_written_chapters_problems_are_tests(chapter):
     text = (ROOT / chapter.path).read_text()
     section = text.split("\n## Problems\n", 1)[1].split("\n## Where to go next\n", 1)[0]
     commands = [body.strip() for lang, body in fences(section) if lang == "bash"]
-    assert commands, "each tested problem shows the command that runs it"
+    assert commands, "the problems show the commands that run them at a desk"
     python_tests = ROOT / "exercises" / "python" / "tests" / f"test_{chapter.slug}.py"
     rust, python = [], []
     for cmd in commands:
@@ -188,7 +188,8 @@ def test_a_written_chapters_problems_are_tests(chapter):
             assert f"def test_{m.group(2)}" in python_tests.read_text(), f"no test named {m.group(2)}*"
         python.append(m.group(2))
     if chapter in PORTED:
-        assert python == rust, "a ported chapter shows each problem's command in both languages"
+        # The workbench runs each problem in the page; at a desk one pair of commands runs them all.
+        assert python == rust == [None], "show the chapter's problem commands once, in both languages"
     else:
         assert not python, "Python problem commands belong to chapters the Python reader covers"
     assert "No test" in section, "every chapter has a problem about the reader's own system"
@@ -243,7 +244,9 @@ def test_a_ported_chapter_quotes_both_readers(chapter):
     tests = (ROOT / "exercises" / "python" / "tests" / f"test_{chapter.slug}.py").read_text()
     assert "@pytest.mark.problem(" in tests
     problems = text[text.index("\n## Problems") : text.index("\n## Where to go next")]
-    assert f"```problems\nchapter: {chapter.slug}\n```" in problems, "end the problems with their workbench"
+    workbench = f"```problems\nchapter: {chapter.slug}\n```"
+    first = re.search(r"^\*\*\d+\.\d+ ", problems, re.M)
+    assert workbench in problems[: first.start()], "open the problems with their workbench, before the first"
 
 
 def test_the_python_engine_runs_exactly_the_ported_chapters_labs():

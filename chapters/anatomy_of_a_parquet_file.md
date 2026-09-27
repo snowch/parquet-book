@@ -569,60 +569,22 @@ Four, in `exercises/python/anatomy_of_a_parquet_file.py`, or in Rust in
 them. Each test compares your function with the book's reader or with pyarrow, across
 many cases, so a hard-coded answer does not pass. The fourth has no test, and says why.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: anatomy_of_a_parquet_file
+```
+
 **2.1 The footer length.** Decode the footer length from the last eight bytes of a file, writing
 the little-endian arithmetic yourself.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_1 -- --ignored
-```
-:::
-::::
 
 **2.2 Where the footer is.** Given a file size and a footer length, return the footer's byte
 range, or refuse when no valid file could have them.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_2 -- --ignored
-```
-:::
-::::
-
 **2.3 How many requests.** A reader that knows the file size reads some number of bytes from the
 end, then fetches whatever part of the footer it missed. Predict how many `GET` requests it makes.
 The test runs the traced reader and counts.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems -k problem_2_3
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test anatomy_of_a_parquet_file problem_2_3 -- --ignored
-```
-:::
-::::
 
 **2.4 Your own files.** No test: the files are yours, and nothing here can see them. Take a
 Parquet file your systems write. Read its last eight bytes (any hex viewer will do) and work out
@@ -633,9 +595,23 @@ when it opens the file. If you can trace the engine's requests, check your predi
 trace. A disagreement means the engine does something this chapter has not described, and finding
 out what is the useful result.
 
-```problems
-chapter: anatomy_of_a_parquet_file
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_2_1` in Python, or `problem_2_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_anatomy_of_a_parquet_file.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test anatomy_of_a_parquet_file -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

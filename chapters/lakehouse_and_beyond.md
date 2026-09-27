@@ -314,44 +314,21 @@ at a time, and makes the log the only practical way to plan a query at all.
 Three, in `exercises/python/lakehouse_and_beyond.py`, or in Rust in
 `exercises/src/lakehouse_and_beyond.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: lakehouse_and_beyond
+```
+
 **14.1 Partition values.** Read the partition values in a Hive-style path, percent-encoding
 included. The test compares your answer with the reader's for every file in the table and a set
 of awkward paths.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_lakehouse_and_beyond.py --problems -k problem_14_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test lakehouse_and_beyond problem_14_1 -- --ignored
-```
-:::
-::::
 
 **14.2 Plan from the log.** Given a log and a range of `order_id`, return the files that could
 hold a row in it. The test compares your files with the reader's decisions for many ranges,
 checks against the files themselves that no file with a matching row is dropped, and runs a log
 that removes a file and adds one with no statistics.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_lakehouse_and_beyond.py --problems -k problem_14_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test lakehouse_and_beyond problem_14_2 -- --ignored
-```
-:::
-::::
 
 **14.3 Your own table.** No test: the data is yours. Pick a table you query, and the three
 conditions its queries use most. Decide which column to partition by, and in what order to write
@@ -359,9 +336,23 @@ the rows within each partition. For each condition, say whether the path, the lo
 or neither would rule files out. A good answer names one condition neither helps, and says what
 it would cost to change the layout so that one did.
 
-```problems
-chapter: lakehouse_and_beyond
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_14_1` in Python, or `problem_14_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_lakehouse_and_beyond.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test lakehouse_and_beyond -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

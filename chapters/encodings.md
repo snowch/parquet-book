@@ -445,59 +445,21 @@ only data page version 2 uses; [ch06](#pages) returns to that.
 Four, in `exercises/python/encodings.py`, or in Rust in
 `exercises/src/encodings.rs`. The first three have tests. The fourth has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: encodings
+```
+
 **5.1 DELTA_BINARY_PACKED.** Decode it. The test uses the fixture's integer columns and hundreds of
 generated encodings with other block sizes, miniblock counts and bit widths.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test encodings problem_5_1 -- --ignored
-```
-:::
-::::
 
 **5.2 Shared prefixes.** Rebuild `DELTA_BYTE_ARRAY`'s values from their prefix lengths and
 suffixes. The test uses the fixture's URLs and generated sorted strings.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test encodings problem_5_2 -- --ignored
-```
-:::
-::::
-
 **5.3 Dictionary indices.** Read a dictionary-encoded page's bit width and indices, and return the
 values. You may use your hybrid decoder from problem 4.1.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_encodings.py --problems -k problem_5_3
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test encodings problem_5_3 -- --ignored
-```
-:::
-::::
 
 **5.4 Your own columns.** No test: the columns are yours. Pick a Parquet file your systems write
 and run `PYTHONPATH=python python3 -m parquet_lab encodings FILE COLUMN` or
@@ -507,9 +469,23 @@ different encoding would suit the values better, and say what pattern in the val
 think so. A good answer checks the claim by rewriting that column with the other encoding and
 measuring; if the saving does not appear, say what the values do that you did not expect.
 
-```problems
-chapter: encodings
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_5_1` in Python, or `problem_5_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_encodings.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test encodings -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

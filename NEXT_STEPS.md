@@ -242,6 +242,13 @@ indices, and `decode_a_column` prints the reader's decode steps for `url`. `enco
 asks pyarrow and the crate for each chunk's encodings and the dictionary. The panel is gone from
 every layer; `report::encodings` stays for `pqlab encodings` and the figures.
 
+## Done: the problems editor first
+
+- Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
+  ending with it several screens below. The per-problem commands are gone: the workbench runs every
+  problem and says which fail, and one pair of commands at the end runs them at a desk, in Python
+  and in Rust.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,

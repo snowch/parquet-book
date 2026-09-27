@@ -30,7 +30,7 @@ including a headless-browser test of the experiments if Playwright is installed.
 
 ## Edit and run it online
 
-- **Python, in the book's pages.** Every chapter ends its problems with a workbench: edit the
+- **Python, in the book's pages.** Every chapter opens its problems with a workbench: edit the
   Python stub and run its tests, which pytest runs in your browser under Pyodide. Every Python
   command the pages print that the browser can run, the reader's tests and its command line, has
   a Run button. On any lab,

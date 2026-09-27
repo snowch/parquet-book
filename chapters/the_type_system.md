@@ -466,61 +466,23 @@ Four, in `exercises/python/the_type_system.py`, or in Rust in
 `exercises/src/the_type_system.rs`. The first three have tests that fail until you solve
 them. The fourth has no test.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: the_type_system
+```
+
 **3.1 Rebuild the tree.** Given each element's name and number of children, in depth-first order,
 return every leaf's path. The test uses the fixtures and hundreds of generated schemas.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test the_type_system problem_3_1 -- --ignored
-```
-:::
-::::
 
 **3.2 Maximum levels.** Given the repetitions along a path, return the maximum definition and
 repetition levels. The test checks every path up to five fields deep, and the fixtures against
 pyarrow.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test the_type_system problem_3_2 -- --ignored
-```
-:::
-::::
-
 **3.3 A decimal from bytes.** Read a big-endian two's-complement integer and place the decimal
 point. The test compares with pyarrow on the fixture and with the reader on generated values,
 negative ones included.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_the_type_system.py --problems -k problem_3_3
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test the_type_system problem_3_3 -- --ignored
-```
-:::
-::::
 
 **3.4 Your own schema.** No test: the tables are yours. Print the schema of a Parquet file your
 systems write (`PYTHONPATH=python python3 -m parquet_lab schema FILE`, `cargo run -p pqlab -- schema FILE`, or any
@@ -530,9 +492,23 @@ strings or integers, money stored as `DOUBLE`, timestamps stored as `INT96`. For
 say whether it is `UTC` or `local`, and whether that matches what the data means. A good answer
 names each column, what it should be, and what a reader would get wrong because of the gap.
 
-```problems
-chapter: the_type_system
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_3_1` in Python, or `problem_3_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_the_type_system.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test the_type_system -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

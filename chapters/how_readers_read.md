@@ -246,42 +246,19 @@ can take longer than fetching, and a reader that overlaps the two gains most.
 Three, in `exercises/python/how_readers_read.py`, or in Rust in
 `exercises/src/how_readers_read.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: how_readers_read
+```
+
 **10.1 Merge ranges.** Turn byte ranges into requests, merging those within a gap. The test
 compares your requests with the reader's on thousands of generated cases.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_how_readers_read.py --problems -k problem_10_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test how_readers_read problem_10_1 -- --ignored
-```
-:::
-::::
 
 **10.2 Time the requests.** Given each phase's request durations and a number of connections,
 say when the last request finishes. The test compares your answer with the simulated store's
 clock.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_how_readers_read.py --problems -k problem_10_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test how_readers_read problem_10_2 -- --ignored
-```
-:::
-::::
 
 **10.3 Your own network.** No test: the network is yours. Time a hundred small range requests
 and a few large ones against the object store your files live in, and estimate its latency and
@@ -290,9 +267,23 @@ bandwidth. Then run `PYTHONPATH=python python3 -m parquet_lab scan FILE --where 
 on one of your files, with a few gaps and connection counts. A good answer names the gap and
 connection count you would choose, and checks the prediction against a real query's timing.
 
-```problems
-chapter: how_readers_read
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_10_1` in Python, or `problem_10_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_how_readers_read.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test how_readers_read -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

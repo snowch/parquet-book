@@ -245,41 +245,18 @@ guessing at it.
 Three, in `exercises/python/pages.py`, or in Rust in
 `exercises/src/pages.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: pages
+```
+
 **6.1 Walk a column chunk.** Return the offset of every page, using the book's Thrift decoder for
 the headers. The test walks every column chunk of every fixture.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_pages.py --problems -k problem_6_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test pages problem_6_1 -- --ignored
-```
-:::
-::::
-
 **6.2 Check a checksum.** Write CRC-32 yourself, and check the fixture's page checksums with it.
 The test also damages the pages and expects your check to fail.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_pages.py --problems -k problem_6_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test pages problem_6_2 -- --ignored
-```
-:::
-::::
 
 **6.3 Your own pages.** No test: the files are yours. Run
 `PYTHONPATH=python python3 -m parquet_lab pages FILE COLUMN` or
@@ -289,9 +266,23 @@ find the writer's page-size setting in its configuration or documentation, and c
 answer explains any gap between the setting and what the pages show; a page far smaller than the
 target usually means a row count limit was reached first, and the answer should say which limit.
 
-```problems
-chapter: pages
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_6_1` in Python, or `problem_6_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_pages.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test pages -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

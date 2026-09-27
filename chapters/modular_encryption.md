@@ -258,42 +258,19 @@ subject, decide which columns to encrypt and hold the keys; the files only carry
 Three, in `exercises/python/modular_encryption.py`, or in Rust in
 `exercises/src/modular_encryption.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: modular_encryption
+```
+
 **13.1 Find the modules.** Split an encrypted column chunk into its modules by their length
 prefixes. The test compares your modules with the reader's for both encrypted columns, and with
 generated chunks.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_modular_encryption.py --problems -k problem_13_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test modular_encryption problem_13_1 -- --ignored
-```
-:::
-::::
-
 **13.2 Which footer mode?** Tell an unencrypted file, a plaintext footer and an encrypted footer
 apart. The test checks every fixture.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_modular_encryption.py --problems -k problem_13_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test modular_encryption problem_13_2 -- --ignored
-```
-:::
-::::
 
 **13.3 Your own threat model.** No test: the data is yours. Pick a table with sensitive columns
 and decide which to encrypt, and whether the footer should be. List what a reader without keys
@@ -301,9 +278,23 @@ would still learn in your choice, from the sizes, offsets and page counts this c
 A good answer names one thing the plaintext footer reveals that matters for your data, and says
 whether that justifies an encrypted footer and the cost of making every reader hold a key.
 
-```problems
-chapter: modular_encryption
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_13_1` in Python, or `problem_13_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_modular_encryption.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test modular_encryption -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

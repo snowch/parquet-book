@@ -122,7 +122,7 @@ fixtures: tiny.parquet, multiple-row-groups.parquet
 `tools/render.py` validates the experiment name and the fixtures and emits a mount point;
 `web/lab/lab.js` loads the WASM module and the fixtures, relative to its own URL, and mounts it.
 
-**Code runs where the reader is.** Every chapter's Problems section ends with a ```` ```problems ````
+**Code runs where the reader is.** Every chapter's Problems section opens with a ```` ```problems ````
 block (`chapter: <slug>`): a workbench (`web/lab/workbench.js`) where the reader edits the Python
 stub and runs its graders with pytest under Pyodide, in a worker (`python-worker.js`, shared
 through `runner.js`), on the repository's own files laid out as a desk has them. A `bash` block

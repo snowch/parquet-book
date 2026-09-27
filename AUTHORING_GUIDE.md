@@ -179,17 +179,21 @@ A problem is a stub and a test that passes only when the stub is right.
 - Make failure messages teach: "if you got X, you read the bytes most significant first".
 - Add an unmarked scaffolding test beside the problems proving they are answerable and not
   trivially so. CI runs it.
-- The chapter shows the command for each tested problem, in a tab set of two `bash` blocks:
-  `python3 -m pytest exercises/python/tests/test_<slug>.py --problems -k problem_N_M` and
-  `cargo test -p exercises --test <slug> problem_N_M -- --ignored`. `tests/test_book.py` checks it.
+- The section opens, after a sentence saying how many problems there are, with the chapter's
+  workbench: a fenced block in the language `problems` holding `chapter: <slug>`. It lets a reader
+  edit the Python stub and run its tests in the page, under Pyodide, with the same graders, so it
+  sits where a reader on a phone meets it first. Keep the Python graders to a few seconds: the
+  page runs them more slowly than a desk.
+- Each problem is its number, title and statement, with no command beneath it: the workbench runs
+  them all and says which fail. The section ends with one tab set of two `bash` blocks that run the
+  chapter's problems at a desk or in a Codespace, and in Rust:
+  `python3 -m pytest exercises/python/tests/test_<slug>.py --problems` and
+  `cargo test -p exercises --test <slug> -- --ignored`, with a sentence saying how to run one
+  (`-k problem_N_M`; `problem_N_M` before the `--`). `tests/test_book.py` checks it.
 - Commands get buttons in the page (`web/lab/commands.js`). Run: `python3 -m pytest` on
   `python/tests` or `exercises/python`, `PYTHONPATH=python python3 -m parquet_lab`, and
   `cargo run -p pqlab --`. Open in Codespaces: any other `cargo`, `make` or `python3` command.
   Keep a block to one kind, so it gets the button it should; a mixed block gets Codespaces.
-- The section ends with the chapter's workbench, a fenced block in the language `problems` holding
-  `chapter: <slug>`. It lets a reader edit the Python stub and run its tests in the page, under
-  Pyodide, with the same graders. Keep the Python graders to a few seconds: the page runs them
-  more slowly than a desk.
 - The last problem has no test. It is about the reader's own files or systems, says what a good
   answer contains, and says what a surprising result would mean.
 

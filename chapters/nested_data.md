@@ -393,41 +393,18 @@ standard three-level form only.
 Three, in `exercises/python/nested_data.py`, or in Rust in
 `exercises/src/nested_data.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: nested_data
+```
+
 **4.1 The hybrid.** Decode an RLE / bit-packing hybrid stream. The test uses every level stream in
 the fixture and a thousand generated streams.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_nested_data.py --problems -k problem_4_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test nested_data problem_4_1 -- --ignored
-```
-:::
-::::
-
 **4.2 A list from its levels.** Rebuild a list of optional strings from its levels and values. The
 test compares with pyarrow on the fixture and with the reader on generated levels.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_nested_data.py --problems -k problem_4_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test nested_data problem_4_2 -- --ignored
-```
-:::
-::::
 
 **4.3 Your own nested data.** No test: the data is yours. Take a nested column from your own
 Parquet files and run `PYTHONPATH=python python3 -m parquet_lab levels FILE COLUMN` or
@@ -436,9 +413,23 @@ among the leaves. Pick three records and write down, before looking, the levels 
 each value slot. Then compare. A good answer explains every disagreement. If your records never
 reach the column's maximum repetition level, say what the schema allows that the data never uses.
 
-```problems
-chapter: nested_data
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_4_1` in Python, or `problem_4_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_nested_data.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test nested_data -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

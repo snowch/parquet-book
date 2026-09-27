@@ -270,42 +270,19 @@ there before reading any data page. This reader does not.
 Three, in `exercises/python/skipping_data.py`, or in Rust in
 `exercises/src/skipping_data.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: skipping_data
+```
+
 **9.1 Can this be skipped?** Decide from a range and a null count whether a page can hold a match
 for four comparisons. The test checks every page of the pruning fixtures: you must never skip a
 page holding a match, and must skip every page the metadata rules out.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_skipping_data.py --problems -k problem_9_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test skipping_data problem_9_1 -- --ignored
-```
-:::
-::::
-
 **9.2 Probe a Bloom filter.** Given a filter's bitset and a value's hash, test the eight bits.
 The test compares your answer with the reader's for thousands of customer numbers.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_skipping_data.py --problems -k problem_9_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test skipping_data problem_9_2 -- --ignored
-```
-:::
-::::
 
 **9.3 Your own condition.** No test: the data is yours. Take a condition your queries use often
 and a file they run against, and run `PYTHONPATH=python python3 -m parquet_lab skipping FILE COLUMN OP VALUE` or
@@ -314,9 +291,23 @@ how many row groups and bytes it skips, and with which mechanisms. Then rewrite 
 that column and run it again. A good answer reports both, says what the sort cost the other
 columns' compression, and names a condition the sort does not help.
 
-```problems
-chapter: skipping_data
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_9_1` in Python, or `problem_9_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_skipping_data.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test skipping_data -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

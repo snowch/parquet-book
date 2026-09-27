@@ -345,42 +345,19 @@ better than these.
 Three, in `exercises/python/compression.py`, or in Rust in
 `exercises/src/compression.rs`. The first two have tests. The third has none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: compression
+```
+
 **7.1 Snappy.** Decompress a raw Snappy block. The test decompresses every page of
 `codec-snappy.parquet` and compares it, byte for byte, with the same page in
 `codec-none.parquet`.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_compression.py --problems -k problem_7_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test compression problem_7_1 -- --ignored
-```
-:::
-::::
-
 **7.2 LZ4.** Decompress an LZ4 block. The fixture's pages include a match long enough to need
 several extra length bytes.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_compression.py --problems -k problem_7_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test compression problem_7_2 -- --ignored
-```
-:::
-::::
 
 **7.3 Your own codec.** No test: the data is yours. Take a Parquet file your systems write and
 rewrite it with each codec your writer supports, keeping everything else the same. Record each
@@ -389,9 +366,23 @@ which codec you would choose, and for which storage: local disk, a network file 
 object store. A good answer names the column that contributes most to the size, and says whether
 a different encoding for that column would matter more than the codec.
 
-```problems
-chapter: compression
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_7_1` in Python, or `problem_7_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_compression.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test compression -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 

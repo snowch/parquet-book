@@ -265,43 +265,20 @@ Three, in `exercises/python/metadata_and_statistics.py`, or in Rust in
 `exercises/src/metadata_and_statistics.rs`. The first two have tests. The third has
 none.
 
+The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
+runs the graders in the page, the same tests that run at a desk.
+
+```problems
+chapter: metadata_and_statistics
+```
+
 **8.1 Sort orders.** Compare two values of a column in its sort order, for six kinds of column.
 The test finds each column chunk's minimum and maximum with your order and checks them against
 the bounds pyarrow wrote.
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_metadata_and_statistics.py --problems -k problem_8_1
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test metadata_and_statistics problem_8_1 -- --ignored
-```
-:::
-::::
-
 **8.2 Which bounds.** Decide which bounds a reader may use. The test presents each chunk's
 statistics as written, without `column_orders`, as an old writer would have set them, and with a
 NaN.
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```bash
-python3 -m pytest exercises/python/tests/test_metadata_and_statistics.py --problems -k problem_8_2
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```bash
-cargo test -p exercises --test metadata_and_statistics problem_8_2 -- --ignored
-```
-:::
-::::
 
 **8.3 Your own footers.** No test: the files are yours. Run
 `PYTHONPATH=python python3 -m parquet_lab statistics FILE 0 COLUMN` or
@@ -311,9 +288,23 @@ the file the footer takes. Then find one column where the statistics could not h
 run, and say why: no statistics, a range as wide as the column's, or a comparison the order does
 not support. A good answer says what the writer could change.
 
-```problems
-chapter: metadata_and_statistics
+For the Rust stubs, or to work at a desk, run the chapter's graders with these commands. Add
+`-k problem_8_1` in Python, or `problem_8_1` before the `--` in Rust, to run one problem:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```bash
+python3 -m pytest exercises/python/tests/test_metadata_and_statistics.py --problems
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```bash
+cargo test -p exercises --test metadata_and_statistics -- --ignored
+```
+:::
+::::
 
 ## Where to go next
 
