@@ -193,12 +193,6 @@ def cases():
         native.append(("changes", "fixtures/changes.json", "--snapshot", snapshot, "--compact"))
     calls.append({"call": "query", "file": "fixtures/tiny.parquet", "sql": "SELECT nonsense FROM"})
     native.append(("query", "fixtures/tiny.parquet", "SELECT nonsense FROM"))
-    for columns, row in (([2, 3], -1), ([3], -1), ([0, 1, 2, 3, 4], 3), ([0, 4], -1), ([], -1)):
-        calls.append({"call": "layouts", "options": {"columns": columns, "row": row}})
-        args = ["layouts", "--columns", ",".join(map(str, columns))]
-        if row >= 0:
-            args += ["--row", str(row)]
-        native.append(tuple(args))
     return calls, native
 
 

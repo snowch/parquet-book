@@ -437,8 +437,10 @@ def build(out: Path) -> None:
         mdast = parse[p["source"]]["mdast"]
         normalise_headings(mdast)
         body = renderer.render_page(mdast)
-        # The lab script also puts buttons on the commands a page prints: Run, or Open in Codespaces.
-        has_lab = any(m in body for m in ('class="lab"', 'class="workbench"', "python3 -m ", "cargo "))
+        # The lab script also puts buttons on the commands a page prints (Run, or Open in Codespaces)
+        # and on its walkthrough steps (Run and Edit), so a page with any of those loads it.
+        markers = ('class="lab"', 'class="workbench"', "python3 -m ", "cargo ", 'class="quoted walkthrough"')
+        has_lab = any(m in body for m in markers)
         text = page_html(
             p,
             body,

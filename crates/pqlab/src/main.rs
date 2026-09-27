@@ -22,8 +22,6 @@
 //! pqlab levels FILE COLUMN          one column's levels, values and rebuilt records
 //! pqlab schema FILE                  the schema: flat, rebuilt, and read through logical types
 //! pqlab interpret FILE OFFSET        every reading of the bytes at OFFSET, as JSON
-//! pqlab layouts --columns 2,3 [--row N]
-//!                                    ch01's row and column layouts, queried, as JSON
 //! pqlab figures [--out DIR] [--check]
 //!                                    write the book's generated fragments, or check them
 //! ```

@@ -14,7 +14,6 @@ from .reader import FooterOptions, Head, Known, SuffixRange
 FILES: list[tuple[str, bytearray]] = []
 
 EXPERIMENTS = (
-    "layouts",
     "anatomy",
     "schema",
     "levels",
@@ -79,11 +78,6 @@ def structure(id: int) -> str:
 def interpret(id: int, offset: int) -> str:
     data = _file(id)
     return _no_such_file(id) if data is None else report.dumps(report.interpret(data, int(offset)))
-
-
-def layouts(column_mask: int, row: int, latency_us: int, bandwidth: int) -> str:
-    model = NetworkModel(int(latency_us), int(bandwidth))
-    return report.dumps(report.layouts(column_mask, row if row >= 0 else None, model))
 
 
 def schema(id: int) -> str:

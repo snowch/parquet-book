@@ -6,7 +6,6 @@
 //!
 //! | Module | What it does | Chapter |
 //! |---|---|---|
-//! | [`layout`] | one table stored by rows and by columns | ch01 |
 //! | [`bytes`] | little-endian integers, varints, zigzag, spans | ch02 |
 //! | [`format`] | the magic bytes, the trailer, where the footer is | ch02 |
 //! | [`thrift`] | Thrift's compact protocol, decoded without a schema | ch02 |
@@ -57,7 +56,6 @@ pub mod encoding;
 pub mod engine;
 pub mod format;
 pub mod json;
-pub mod layout;
 pub mod logical;
 pub mod metadata;
 pub mod nested;

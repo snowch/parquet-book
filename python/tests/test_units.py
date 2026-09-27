@@ -22,7 +22,6 @@ from parquet_lab.format import (
     footer_span,
     parse_trailer,
 )
-from parquet_lab.layout import Layout, Query, Table, encode, ranges
 from parquet_lab.object_store import (
     Bounded,
     MemoryStore,
@@ -111,17 +110,6 @@ def test_nesting_has_a_limit():
     # A struct whose field 1 is a struct whose field 1 is a struct, and so on.
     with pytest.raises(TooDeep):
         read_struct(ByteReader(bytes([0x1C] * 200), 0))
-
-
-def test_ranges_merge_only_when_they_touch():
-    table = Table.sales()
-    by_rows = encode(table, Layout.ROWS)
-    by_columns = encode(table, Layout.COLUMNS)
-    everything = Query(list(range(5)), list(range(8)))
-    assert ranges(by_rows, everything) == [Span(0, len(by_rows.data))]
-    one_column = Query([3], list(range(8)))
-    assert len(ranges(by_columns, one_column)) == 1
-    assert len(ranges(by_rows, one_column)) == 8
 
 
 def test_the_store_serves_ranges_as_s3_does():

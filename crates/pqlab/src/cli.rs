@@ -34,7 +34,6 @@ pub const USAGE: &str = "usage:
   pqlab statistics FILE ROW_GROUP COLUMN
   pqlab compression FILE COLUMN [PAGE]
   pqlab interpret FILE OFFSET
-  pqlab layouts --columns 2,3 [--row N] [--latency-us N] [--bandwidth BYTES_PER_SEC]
   pqlab figures [--out DIR] [--check]";
 
 /// Every object a table's listing names (ch14, ch15), read from beside the listing, by key.
@@ -422,40 +421,6 @@ pub fn run(
             if json.get("ok") != Some(&Json::Bool(true)) {
                 return Ok(1);
             }
-        }
-        "layouts" => {
-            let mut mask = 0u32;
-            for c in flag(args, "--columns")
-                .unwrap_or("")
-                .split(',')
-                .filter(|c| !c.is_empty())
-            {
-                let c: u32 = c
-                    .parse()
-                    .map_err(|_| format!("--columns wants numbers, not {c:?}"))?;
-                mask |= 1 << c;
-            }
-            let row = match flag(args, "--row") {
-                None => None,
-                Some(r) => Some(
-                    r.parse::<usize>()
-                        .map_err(|_| format!("--row wants a number, not {r:?}"))?,
-                ),
-            };
-            let defaults = NetworkModel::default();
-            let model = NetworkModel {
-                latency_us: number(args, "--latency-us", defaults.latency_us)?,
-                bandwidth_bytes_per_sec: number(
-                    args,
-                    "--bandwidth",
-                    defaults.bandwidth_bytes_per_sec,
-                )?,
-            };
-            out!(
-                out,
-                "{}",
-                report::layouts(mask, row, model).to_json_pretty()
-            );
         }
         other => return Err(format!("unknown command {other:?}")),
     }

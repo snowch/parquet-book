@@ -378,8 +378,7 @@ ORDERS = _orders(256)
 CODECS = ("none", "snappy", "gzip", "lz4", "zstd", "brotli")
 
 
-#: ch01's eight orders, as a pipeline would hold them before writing them out. The same rows as
-#: the layouts lab's table (``Table.sales()``); python/tests/test_fixtures.py holds them equal.
+#: ch01's eight orders, as a pipeline would hold them before writing them out.
 #: They are written to ``formats/`` as CSV and as Parquet, beside a larger table of orders.
 #: pyarrow infers a nullable schema, and the lab's table has no nulls, so every column is then
 #: made required, as in tiny.parquet.

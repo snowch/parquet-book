@@ -87,31 +87,34 @@ files.
 
 ### One table, two layouts
 
-Why the difference? The panel stores the eight orders both ways in the plainest encoding there
-is: an integer is eight bytes, a date is a four-byte day number, and a string is a four-byte
-length followed by its bytes. The only difference is order. The row layout writes each order's
-values together, as a CSV file does. The column layout writes all eight `order_id` values, then
-all eight `customer_id` values, and so on, as a Parquet file does within each row group.
+Why the difference? A layout is only the order in which a table's values are stored. Store the
+eight orders both ways, and mark the values the query needs, one character a value:
 
-```lab
-experiment: layouts
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/why_parquet_exists/two_layouts.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/two_layouts.rs
+:language: rust
+```
+:::
+::::
 
-Try these:
+By rows, each order's values sit together, as in the CSV file, so the two columns come in one
+short run per order and a reader must skip past everything between them. By columns, each
+column's values sit together, as in a Parquet file, so the two columns are one run: one read.
 
-1. **Keep the default query**, `country` and `amount_cents` for every row. In the row layout the
-   lit bytes are scattered through the object, one run per order. In the column layout they form
-   one block.
-2. **Add columns one at a time.** The row layout needs a range per order until you pick every
-   column. The column layout needs one range for each run of adjacent columns you pick.
-3. **Switch to one order.** Now the row layout needs one range and the column layout needs one per
-   column. Reading a row back out of columns is called *reconstructing* it, and its cost grows
-   with the number of columns. This is the trade Parquet makes, and the reason it is not a
-   database format.
-
-The picture is drawn from the book's reader, its `layout` module
-(`python/parquet_lab/layout.py`, or `crates/parquet-lab/src/layout.rs`). The book does not walk
-through that module, because it is not Parquet. The rest of the reader is.
+Change `wanted` and run it again. Add columns, and the row layout keeps one run per order until
+every column is wanted; the column layout needs one run for each group of neighbouring columns.
+Then keep a single order, `rows = rows[3:4]`, and the trade reverses: by rows the order is one
+run, and by columns it is a piece of every column. Reading a row back out of columns is called
+*reconstructing* it, and its cost grows with the number of columns. This is the trade Parquet
+makes, and the reason it is not a database format.
 
 ### Why analytical queries favour columns
 
@@ -149,8 +152,8 @@ then with pyarrow.
 ## What this cannot tell you
 
 **How the files compress.** The Parquet file is smaller than the CSV file, as well as cheaper to
-read from, because pyarrow encoded and compressed each column on its own. The panel uses no
-compression, so its two layouts are the same size. [ch05](#encodings) and [ch07](#compression)
+read from, because pyarrow encoded and compressed each column on its own. The two layouts above
+only reorder values, so they hold the same bytes. [ch05](#encodings) and [ch07](#compression)
 show what a column's encoding and compression do.
 
 **Other CSV readers.** Some readers split a CSV file among workers, or skip the fields a query
@@ -188,7 +191,7 @@ Two, both for reasoning. No test grades them: there is no code to write until th
 rows, and a query that reads three of its columns for every row. For each layout, say how many
 separate ranges the query needs, and how the bytes it moves compare with the size of the table,
 both when it fetches range by range and when it fetches the whole object. Check the shape of
-your answer against the panel by picking columns. A good answer says that the row layout needs a
+your answer by changing `wanted` in the layouts step. A good answer says that the row layout needs a
 range per row, or else the whole object, while the column layout needs at most one range per
 column. It also says that the column layout moves about three columns' worth of bytes, however
 many rows there are.

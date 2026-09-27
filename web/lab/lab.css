@@ -379,36 +379,8 @@
   .changes-grid .c-reqs th:last-child, .changes-grid .c-reqs td:last-child { display: none; }
 }
 
-/* Ch01: the layouts. */
-.lab .sql { margin: .7rem 1rem 0; }
-.lab table.data { margin: 0 1rem; font-size: 13px; }
+/* Tables inside a panel. */
 .lab .table-wrap { margin: .7rem 0; }
-.lab table.data td, .lab table.data th { padding: .2rem .6rem; }
-.lab table.data .on { background: var(--wash); font-weight: 600; color: var(--ink); }
-.strips { padding: 0 1rem; }
-.strip { margin: .8rem 0; }
-.strip figcaption { font: 13px/1.4 var(--chrome); color: var(--muted); margin-bottom: .3rem; }
-.cells .line { display: flex; align-items: center; gap: .4rem; margin: 2px 0; }
-.cells .line-name { flex: 0 0 6.5rem; font: 11px var(--mono); color: var(--muted); text-align: right;
-                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cells .line-cells { flex: 1; display: grid; grid-template-columns: repeat(var(--widest), minmax(0, 1fr)); gap: 1px; }
-.cell { height: 12px; min-width: 0; border-radius: 1px; opacity: .25; }
-.cell.start { margin-left: 1px; }
-@media (max-width: 36rem) {
-  .cells .line-name { flex-basis: 4.2rem; font-size: 10px; }
-  .lab table.data { margin: 0 .5rem; font-size: 12px; }
-  .lab table.data td, .lab table.data th { padding: .2rem .3rem; }
-  .lab table.data th { text-transform: none; letter-spacing: 0; font-size: 10.5px; }
-  .strips { padding: 0 .5rem; }
-}
-.cell.on { opacity: 1; }
-.cell.c0 { background: #35648f; } .cell.c1 { background: #2e7d32; } .cell.c2 { background: #9c4f96; }
-.cell.c3 { background: #c8791a; } .cell.c4 { background: #5a707b; }
-.lab table.data th.c0.on, .lab table.data td.c0.on { box-shadow: inset 0 -2px 0 #35648f; }
-.lab table.data th.c1.on, .lab table.data td.c1.on { box-shadow: inset 0 -2px 0 #2e7d32; }
-.lab table.data th.c2.on, .lab table.data td.c2.on { box-shadow: inset 0 -2px 0 #9c4f96; }
-.lab table.data th.c3.on, .lab table.data td.c3.on { box-shadow: inset 0 -2px 0 #c8791a; }
-.lab table.data th.c4.on, .lab table.data td.c4.on { box-shadow: inset 0 -2px 0 #5a707b; }
 
 @media (max-width: 52rem) {
   .schema-grid { grid-template-columns: minmax(0, 1fr); }

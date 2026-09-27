@@ -98,7 +98,17 @@ def formats_facts() -> dict:
     uk = pc.sum(orders.filter(pc.equal(orders["country"], "UK"))["amount_cents"]).as_py()
     csv_size = (formats / "orders.csv").stat().st_size
     parquet_size = (formats / "orders.parquet").stat().st_size
+    import csv
+
+    header, *rows = list(csv.reader((formats / "eight-orders.csv").open()))
+    mark = ["#" if name in ("country", "amount_cents") else "." for name in header]
+    by_rows = "".join(mark * len(rows))
+    by_columns = "".join(m * len(rows) for m in mark)
     return {
+        ("why_parquet_exists", "two_layouts"): [
+            f"by rows: {by_rows}  {len(rows)} runs",
+            f"by columns: {by_columns}  1 run",
+        ],
         ("why_parquet_exists", "read_a_csv"): [
             f"read {csv_size} of {csv_size} bytes",
             f"amount_cents in the UK: {uk}",

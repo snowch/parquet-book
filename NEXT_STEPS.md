@@ -178,7 +178,8 @@ the structure by hand, build it into the reader, then ask a library (PLAN.md, se
   each through a file that counts the bytes read (`fixtures/formats/`, pyarrow's defaults). The
   book's reader works out the least a Parquet reader can read; the crate reads exactly that, and
   pyarrow more, for its prefetched tail. The eight-order version shows Parquet losing to a tiny
-  CSV. The layouts lab follows, as the picture of why, with no engine choice or editor.
+  CSV. Then `two_layouts` draws the picture of why in text, one character a value: the query's
+  columns scattered by rows, one run by columns. ch01 has no panels and uses none of the reader.
 - ch02 ends *Building it* with "Ask a library": `footer_with_a_library`, pyarrow's `read_metadata` in
   Python (run in the page, pyarrow loaded under Pyodide on first run) and the `parquet` crate in
   Rust (`walkthroughs/libraries`, a workspace of its own). The test checks both against the
@@ -212,7 +213,7 @@ CLI's `footer` command and the byte map.
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
 ch12's SQL box), make it a code step with the parameters in the call, as ch02 did; keep panels
-whose value is a picture (ch01's layouts, ch02's byte map, ch04's levels, ch07's tokens, the
+whose value is a picture (ch02's byte map, ch04's levels, ch07's tokens, the
 request timelines of ch10 and ch15).
 
 In order, each a walkthrough by hand at the start of the experiment and an "Ask a library" step

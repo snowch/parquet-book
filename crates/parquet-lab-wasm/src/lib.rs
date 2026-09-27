@@ -188,23 +188,6 @@ pub extern "C" fn pl_interpret(id: u32, offset: f64) -> usize {
     }
 }
 
-/// Ch01's experiment: the sales table stored by rows and by columns, queried through the
-/// simulated store. See `report::layouts`. `row` below zero means every row.
-#[no_mangle]
-pub extern "C" fn pl_layouts(
-    column_mask: u32,
-    row: i32,
-    latency_us: f64,
-    bandwidth_bytes_per_sec: f64,
-) -> usize {
-    let model = NetworkModel {
-        latency_us: latency_us as u64,
-        bandwidth_bytes_per_sec: bandwidth_bytes_per_sec as u64,
-    };
-    let row = usize::try_from(row).ok();
-    emit(report::layouts(column_mask, row, model))
-}
-
 /// Ch03's experiment: the flat schema, the rebuilt tree, and each column's statistics read
 /// through its logical type. See `report::schema`.
 #[no_mangle]

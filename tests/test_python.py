@@ -339,27 +339,11 @@ def test_every_byte_of_the_smallest_file_reads_the_same():
         assert python(report.interpret(data, offset)) == rust("interpret", path, offset), offset
 
 
-@pytest.mark.parametrize(
-    "columns, row",
-    [([2, 3], None), ([3], None), ([0, 1, 2, 3, 4], 3), ([0, 4], None), ([], None), ([1], 7), ([2], 99)],
-)
-def test_the_layouts_lab_matches(columns, row):
-    mask = sum(1 << c for c in columns)
-    for latency, bandwidth in ((20000, 100_000_000), (0, 0), (5000, 1000)):
-        args = ["layouts", "--columns", ",".join(map(str, columns))]
-        if row is not None:
-            args += ["--row", row]
-        args += ["--latency-us", latency, "--bandwidth", bandwidth]
-        mine = python(report.layouts(mask, row, NetworkModel(latency, bandwidth)))
-        assert mine == rust(*args)
-
-
 CLI = [
     ["structure", "fixtures/tiny.parquet"],
     ["footer", "fixtures/tiny.parquet", "--size", "suffix", "--prefetch", "65536", "--json"],
     ["interpret", "fixtures/tiny.parquet", "629"],
     ["schema", "fixtures/types.parquet"],
-    ["layouts", "--columns", "2,3", "--row", "1"],
     ["levels", "fixtures/nested.parquet", "1"],
     ["encodings", "fixtures/dictionary.parquet", "1"],
     ["pages", "fixtures/pages.parquet", "1"],

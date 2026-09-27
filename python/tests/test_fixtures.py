@@ -130,19 +130,18 @@ def test_the_structure_view_and_the_footer_lab_report_success(name, data, manife
     assert report.footer_lab(data, name, FooterOptions(), NetworkModel())["ok"]
 
 
-def test_the_eight_orders_file_holds_the_layouts_table():
-    """ch01 stores Table.sales() by hand, and measures pyarrow's files of the same orders."""
-    from parquet_lab import engine
-    from parquet_lab.layout import Table, show_cell
+def test_the_formats_files_hold_the_same_rows_as_csv_and_as_parquet():
+    """ch01 reads the same tables from a CSV file and a Parquet file: they must agree."""
+    import csv
 
-    table = Table.sales()
-    data = (ROOT / "fixtures" / "formats" / "eight-orders.parquet").read_bytes()
-    answer = engine.run(data, "SELECT * FROM orders")
-    assert answer.columns == [name for name, _ in table.columns]
-    expected = [
-        [show_cell(v, kind) for (_, kind), v in zip(table.columns, row, strict=True)] for row in table.rows
-    ]
-    assert [[str(v) for v in row] for row in answer.rows] == expected
+    from parquet_lab import engine
+
+    for name in ("eight-orders", "orders"):
+        header, *rows = list(csv.reader((ROOT / "fixtures" / "formats" / f"{name}.csv").open()))
+        data = (ROOT / "fixtures" / "formats" / f"{name}.parquet").read_bytes()
+        answer = engine.run(data, "SELECT country, amount_cents FROM orders")
+        at = [header.index("country"), header.index("amount_cents")]
+        assert [[r[at[0]], int(r[at[1]])] for r in rows] == answer.rows, name
 
 
 # ---- ch15: a changing table -------------------------------------------------------------------

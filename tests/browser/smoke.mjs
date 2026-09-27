@@ -129,14 +129,6 @@ if (shots) {
   await anatomy.screenshot({ path: path.join(shots, "anatomy-lab.png") });
 }
 
-// ch01: the layouts.
-await page.goto(base + "why-parquet-exists.html");
-const layouts = page.locator('.lab[data-experiment="layouts"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]')?.dataset.rowsRanges);
-check(await layouts.getAttribute("data-rows-ranges") === "8" && await layouts.getAttribute("data-columns-ranges") === "1",
-  "a two-column scan: one range per row by rows, one range by columns");
-if (shots) await layouts.screenshot({ path: path.join(shots, "layouts-lab.png") });
-
 // The code tabs: Python first, one choice for every excerpt, remembered across pages. (ch01 is
 // an introduction and quotes no reader code, so this starts on ch03.)
 await page.goto(base + "the-type-system.html");
@@ -173,13 +165,9 @@ await page.waitForFunction(() => {
 check(true, "the engine choice holds on the next page");
 await page.locator('.lab[data-experiment="schema"] .engine-bar button[data-engine="rust"]').click();
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="schema"]').dataset.engine === "rust");
-// ch01 is an introduction: its lab is a picture, with no engine to choose and no code to edit,
-// whatever engine the reader chose elsewhere.
-await page.evaluate(() => localStorage.setItem("lab-engine", "python"));
+// ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="layouts"]')?.dataset.ready === "true");
-check(await layouts.getAttribute("data-engine") === "rust" && await layouts.locator(".engine-bar").count() === 0,
-  "ch01's lab offers no engine choice and no editor");
+check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
 {
   // ch01 opens on code: the CSV file read a row at a time, in the page, reads every byte.
   const step = page.locator('figure.walkthrough[data-file$="read_a_csv.py"]');
@@ -190,6 +178,12 @@ check(await layouts.getAttribute("data-engine") === "rust" && await layouts.loca
   const out = await step.locator(".run-output").innerText();
   const csvSize = (await stat("fixtures/formats/orders.csv")).size;
   check(out.includes(`read ${csvSize} of ${csvSize} bytes`), `ch01's CSV step runs in the page and reads all ${csvSize} bytes`);
+  // And the two layouts, drawn by code: the query's two columns are one run when stored by columns.
+  const layouts = page.locator('figure.walkthrough[data-file$="two_layouts.py"]');
+  await layouts.locator(".run-button:not(.edit-button)").click();
+  await layouts.locator(".run-output").filter({ hasText: "by columns" }).waitFor({ timeout: 60000 });
+  const drawn = await layouts.locator(".run-output").innerText();
+  check(/by rows: \S+ {2}8 runs/.test(drawn) && /by columns: \S+ {2}1 run$/m.test(drawn), "ch01's layouts step draws both layouts in the page");
 }
 await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 if (shots) {

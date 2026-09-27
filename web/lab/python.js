@@ -191,8 +191,4 @@ importlib.invalidate_caches()
     return this.#run(() => this.api.interpret(id, offset));
   }
 
-  layouts({ columns = [], row = -1, latencyUs = 20000, bandwidth = 100e6 } = {}) {
-    const mask = columns.reduce((m, c) => m | (1 << c), 0);
-    return this.#run(() => this.api.layouts(mask, row, latencyUs, bandwidth));
-  }
 }

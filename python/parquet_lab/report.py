@@ -19,10 +19,9 @@ from .column import first_rows, read_column
 from .compress import decompress, supported
 from .encoding import hex, json_text, plain_scalar, quote
 from .format import MIN_FILE_LEN, TRAILER_LEN, check_header, footer_span, parse_trailer
-from .layout import Layout, Query, Table, encode, ranges, show_cell
 from .metadata import ColumnChunk, FileMetaData, decode_file_metadata
 from .nested import assemble, explain, path_fields
-from .object_store import Bounded, MemoryStore, NetworkModel, Request, StoreError, TracingStore
+from .object_store import MemoryStore, NetworkModel, Request, StoreError, TracingStore
 from .pages import walk_pages
 from .parquet_thrift import Kind, enum_value_name, field_def
 from .prune import NONE as NO_MECHANISMS
@@ -525,69 +524,6 @@ def open_bytes(file: bytes) -> FileMetaData:
     store = MemoryStore()
     store.put("file", file)
     return read_footer(store, "file", FooterOptions()).metadata
-
-
-def layouts(column_mask: int, row: int | None, model: NetworkModel) -> dict:
-    """Ch01's experiment: one query against the same table in both layouts, read through the
-    simulated object store.
-
-    ``column_mask`` has bit ``c`` set for each column the query projects. ``row`` is one row to
-    fetch, or ``None`` for every row. Each layout is stored as an object and read twice: once
-    range by range, asking only for the bytes the query needs, and once as a single whole-object
-    ``GET``. Both reads are real requests against the store, and their traces are returned.
-    """
-    table = Table.sales()
-    columns = [c for c in range(len(table.columns)) if column_mask & (1 << c)]
-    rows = [row] if row is not None and row < len(table.rows) else list(range(len(table.rows)))
-    query = Query(columns, rows)
-
-    def layout_json(layout: Layout, key: str) -> dict:
-        enc = encode(table, layout)
-        needed = ranges(enc, query)
-        store = MemoryStore()
-        store.put(key, enc.data)
-        by_range = TracingStore(store, model)
-        for i, span in enumerate(needed):
-            by_range.get(key, Bounded(span), f"range {i + 1} of {len(needed)}: the query's values")
-        whole = TracingStore(store, model)
-        if needed:
-            whole.get(
-                key,
-                Bounded(Span(0, len(enc.data))),
-                "the whole object, to pick the values out locally",
-            )
-        return {
-            "layout": layout.value,
-            "key": key,
-            "bytes": list(enc.data),
-            "cells": enc.cells,
-            "needed": needed,
-            "needed_bytes": sum(s.length for s in needed),
-            "total_bytes": len(enc.data),
-            "by_range": {
-                "requests": requests_json(by_range.requests),
-                "bytes": by_range.bytes_returned(),
-                "elapsed_us": by_range.elapsed_us(),
-            },
-            "whole": {
-                "requests": requests_json(whole.requests),
-                "bytes": whole.bytes_returned(),
-                "elapsed_us": whole.elapsed_us(),
-            },
-        }
-
-    return {
-        "ok": True,
-        "columns": [name for name, _ in table.columns],
-        "rows": [[show_cell(v, t) for v, (_, t) in zip(r, table.columns, strict=True)] for r in table.rows],
-        "query": {"columns": query.columns, "rows": query.rows},
-        "model": {
-            "latency_us": model.latency_us,
-            "bandwidth_bytes_per_sec": model.bandwidth_bytes_per_sec,
-        },
-        "rows_layout": layout_json(Layout.ROWS, "sales.rows"),
-        "columns_layout": layout_json(Layout.COLUMNS, "sales.columns"),
-    }
 
 
 def _open(file: bytes) -> FileMetaData | str:

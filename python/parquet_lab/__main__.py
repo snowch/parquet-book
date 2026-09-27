@@ -4,7 +4,6 @@
     PYTHONPATH=python python3 -m parquet_lab structure fixtures/tiny.parquet
     PYTHONPATH=python python3 -m parquet_lab interpret fixtures/tiny.parquet 629
     PYTHONPATH=python python3 -m parquet_lab schema fixtures/types.parquet
-    PYTHONPATH=python python3 -m parquet_lab layouts --columns 2,3
     PYTHONPATH=python python3 -m parquet_lab scan fixtures/writing-baseline.parquet --where 0 = 431
     PYTHONPATH=python python3 -m parquet_lab query fixtures/writing-baseline.parquet "SELECT count(*) FROM orders"
     PYTHONPATH=python python3 -m parquet_lab table fixtures/table.json "SELECT count(*) FROM orders"
@@ -49,11 +48,9 @@ def main() -> None:
         "--json", action="store_true", help="accepted for pqlab's sake; the output is always JSON"
     )
     scan = sub.add_parser("scan", help="a query through the simulated object store (ch10)")
-    for p in (footer, layouts := sub.add_parser("layouts", help="ch01's two layouts"), scan):
+    for p in (footer, scan):
         p.add_argument("--latency-us", type=int, default=NetworkModel().latency_us)
         p.add_argument("--bandwidth", type=int, default=NetworkModel().bandwidth_bytes_per_sec)
-    layouts.add_argument("--columns", default="")
-    layouts.add_argument("--row", type=int)
     sub.add_parser("structure", help="every region of a file").add_argument("file", type=Path)
     sub.add_parser("schema", help="the schema, flat and as a tree (ch03)").add_argument("file", type=Path)
     for name, what in (
@@ -169,11 +166,8 @@ def main() -> None:
         else:
             op = ("scan",)
         out = report.changes(objects, a.snapshot, op, a.prefetch, a.connections, NetworkModel())
-    elif a.command == "interpret":
-        out = report.interpret(a.file.read_bytes(), a.offset)
     else:
-        mask = sum(1 << int(c) for c in a.columns.split(",") if c)
-        out = report.layouts(mask, a.row, NetworkModel(a.latency_us, a.bandwidth))
+        out = report.interpret(a.file.read_bytes(), a.offset)
     print(json.dumps(report.jsonable(out), indent=2, ensure_ascii=False))
 
 

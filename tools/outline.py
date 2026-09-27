@@ -129,8 +129,8 @@ _CHAPTERS = (
         "the_file",
         "Why store a table one column at a time, when every program thinks in rows?",
         "A tiny table stored both ways, and a count of the bytes each query must touch.",
-        ("layouts",),
-        ("formats/orders.csv", "formats/orders.parquet"),
+        (),
+        ("formats/orders.csv", "formats/orders.parquet", "formats/eight-orders.csv"),
     ),
     (
         "anatomy_of_a_parquet_file",
@@ -303,7 +303,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: The experiments ``web/lab/lab.js`` knows how to mount. A ``lab`` block naming anything else
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
-    "layouts",
     "anatomy",
     "schema",
     "levels",

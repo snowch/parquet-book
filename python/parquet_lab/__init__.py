@@ -7,7 +7,6 @@ the same JSON. Each module here has a Rust module of the same name.
 
 | Module | What it does | Chapter |
 |---|---|---|
-| ``layout`` | one table stored by rows and by columns | ch01 |
 | ``bytes`` | little-endian integers, varints, zigzag, spans | ch02 |
 | ``format`` | the magic bytes, the trailer, where the footer is | ch02 |
 | ``thrift`` | Thrift's compact protocol, decoded without a schema | ch02 |

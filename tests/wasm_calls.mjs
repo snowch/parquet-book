@@ -47,7 +47,6 @@ const out = calls.map((c) => {
     case "statistics": return lab.statistics(id(c.file), c.row_group, c.column);
     case "compression": return lab.compression(id(c.file), c.column, c.page ?? null);
     case "interpret": return lab.interpret(id(c.file), c.offset);
-    case "layouts": return lab.layouts(c.options);
     case "cli": loadEveryFixture(); return lab.cli(c.args);
     default: throw new Error(`unknown call ${c.call}`);
   }
