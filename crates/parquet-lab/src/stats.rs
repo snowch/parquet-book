@@ -263,7 +263,11 @@ pub fn bounds(
     }
     if let (Some(min), Some(max)) = (&stats.min_value, &stats.max_value) {
         if !type_order {
-            return Err("the footer has no column_orders, so the order of min_value and max_value is undefined".into());
+            return Err(
+                "the footer has no column_orders, so the order of min_value and \
+                 max_value is undefined"
+                    .into(),
+            );
         }
         if is_nan(min) || is_nan(max) {
             return Err(

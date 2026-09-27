@@ -66,7 +66,7 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   `max` apart from `min_value` and `max_value`; `column_orders` and `sorting_columns` decoded.
 - Fixture `statistics.parquet`. The reader's orders reproduce pyarrow's bounds for every column
   chunk of every fixture. NaN is written to JSON as `"NaN"` instead of `null`.
-- Experiment: the statistics panel. Problems 8.1 (sort orders) and 8.2 (which bounds); 8.3 open.
+- Experiment: the statistics panel, since replaced by code (below). Problems 8.1 (sort orders) and 8.2 (which bounds); 8.3 open.
 
 ## Done: ch09, skipping data
 
@@ -252,6 +252,15 @@ pyarrow reading the damaged file silently and refusing it with `page_checksum_ve
 the crate's page reader (now built with `crc`) refusing it too. `report::pages` stays for `pqlab
 pages` and the figures.
 
+## Done: ch08 in code
+
+ch08 opens on three steps instead of its statistics panel: `signed_or_unsigned` reads
+`customer_id`'s bounds as unsigned and signed, `byte_order` sorts four cities by their bytes both
+ways, and `the_reader_decides` asks `stats.bounds` about every column chunk. In
+`statistics_with_a_library`, pyarrow's `max_raw` and the crate's `max_opt` both give the negative
+maximum, though the crate reports the column order as unsigned. `report::statistics` stays for
+`pqlab statistics` and the figures; the grid figure is gone.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -271,7 +280,7 @@ at the end of *Building it*, both in both languages, tested against the manifest
 where a picture beats printed output, and trimmed or cut elsewhere:
 
 1. ch07: a compressed page by hand; column chunk `compression` and sizes from both libraries.
-2. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
+2. ch09 and ch10: statistics against a condition; a filtered
    `pq.read_table` compared with the reader's plan.
 3. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.

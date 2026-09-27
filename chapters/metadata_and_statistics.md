@@ -20,33 +20,108 @@ an order. When is the footer's minimum the value a reader thinks it is?
 
 ## The experiment
 
-### Twelve orders in three row groups
+### Read the statistics yourself
 
 `statistics.parquet` holds twelve orders, four to a row group. Each column was chosen for a way
-statistics are misread. [Appendix B](#the-fixtures) says how it was written.
+statistics are misread. [Appendix B](#the-fixtures) says how pyarrow wrote it.
 
-```lab
-experiment: statistics
-fixture: statistics.parquet
-fixtures: statistics.parquet, types.parquet, multiple-row-groups.parquet
-column: 0
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+[ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
+`decode_file_metadata` from [ch03](#the-type-system).
+
+**Four bytes, two numbers.** `customer_id` holds customer numbers, and some are above `2^31`. The
+footer stores each row group's smallest and largest in four bytes, least significant first. Read
+the bytes two ways:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/metadata_and_statistics/signed_or_unsigned.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/signed_or_unsigned.rs
+:language: rust
+```
+:::
+::::
 
-The top table is every column chunk's minimum and maximum, as the reader decided it may use
-them. Pick a cell to see the chunk's statistics field by field, and its values in the column's
-order. Try these:
+The schema says `customer_id` is an `INT32` annotated as an unsigned integer. Read as unsigned,
+every row group's maximum is a customer number above `2^31`. Read as signed, the same four bytes
+are negative, and the maximum falls below the minimum. The minimums are small, so both readings
+agree on them. Nothing in the bytes says which reading is right. Only the annotation does.
 
-1. **`order_id`, row group by row group.** The ranges do not overlap, because the rows were
-   written in order, and the footer says so. A reader looking for one order reads one row group.
-2. **`customer_id`, row group 0.** The maximum is a customer number above `2^31`, stored in
-   four bytes as an `INT32`. Read those bytes as a signed integer and it is negative.
-3. **`city`, row group 0.** The maximum is `Łódź`, whose first byte is above `0x7f`. Compare
-   bytes as signed numbers, as Java does, and it becomes the minimum.
-4. **`temp_c`, row groups 0 and 1.** One value is NaN, and the bounds leave it out. In row
-   group 1 the minimum is written as `-0`.
-5. **`coupon`, row group 1.** Every value is null. There is no minimum, and the null count says
-   why.
-6. **`note`.** The writer was told not to keep statistics for it. The reader has nothing to use.
+Change the column to 2, which is `delta`, a signed 8-bit integer stored in an `INT32`. Now the
+signed reading is the right one, and the unsigned reading turns its negative minimums into
+numbers above `2^31`.
+
+**Bytes in order.** Strings are compared byte by byte, as UTF-8 writes them. Sort four of the
+fixture's cities by their bytes, then by the same bytes read as signed numbers:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/metadata_and_statistics/byte_order.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/byte_order.rs
+:language: rust
+```
+:::
+::::
+
+UTF-8 writes each ASCII letter as one byte below `0x80`, and every other letter as two or more
+bytes of `0x80` and above. So `Århus` and `Łódź` sort after `Zürich` by their bytes. Read each
+byte as signed, as Java does, and those bytes become negative: both names move in front of
+`Aarhus`. Python's own sort of the strings agrees with the bytes, because UTF-8 keeps the order of
+code points. Rust sorts a `str` by its bytes.
+
+Add `"Écija"` or `"Ängelholm"`, two more of the fixture's cities, and see where each order puts
+them.
+
+**The reader decides.** The reader chooses an order for each column from its physical type and
+its annotation, then asks its `bounds` function whether it may use each column chunk's minimum
+and maximum:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/metadata_and_statistics/the_reader_decides.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/the_reader_decides.rs
+:language: rust
+```
+:::
+::::
+
+Every column chunk with a minimum and maximum gives a range in its column's order.
+`customer_id`'s maximums are the unsigned numbers, and `city`'s maximum in row group 0 is `Łódź`,
+as the second step predicted. `order_id`'s ranges do not overlap, because the rows were
+written in order: a reader looking for one order reads one row group. `temp_c` holds a NaN in
+row group 0, and the bounds leave it out. Its minimum in row group 1 is `-0`.
+
+Two kinds of chunk give nothing. `coupon` in row group 1 has no minimum and no maximum, and its
+null count says why: every value is null. `note` has no statistics at all, because the writer was
+told not to keep them.
+
+Set `old_writer` to true (`True` in Python). The step then deletes `min_value` and `max_value`, and keeps only the
+deprecated `min` and `max`, as a writer from before the newer fields would have. The reader still
+accepts `order_id`, `delta` and `temp_c`. `customer_id` and the strings have nothing left, because
+pyarrow wrote no deprecated fields for them. The reader refuses `amount`, although pyarrow wrote
+both pairs for it, and the section on the deprecated fields below says why. Then set `old_writer`
+back, and make `type_order` false, as if the footer had no `column_orders`: every chunk with
+statistics is refused.
 
 ### What the footer records
 
@@ -58,8 +133,8 @@ group:
 
 - **`min_value` and `max_value`** are the bounds in the column's own sort order.
 - **`min` and `max`** are older fields with the same purpose. They are deprecated. pyarrow still
-  writes them, as copies of `min_value` and `max_value`, for every column whose order is signed,
-  as the table shows.
+  writes them, as copies of `min_value` and `max_value`, for every column whose order is signed.
+  Here that is every column but the unsigned integers and the strings, as the table shows.
 - **`null_count`** counts the nulls. A chunk whose null count equals its value count holds no
   values at all.
 - **`is_min_value_exact` and `is_max_value_exact`** say whether each bound is a value in the
@@ -81,14 +156,8 @@ type:
 | every other byte array: strings, UUIDs, binary | unsigned, byte by byte |
 | `INT96`, `INTERVAL` | undefined |
 
-The order of strings is the order of their bytes in UTF-8. It is not alphabetical order for a
-person: `Århus` sorts after `Zürich`, because `Å` is written with a byte above every ASCII
-letter's.
-
-These are the ranges the reader accepts, for every row group:
-
-```{include} _generated/statistics-grid.md
-```
+The order of strings is the order of their bytes in UTF-8, as the second step showed. It is not
+alphabetical order for a person: `Århus` sorts after `Zürich`.
 
 ### What a mistaken order gives
 
@@ -133,8 +202,8 @@ which they recognise by the footer's `created_by` string. This reader does not.
 Floats have two traps. NaN is not less than, equal to or greater than anything, so a writer
 leaves it out of the bounds, and a reader looking for NaN cannot use them. And `-0` equals `+0`,
 though their bytes differ. The format asks writers to store a zero minimum as `-0` and a zero
-maximum as `+0`, and asks readers to remember that a chunk with either may hold both. Row group 1
-of `temp_c` shows the first rule.
+maximum as `+0`, and asks readers to remember that a chunk with either may hold both. The `-0`
+the third step printed for `temp_c` in row group 1 is the first rule at work.
 
 ### What else the footer says
 
@@ -142,8 +211,9 @@ Beyond statistics, each row group records its row count and size, and may list t
 rows are sorted by. `sorting_columns` is a claim: a reader may rely on it and cannot check it
 without reading every value. Each column chunk may also carry **size statistics**: the number of
 bytes its strings take once decoded, and a histogram of its definition and repetition levels,
-from which a reader can count nulls and list elements without reading a page. Open the structure
-view below the panel to see them.
+from which a reader can count nulls and list elements without reading a page. pyarrow's
+metadata does not show them; the `parquet` crate's does, as `unencoded_byte_array_data_bytes`
+and the level histograms.
 
 All of it costs bytes, in a place every reader must fetch:
 
@@ -156,6 +226,11 @@ reads anything else. [ch11](#writing-parquet-well) shows a footer growing with t
 groups.
 
 ## Building it
+
+The steps read bounds out of the footer, compared bytes in two orders, and asked the reader which
+bounds it may use. This section builds the two parts of the reader the last step called: the
+comparator for a column, and the rules in `bounds`. The tabs switch every excerpt on the page
+between the two languages.
 
 ### The comparator for a column
 
@@ -182,7 +257,9 @@ The order comes from the physical type and the annotation together:
 
 ### The rules
 
-`bounds` applies the rules in the order the chapter gives them, and says why when it refuses:
+`bounds` applies the rules in the order the chapter gives them, and says why when it refuses. It
+refuses a type without an order first, then prefers `min_value` and `max_value`, which it uses
+only when the footer names their order and neither is NaN:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -190,6 +267,7 @@ The order comes from the physical type and the annotation together:
 ```{literalinclude} ../python/parquet_lab/stats.py
 :language: python
 :start-at: def bounds(stats: Statistics
+:end-before: if stats.min is not None and stats.max is not None:
 ```
 :::
 :::{tab-item} Rust
@@ -197,6 +275,28 @@ The order comes from the physical type and the annotation together:
 ```{literalinclude} ../crates/parquet-lab/src/stats.rs
 :language: rust
 :start-at: pub fn bounds(
+:end-before: if let (Some(min), Some(max)) = (&stats.min, &stats.max)
+```
+:::
+::::
+
+Without the newer fields, it falls back to the deprecated pair, but only for a column whose order
+is signed and whose values are not byte arrays. This is the branch that refused `amount` when you
+set `old_writer`:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/stats.py
+:language: python
+:start-at: if stats.min is not None and stats.max is not None:
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/stats.rs
+:language: rust
+:start-at: if let (Some(min), Some(max)) = (&stats.min, &stats.max)
 :end-before: #[cfg(test)]
 ```
 :::
@@ -226,6 +326,47 @@ cargo test -p parquet-lab --test fixtures
 ```
 :::
 ::::
+
+### Ask a library
+
+pyarrow and the `parquet` crate both read the statistics for you. Ask each for row group 0:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/metadata_and_statistics/statistics_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/statistics_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+pyarrow reads the bounds through the logical type. Its `min` and `max` give `customer_id`'s
+maximum as the unsigned customer number, and `city`'s as a string. Its `min_raw` and `max_raw`
+give the physical type's reading, where `customer_id`'s maximum is negative, as the first step's
+signed reading was. It reports the footer's size, which is the footer bytes in the cost table,
+and the row group's `sorting_columns`. It has no attribute for the exact flags, and none for the
+column orders.
+
+The crate reports each column's order from `column_orders`: `customer_id`'s is
+`TYPE_DEFINED_ORDER(UNSIGNED)`. Yet its statistics for an `INT32` column hold an `i32`, and
+`max_opt` returns `customer_id`'s maximum as a negative number. The crate hands you the first
+step's mistake, and applying the column order is left to you. It also says every bound is exact,
+and that none came from the deprecated fields, although pyarrow wrote those too: where both pairs
+are present, the crate reads `min_value` and `max_value`.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin statistics_with_a_library
+```
 
 ## What this cannot tell you
 

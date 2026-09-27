@@ -91,6 +91,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(nested_facts())
     known.update(encodings_facts())
     known.update(pages_facts())
+    known.update(statistics_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -319,6 +320,123 @@ def pages_facts() -> dict:
                 "one bit flipped:",
                 "refused: ",
                 "CRC checksum mismatch",
+            ],
+        },
+    }
+
+
+def statistics_facts() -> dict:
+    """What ch08's steps must print: every column chunk's bounds as pyarrow reads them, through
+    the logical type and raw; the order each column's type gives it; and four of the fixture's
+    cities sorted by their bytes, unsigned and signed."""
+    import pyarrow.parquet as pq
+
+    path = ROOT / "fixtures" / "statistics.parquet"
+    md = pq.read_metadata(path)
+    columns = [md.schema.column(i) for i in range(md.num_columns)]
+    groups = [md.row_group(g) for g in range(md.num_row_groups)]
+    stats = [[rg.column(i).statistics for rg in groups] for i in range(md.num_columns)]
+
+    # The format's order for each column, from its type as pyarrow reports it.
+    def order(c) -> tuple[str, str]:
+        t, lt = c.physical_type, json.loads(c.logical_type.to_json())
+        if lt["Type"] == "Int" and not lt["isSigned"]:
+            return "UNSIGNED", "unsigned integers"
+        if lt["Type"] == "Decimal":
+            return "SIGNED", "signed big-endian integers"
+        if t in ("BYTE_ARRAY", "FIXED_LEN_BYTE_ARRAY"):
+            return "UNSIGNED", "unsigned bytes"
+        if t in ("FLOAT", "DOUBLE"):
+            return "SIGNED", "floating-point values"
+        return "SIGNED", "signed integers"
+
+    def shown(v) -> str:  # as the book's reader displays a value
+        if isinstance(v, str):
+            return json.dumps(v, ensure_ascii=False)
+        return repr(v).removesuffix(".0") if isinstance(v, float) else str(v)
+
+    customer = next(i for i, c in enumerate(columns) if c.path == "customer_id")
+    lt = json.loads(columns[customer].logical_type.to_json())
+    kind = f"INTEGER({lt['bitWidth']}, {'signed' if lt['isSigned'] else 'unsigned'})"
+    signed = []
+    for g, s in enumerate(stats[customer]):
+        high = s.max.to_bytes(4, "little")
+        both = f"unsigned [{s.min}, {s.max}], signed [{s.min_raw}, {s.max_raw}]"
+        signed.append(
+            (
+                f"row group {g}: max {high.hex(' ')}; {both}",
+                f"row group {g}: max [{', '.join(f'{b:02x}' for b in high)}]; {both}",
+            )
+        )
+
+    cities = ["Zürich", "Łódź", "Aarhus", "Århus"]  # the step's four, all in the fixture
+    rows = json.loads(path.with_suffix(".json").read_text())["rows"]
+    assert set(cities) <= {row["city"] for row in rows}
+    by_bytes = sorted(cities, key=str.encode)
+    by_signed = sorted(cities, key=lambda c: [b - 256 if b > 127 else b for b in c.encode()])
+
+    def decides(source: str) -> list[str]:
+        out = []
+        for c, chunks in zip(columns, stats, strict=True):
+            out.append(f"{c.path}, compared as {order(c)[1]}")
+            for g, s in enumerate(chunks):
+                if s is None:
+                    out.append(f"  row group {g}: no statistics\n")
+                elif not s.has_min_max:
+                    out.append(f"  row group {g}: refused, ")
+                    out.append(f"; null count {s.null_count}\n")
+                else:
+                    out.append(f"  row group {g}: {shown(s.min)} to {shown(s.max)}, from {source}\n")
+        return out
+
+    first = [(c, s[0]) for c, s in zip(columns, stats, strict=True)]
+    sorting = groups[0].sorting_columns
+    rust_sorting = ", ".join(
+        f"SortingColumn {{ column_idx: {x.column_index}, descending: {str(x.descending).lower()}, "
+        f"nulls_first: {str(x.nulls_first).lower()} }}"
+        for x in sorting
+    )
+    return {
+        ("metadata_and_statistics", "signed_or_unsigned"): {
+            "python": [f"customer_id {columns[customer].physical_type} {kind}\n", *(p for p, _ in signed)],
+            "rust": [f"customer_id {columns[customer].physical_type} {kind}\n", *(r for _, r in signed)],
+        },
+        ("metadata_and_statistics", "byte_order"): {
+            "python": [
+                *(f"{c} {c.encode().hex(' ')}\n" for c in cities),
+                f"unsigned bytes: {', '.join(by_bytes)}\n",
+                f"signed bytes:   {', '.join(by_signed)}\n",
+                f"Python's sort:  {', '.join(sorted(cities))}\n",
+            ],
+            "rust": [
+                *(f"{c} [{', '.join(f'{b:02x}' for b in c.encode())}]\n" for c in cities),
+                f"unsigned bytes: {json.dumps(by_bytes, ensure_ascii=False, separators=(', ', ': '))}",
+                f"signed bytes:   {json.dumps(by_signed, ensure_ascii=False, separators=(', ', ': '))}",
+            ],
+        },
+        ("metadata_and_statistics", "the_reader_decides"): {
+            "python": decides("min_value and max_value"),
+            "rust": decides("MinMaxValue"),
+        },
+        ("metadata_and_statistics", "statistics_with_a_library"): {
+            "python": [
+                f"the footer: {md.serialized_size} bytes; sorted by {sorting}\n",
+                *(
+                    f"{c.path}: no statistics\n"
+                    if s is None
+                    else f"{c.path}: {s.min!r} to {s.max!r}, null count {s.null_count}\n"
+                    for c, s in first
+                ),
+                f"  raw, as INT32: {stats[customer][0].min_raw} to {stats[customer][0].max_raw}\n",
+            ],
+            "rust": [
+                f"sorted by Some([{rust_sorting}])\n",
+                *(
+                    f"{c.path}: TYPE_DEFINED_ORDER({order(c)[0]})"
+                    + (", no statistics\n" if s is None else ", exact ")
+                    for c, s in first
+                ),
+                f"customer_id: Some({stats[customer][0].min_raw}) to Some({stats[customer][0].max_raw})",
             ],
         },
     }

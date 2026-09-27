@@ -16,7 +16,6 @@ FILES: list[tuple[str, bytearray]] = []
 EXPERIMENTS = (
     "anatomy",
     "compression",
-    "statistics",
     "skipping",
     "scan",
     "writing",
@@ -83,15 +82,6 @@ def compression(id: int, column: int, page: int) -> str:
         return _no_such_file(id)
     chosen = None if page >= 0xFFFF_FFFF else int(page)
     return report.dumps(report.compression(data, int(column), chosen))
-
-
-def statistics(id: int, row_group: int, column: int) -> str:
-    data = _file(id)
-    return (
-        _no_such_file(id)
-        if data is None
-        else report.dumps(report.statistics(data, int(row_group), int(column)))
-    )
 
 
 def skipping(id: int, column: int, op: int, value: str, mechanisms: int) -> str:

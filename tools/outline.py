@@ -201,7 +201,7 @@ _CHAPTERS = (
         "reading_less",
         "What does the footer know that lets a reader avoid reading the data?",
         "Sort orders for every type, and the rules for which statistics a reader may use.",
-        ("statistics",),
+        (),
         ("statistics.parquet", "types.parquet"),
     ),
     (
@@ -305,7 +305,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 EXPERIMENTS = (
     "anatomy",
     "compression",
-    "statistics",
     "skipping",
     "scan",
     "writing",

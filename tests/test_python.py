@@ -128,8 +128,9 @@ def test_the_compression_lab_matches_on_every_page(tmp_path):
             assert mine == rust("compression", path, 1, page), f"{path.name} page {page}"
 
 
-def test_the_statistics_lab_matches(tmp_path):
-    """ch08: every column of the first row groups of every fixture, and the damaged copies."""
+def test_the_statistics_report_matches(tmp_path):
+    """ch08: every column of the first row groups of every fixture, and the damaged copies. The
+    statistics report has no panel, and stays for the command line and the figures."""
     for path in files(tmp_path):
         data = path.read_bytes()
         for row_group in range(3):

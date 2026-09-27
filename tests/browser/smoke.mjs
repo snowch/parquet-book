@@ -286,24 +286,24 @@ if (shots) {
   await compLab.screenshot({ path: path.join(shots, "compression-lab.png") });
 }
 
-// ch08: statistics. Verdicts, orders and the mistaken order are the reader's.
-await page.goto(base + "metadata-and-statistics.html");
-const statsLab = page.locator('.lab[data-experiment="statistics"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]')?.dataset.state === "ok");
-await statsLab.locator('button[data-cell="0:1"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]').dataset.selected === "0:1");
-const cust = native(["statistics", "fixtures/statistics.parquet", "0", "1"]).selected;
-check(await statsLab.getAttribute("data-order") === cust.order, `customer_id is compared as ${cust.order}, as the reader says`);
-check((await statsLab.locator(".mistake").innerText()).includes(cust.values.mistake.result.max),
-  `the mistaken order's maximum, ${cust.values.mistake.result.max}, is shown`);
-await statsLab.locator('button[data-cell="1:6"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="statistics"]').dataset.selected === "1:6");
-check(await statsLab.getAttribute("data-usable") === "false", "an all-null chunk offers no bounds");
-await statsLab.locator(".stats-fields button.span").first().click();
-check(await statsLab.locator(".hex .b.sel").count() > 0, "a statistics field highlights its bytes");
-if (shots) {
-  await statsLab.locator('button[data-cell="0:3"]').click();
-  await statsLab.screenshot({ path: path.join(shots, "statistics-lab.png") });
+// ch08: statistics. The book's Python reader decides in the page which bounds it may use for
+// every column chunk, and each range it prints, or refuses, is the native reader's.
+{
+  await page.goto(base + "metadata-and-statistics.html");
+  check(await page.locator(".lab").count() === 0, "ch08 has no panels: its steps print the bounds");
+  const nativeStats = native(["statistics", "fixtures/statistics.parquet", "0", "0"]);
+  const step = page.locator('figure.walkthrough[data-file$="the_reader_decides.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  const last = nativeStats.columns.at(-1);
+  await step.locator(".run-output").filter({ hasText: `${last.path}, compared as` }).waitFor({ timeout: 300000 });
+  const lines = (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  const chunks = nativeStats.columns.flatMap((c) => c.chunks);
+  const printed = (c) => c.usable
+    ? lines.includes(`row group ${c.row_group}: ${c.min} to ${c.max}, from ${c.source}`)
+    : lines.some((l) => l.startsWith(`row group ${c.row_group}: refused`) || l === `row group ${c.row_group}: no statistics`);
+  check(nativeStats.columns.every((c) => lines.includes(`${c.path}, compared as ${c.comparator}:`)) &&
+    chunks.every(printed) && chunks.some((c) => c.usable) && chunks.some((c) => !c.usable),
+    `ch08's bounds are decided in the page: ${chunks.filter((c) => c.usable).length} of ${chunks.length} chunks usable, as the reader decides`);
 }
 
 // ch09: skipping. Every plan is the reader's.

@@ -18,7 +18,7 @@ import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 const MODULE = {
   anatomy: "metadata.py",
   compression: "compress.py",
-  statistics: "stats.py", skipping: "prune.py", scan: "scan.py", writing: "prune.py",
+  skipping: "prune.py", scan: "scan.py", writing: "prune.py",
   engine: "engine.py", encryption: "crypto.py", table: "table.py", changes: "changes.py",
 };
 

@@ -124,10 +124,6 @@ importlib.invalidate_caches()
     return this.#run(() => this.api.compression(id, column, page === null ? 0xffffffff : page));
   }
 
-  statistics(id, rowGroup, column) {
-    return this.#run(() => this.api.statistics(id, rowGroup, column));
-  }
-
   /** `mechanisms`: 1 row group statistics, 2 Bloom filters, 4 the page index, added together. */
   skipping(id, column, op, value, mechanisms = 7) {
     return this.#run(() => this.api.skipping(id, column, OPS.indexOf(op), value ?? "", mechanisms));

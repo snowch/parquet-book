@@ -82,10 +82,6 @@ def cases():
         for column in range(12):
             calls.append({"call": "compression", "file": f, "column": column})
             native.append(("compression", f, str(column)))
-        for row_group in range(3):
-            for column in range(0, 12, 2):
-                calls.append({"call": "statistics", "file": f, "row_group": row_group, "column": column})
-                native.append(("statistics", f, str(row_group), str(column)))
         if "pruning" in f or f.endswith("tiny.parquet"):
             for where, strat, extra in (
                 (
