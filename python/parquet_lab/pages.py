@@ -58,8 +58,8 @@ def walk_pages(chunk: bytes, base: int) -> list[Page]:
     """Walk the pages of a column chunk whose bytes are ``chunk``, starting at file offset
     ``base``.
 
-    Stops at the end of the chunk. A page whose body would run past the end is an error: the
-    chunk's size in the footer and the sizes in its page headers must agree.
+    Stops at the end of the chunk. A page whose body would run past the end is an error:
+    the chunk's size in the footer and the sizes in its page headers must agree.
     """
     r = ByteReader(chunk, base)
     pages = []
@@ -86,7 +86,7 @@ def read_page(r: ByteReader) -> Page:
     stats_field = {0: 5, 3: 8}.get(page_type, 0)
     stats = sub.field(stats_field) if sub else None
     page_statistics = statistics(stats.node) if stats else None
-    # A negative size cannot be read; asking for more bytes than exist reports where it failed.
+    # A negative size cannot be read, and too large a size reports where it failed.
     body, body_span = r.read_bytes(compressed if compressed >= 0 else 2**64 - 1)
     crc = opt_int(h, 4)
     # The header stores the CRC as a signed 32-bit integer.

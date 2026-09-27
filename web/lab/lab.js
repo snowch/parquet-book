@@ -18,7 +18,6 @@
 import { Lab } from "./wasm.js";
 import { PyLab } from "./python.js";
 import { mountAnatomy } from "./footer.js";
-import { mountPages } from "./pages.js";
 import { mountCompression } from "./compression.js";
 import { mountStatistics } from "./statistics.js";
 import { mountSkipping } from "./skipping.js";
@@ -34,7 +33,7 @@ import { mountCommands } from "./commands.js";
 
 const EXPERIMENTS = {
   anatomy: mountAnatomy,
-  pages: mountPages, compression: mountCompression,
+  compression: mountCompression,
   statistics: mountStatistics,
   skipping: mountSkipping,
   scan: mountScan,

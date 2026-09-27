@@ -156,10 +156,6 @@ export class Lab {
     return this.#result(this.exports.pl_compression(id, column, page === null ? 0xffffffff : page));
   }
 
-  pages(id, column) {
-    return this.#result(this.exports.pl_pages(id, column));
-  }
-
   interpret(id, offset) {
     return this.#result(this.exports.pl_interpret(id, offset));
   }

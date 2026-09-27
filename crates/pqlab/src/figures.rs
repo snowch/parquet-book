@@ -900,6 +900,8 @@ fn split_weights(root: &Path) -> Result<String, String> {
     Ok(s)
 }
 
+/// One column chunk's pages, in four columns so that the table stays a table on a phone. The
+/// offsets and value counts are left to ch06's walk_the_pages step, which prints them.
 fn pages_table(root: &Path, file: &str) -> Result<String, String> {
     let bytes = fixture(root, file)?;
     let j = parquet_lab::report::pages(&bytes, 1);
@@ -913,54 +915,45 @@ fn pages_table(root: &Path, file: &str) -> Result<String, String> {
     let dash = |v: String| if v.is_empty() { "·".to_string() } else { v };
     let mut s = String::from(HEADER);
     if v2 {
-        s.push_str("| # | Type | Starts at | Body bytes | Values | Rows | Nulls | Level bytes (def) | Checksum |\n|--:|---|--:|--:|--:|--:|--:|--:|---|\n");
+        s.push_str("| Type | Body bytes | Level bytes | Rows |\n|---|--:|--:|--:|\n");
     } else {
-        s.push_str("| # | Type | Starts at | Body bytes | Values | First row | Rows | Nulls | Min | Max |\n|--:|---|--:|--:|--:|--:|--:|--:|---|---|\n");
+        s.push_str("| Type | Body bytes | First row | Rows |\n|---|--:|--:|--:|\n");
     }
     for p in pages {
-        let start = p
-            .get("span")
-            .and_then(Json::as_array)
-            .and_then(|a| a.first())
-            .map(|x| x.to_json())
-            .unwrap_or_default();
-        let st = p.get("statistics");
-        let pick = |k: &str| dash(text_of(st.and_then(|x| x.get(k))));
         let v = p.get("v2");
         let vk = |k: &str| dash(text_of(v.and_then(|x| x.get(k))));
-        if v2 {
-            s.push_str(&format!(
-                "| {} | {} | {start} | {} | {} | {} | {} | {} | {} |\n",
-                text_of(p.get("index")),
-                text_of(p.get("type")),
-                text_of(p.get("compressed_page_size")),
-                dash(text_of(p.get("num_values"))),
-                vk("num_rows"),
-                vk("num_nulls"),
-                vk("definition_levels_byte_length"),
-                match p.get("crc_ok") {
-                    Some(Json::Bool(true)) => "matches",
-                    Some(Json::Bool(false)) => "does not match",
-                    _ => "none stored",
-                },
-            ));
+        let (third, rows) = if v2 {
+            (vk("definition_levels_byte_length"), vk("num_rows"))
         } else {
-            s.push_str(&format!(
-                "| {} | {} | {start} | {} | {} | {} | {} | {} | {} | {} |\n",
-                text_of(p.get("index")),
-                text_of(p.get("type")),
-                text_of(p.get("compressed_page_size")),
-                dash(text_of(p.get("num_values"))),
+            (
                 dash(text_of(p.get("first_row"))),
                 dash(text_of(p.get("rows_started"))),
-                pick("null_count"),
-                pick("min"),
-                pick("max"),
+            )
+        };
+        s.push_str(&format!(
+            "| {} | {} | {third} | {rows} |\n",
+            text_of(p.get("type")),
+            text_of(p.get("compressed_page_size")),
+        ));
+    }
+    let where_from = if v2 {
+        // Every page's checksum is recomputed; a table whose pages all match says so once.
+        let matching = pages
+            .iter()
+            .filter(|p| p.get("crc_ok") == Some(&Json::Bool(true)))
+            .count();
+        if matching != pages.len() {
+            return Err(format!(
+                "{file}: {matching} of {} checksums match",
+                pages.len()
             ));
         }
-    }
+        "The level bytes and rows are each header's own, and every page's checksum matches"
+    } else {
+        "The rows are counted from each page's decoded levels: a version 1 header does not count them"
+    };
     s.push_str(&format!(
-        "\n*Computed by the reader from `fixtures/{file}` ({} bytes), column `{}`.*\n",
+        "\n{where_from}.\n\n*Computed by the reader from `fixtures/{file}` ({} bytes), column `{}`.*\n",
         bytes.len(),
         text_of(j.get("path"))
     ));

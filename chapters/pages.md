@@ -17,63 +17,109 @@ chunks page by page, and compare the two versions of the data page.
 
 ## The experiment
 
-### Sixty orders in small pages
+### Walk the pages yourself
 
 `pages.parquet` and `pages-v2.parquet` hold the same sixty orders. The writer was told to keep
 pages small, so each column chunk holds several. Every seventh country is null. The first file
 uses data page version 1; the second uses version 2 and puts a checksum in every page header.
+[Appendix B](#the-fixtures) says how pyarrow wrote both.
 
-```lab
-experiment: pages
-fixture: pages.parquet
-fixtures: pages.parquet, pages-v2.parquet
-column: 1
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+[ch02](#anatomy-of-a-parquet-file) did.
+
+**A column chunk, header by header.** The footer says where `country`'s column chunk starts and
+how many bytes it takes, headers included. Walk it with the reader's `read_page`. It decodes one
+page header with the Thrift decoder from [ch03](#the-type-system), then takes as many bytes of
+body as the header says:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/pages/walk_the_pages.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/walk_the_pages.rs
+:language: rust
+```
+:::
+::::
 
-The panel lists the pages of one column chunk as the reader found them. Try these:
+The first page is a dictionary page, and the data pages follow it. Each header starts where the
+body before it ended, and the last body ends where the footer said the column chunk ends. The loop
+needs no index and no count of pages, because each header's body size says where the next header
+is.
 
-1. **Read the `country` column top to bottom.** A dictionary page comes first, then the data
-   pages. The first-row column says which rows each page holds.
-2. **Click a data page's `header`**, then look in the structure view. The header records the
-   page's type, its sizes, its value count, its encodings and its own statistics.
-3. **Click `def` and `values`** for the same page to see the two parts of its body.
-4. **Switch to `pages-v2.parquet`.** The same pages now report their rows and nulls in the header,
-   and their bodies are smaller.
-5. **Damage a page.** In `pages-v2.parquet`, click a data page's `values`, then change its first
-   byte in the inspector. The page's checksum no longer matches, and the panel says which page.
+Change `pages.parquet` to `pages-v2.parquet` and run the step again. The same rows sit in the
+same number of pages, but each data page is now a `DATA_PAGE_V2`, its body is smaller, and its
+header counts the page's rows and nulls. Then change the column to 2, which is `amount_cents`. It
+has no dictionary page, and its headers are longer. Each carries the page's minimum and maximum,
+which for this column are eight-byte integers, where `country`'s are two-letter strings.
+
+**A damaged page.** Every page header in `pages-v2.parquet` carries a CRC-32 of the page's body.
+Recompute it for the last page of `country`, then flip one bit of the body and recompute it:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/pages/damage_a_page.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/damage_a_page.rs
+:language: rust
+```
+:::
+::::
+
+The body as written gives the header's checksum. One flipped bit gives a different one, so the
+page no longer matches its header. The reader checks every page it walks, and its walk agrees:
+only the damaged page fails. Python computed the checksum with `zlib` and Rust with the book's
+reader. They agree because CRC-32 is one fixed algorithm.
+
+Change the byte the step flips, or flip two bits, and look at the checksum each time. Then change
+`[-1]` to `[1]` in Python, or `last()` to `get(1)` in Rust, to damage the first data page
+instead, and see which page the reader's walk marks.
 
 ### What a page header says
 
-Every page starts with a Thrift `PageHeader`. This is the first data page of `amount_cents`, read
-field by field:
+Every page starts with a Thrift `PageHeader`. This is the first data page of `amount_cents`, the
+column the first step walked when you changed it, read field by field:
 
 ```{include} _generated/page-header-fields.md
 ```
 
-`compressed_page_size` is the one a walker needs: the body's length, and so where the next header
-starts. No index is needed to walk a column chunk, only each header in turn. Here the two sizes
-are equal because the file is not compressed; [ch07](#compression) makes them differ.
+`compressed_page_size` is the field a walker needs: the body's length, and so where the next
+header starts. Here the two sizes are equal because the file is not compressed;
+[ch07](#compression) makes them differ.
 
 The header also carries the page's own minimum, maximum and null count. They describe a few rows
 rather than a whole row group, which makes them more selective, and [ch09](#skipping-data) uses
 them to skip pages.
 
-### A column chunk, page by page
+### Data page version 1
 
-These are the pages of `country` in version 1:
+These are the pages of `country` in version 1, with the rows each holds:
 
 ```{include} _generated/pages-country-v1.md
 ```
 
 The dictionary page is first, and there is only one: every data page's indices point into it.
-Each data page body holds three parts, in order, and the reader decoded them to count rows:
+Each data page body holds three parts, in order:
 
 1. the repetition levels, with a four-byte length in front, if the column can repeat;
 2. the definition levels, with a four-byte length in front, if the column can be null;
 3. the values, in the page's encoding.
 
-Under version 1, a page's whole body is compressed as one block. To count the nulls or the rows in a
-compressed page, a reader must decompress all of it first.
+A version 1 header counts the page's values, not its rows, so the reader counted the rows by
+decoding each page's levels. Under version 1, a page's whole body is compressed as one block. To
+count the nulls or the rows in a compressed page, a reader must decompress all of it first.
 
 ### Data page version 2
 
@@ -82,7 +128,8 @@ Version 2 changes where things are, not what they mean. The same column chunk:
 ```{include} _generated/pages-country-v2.md
 ```
 
-The differences, each visible in the tables:
+The first step showed the differences when you ran it on this file, and the two tables set them
+side by side:
 
 - **The level lengths moved into the header.** The levels have no four-byte prefix in the body,
   which is why every body is smaller than its version 1 counterpart.
@@ -101,9 +148,12 @@ Every reader a file will meet must support version 2 before a writer should prod
 A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page
 from one whose values happen to be unusual. Whether a writer includes it depends on the
 implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
-parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on. The
-panel's checksum column is the reader recomputing each body's CRC and comparing it with the
-header's.
+parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on.
+
+A checksum helps only a reader that checks it, and checking costs a pass over every body. The bit
+the second step flipped turns one country into another, and the damaged index still points into
+the dictionary. A reader that skips the check reads the wrong country without complaint, as the
+library step at the end of *Building it* shows.
 
 ### How big a page should be
 
@@ -118,11 +168,14 @@ trade-off is the same at any size:
 
 ## Building it
 
+The steps looped the reader's `read_page` over a column chunk and compared a body with its
+checksum. This section builds the reader's parts they used: the walk, the body and its checksum,
+the version 2 level lengths, and CRC-32 itself. The tabs switch every excerpt on the page between
+the two languages.
+
 ### Walking the pages
 
-The walker reads a header, reads the body it describes, and repeats until the column chunk ends.
-A body that would run past the end of the chunk is an error: the chunk's size in the footer and
-the sizes in its headers must agree.
+The walker reads a page, then the next, until the column chunk ends. It is the first step's loop:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -130,6 +183,7 @@ the sizes in its headers must agree.
 ```{literalinclude} ../python/parquet_lab/pages.py
 :language: python
 :start-at: def walk_pages(
+:end-before: def read_page(
 ```
 :::
 :::{tab-item} Rust
@@ -137,6 +191,31 @@ the sizes in its headers must agree.
 ```{literalinclude} ../crates/parquet-lab/src/pages.rs
 :language: rust
 :start-at: pub fn walk_pages(
+:end-before: /// Read one page:
+```
+:::
+::::
+
+`read_page` decodes the header, finds the sub-header that matches the page type, and then takes
+the body. A body that would run past the end of the chunk is an error: the chunk's size in the
+footer and the sizes in its headers must agree. Then it compares the body with the header's
+checksum, when there is one, as the second step did:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/pages.py
+:language: python
+:start-at: # A negative size cannot be read
+:end-before: v2 = None
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/pages.rs
+:language: rust
+:start-at: let (body, body_span) = r
+:end-before: let v2 = match (page_type, sub)
 ```
 :::
 ::::
@@ -166,7 +245,8 @@ The only change the column reader needs for version 2 is where the level lengths
 
 ### The checksum
 
-CRC-32, computed a bit at a time, which is slow and short enough to read in full:
+CRC-32, computed a bit at a time, which is slow and short enough to read in full. It gives the
+same answer as `zlib.crc32`, which the Python step used:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -206,6 +286,41 @@ cargo test -p parquet-lab --test fixtures
 ```
 :::
 ::::
+
+### Ask a library
+
+pyarrow has no API for pages. Its metadata gives a column chunk's offsets and size, and it checks
+every page's checksum while it reads when you ask it to. The `parquet` crate reads a column chunk
+page by page. It checks each checksum when it is built with its `crc` feature, as the book's copy
+is. Both read the file with the bit the second step flipped:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/pages/pages_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/pages_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+pyarrow finds the column chunk where the first step did. Read without the check, the damaged file
+gives one row a different country, and nothing says so. With `page_checksum_verification`, pyarrow
+refuses the file and names the page. The crate prints each version 2 header's rows, nulls and
+level bytes, which agree with the version 2 table, and refuses the damaged page when it reaches it.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin pages_with_a_library
+```
 
 ## What this cannot tell you
 

@@ -90,6 +90,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(types_facts())
     known.update(nested_facts())
     known.update(encodings_facts())
+    known.update(pages_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -247,6 +248,77 @@ def encodings_facts() -> dict:
                 f"country: dictionary page at Some({md.dictionary_page_offset})",
                 f"DICTIONARY_PAGE {plain} {len(entries)}",
                 f"DATA_PAGE {kind} {len(countries)}",
+            ],
+        },
+    }
+
+
+def pages_facts() -> dict:
+    """What ch06's steps must print: where country's column chunk and pages start, from pyarrow's
+    metadata; how many values each data page holds, from the batch size the manifest says the
+    writer was given; and the row pyarrow reads differently once the damaged bit is flipped."""
+    import io
+
+    import pyarrow.parquet as pq
+
+    def chunk(name: str):
+        path = ROOT / "fixtures" / name
+        md = pq.read_metadata(path).row_group(0).column(1)
+        manifest = json.loads(path.with_suffix(".json").read_text())
+        batch = manifest["generator"]["options"]["write_batch_size"]
+        rows = [row["country"] for row in manifest["rows"]]
+        return path, md, [rows[i : i + batch] for i in range(0, len(rows), batch)]
+
+    path, md, batches = chunk("pages.parquet")
+    distinct = len({c for batch in batches for c in batch} - {None})  # the dictionary's entries
+    walk = [
+        f"country: bytes {md.dictionary_page_offset} to "
+        f"{md.dictionary_page_offset + md.total_compressed_size}\n",
+        f"DICTIONARY_PAGE at {md.dictionary_page_offset}: ",
+        f"-byte body, {distinct} values\n",
+        f"DATA_PAGE at {md.data_page_offset}: ",
+        *(f"-byte body, {len(b)} values\n" for b in batches),
+    ]
+
+    path, md, batches = chunk("pages-v2.parquet")
+    end = md.dictionary_page_offset + md.total_compressed_size
+    data = bytearray(path.read_bytes())
+    data[end - 2] ^= 1  # the bit the steps flip
+    before = pq.read_table(path, columns=["country"])["country"].to_pylist()
+    after = pq.read_table(io.BytesIO(data), columns=["country"])["country"].to_pylist()
+    row = next(i for i, (a, b) in enumerate(zip(before, after, strict=True)) if a != b)
+    walked = [True] * len(batches)  # the dictionary page and every data page but the last
+    return {
+        ("pages", "walk_the_pages"): walk,
+        ("pages", "damage_a_page"): {
+            "python": [
+                "DATA_PAGE_V2 at ",
+                "matches the header: True\n",
+                "matches the header: False\n",
+                f"the reader's walk: {[*walked, False]}",
+            ],
+            "rust": [
+                "DATA_PAGE_V2 at ",
+                "matches the header: true\n",
+                "matches the header: false\n",
+                f"the reader's walk: [{', '.join(['Some(true)'] * len(walked))}, Some(false)]",
+            ],
+        },
+        ("pages", "pages_with_a_library"): {
+            "python": [
+                f"country: bytes {md.dictionary_page_offset} to {end}",
+                f"the dictionary page at {md.dictionary_page_offset}, "
+                f"the first data page at {md.data_page_offset}",
+                f"unchecked, row {row} reads {after[row]!r}, not {before[row]!r}",
+                "checked, it refuses: ",
+                "CRC checksum verification failed",
+            ],
+            "rust": [
+                f"country: bytes {md.dictionary_page_offset} to {end}",
+                *(f"DATA_PAGE_V2: {len(b)} rows, {b.count(None)} nulls, " for b in batches),
+                "one bit flipped:",
+                "refused: ",
+                "CRC checksum mismatch",
             ],
         },
     }

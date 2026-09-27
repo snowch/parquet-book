@@ -236,7 +236,8 @@ fn decode_pages(
             (body, page.body_span.start)
         };
         let mut r = ByteReader::new(levels_bytes, levels_base);
-        // Version 2 moves the level lengths into the header and never compresses the levels.
+        // Version 2 moves the level lengths into the header, and never compresses the
+        // levels.
         let (rep_len, def_len) = match page.v2 {
             Some(v2) => (
                 Some(v2.repetition_levels_byte_length.max(0) as usize),

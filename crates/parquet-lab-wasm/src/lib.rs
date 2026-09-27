@@ -451,15 +451,6 @@ pub extern "C" fn pl_compression(id: u32, column: u32, page: u32) -> usize {
     }
 }
 
-/// Ch06's experiment: every page of one column chunk. See `report::pages`.
-#[no_mangle]
-pub extern "C" fn pl_pages(id: u32, column: u32) -> usize {
-    match with_file(id, |f| report::pages(&f.bytes, column as usize)) {
-        Some(json) => emit(json),
-        None => no_such_file(id),
-    }
-}
-
 /// `pqlab ARGS`, run in the page: the command-line tool the book prints commands for, on the
 /// files the page has loaded, found by the name each was loaded under (`fixtures/tiny.parquet`).
 /// `args` is a `pl_alloc` buffer this call takes and frees, the arguments separated by zero

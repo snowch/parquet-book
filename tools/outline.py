@@ -174,7 +174,7 @@ _CHAPTERS = (
         "the_values",
         "What is inside a column chunk, and how does a reader walk it?",
         "A page walker for dictionary pages and data pages v1 and v2, with row boundaries and checksums.",
-        ("pages",),
+        (),
         ("pages.parquet", "pages-v2.parquet"),
     ),
     (
@@ -304,7 +304,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
     "anatomy",
-    "pages",
     "compression",
     "statistics",
     "skipping",

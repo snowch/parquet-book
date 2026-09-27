@@ -44,7 +44,8 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 ## Done: ch06, pages
 
 - Reader: data page v2 bodies, v2 header fields, CRC-32 page checksums, rows per page
-  (`column::first_rows`). Fixtures `pages.parquet` and `pages-v2.parquet`. The page walker panel.
+  (`column::first_rows`). Fixtures `pages.parquet` and `pages-v2.parquet`. The page walker panel,
+  since replaced by code (below).
 - Problems 6.1 (walk a chunk) and 6.2 (CRC-32) with tests; 6.3 open.
 - The Rust toolchain is pinned in `rust-toolchain.toml`, after a floating `stable` turned CI red.
 
@@ -242,6 +243,15 @@ indices, and `decode_a_column` prints the reader's decode steps for `url`. `enco
 asks pyarrow and the crate for each chunk's encodings and the dictionary. The panel is gone from
 every layer; `report::encodings` stays for `pqlab encodings` and the figures.
 
+## Done: ch06 in code
+
+ch06 opens on two steps instead of its pages panel: `walk_the_pages` loops `read_page` over
+`country`'s column chunk and prints each header, and `damage_a_page` recomputes a body's CRC-32,
+flips a bit, and shows the reader's walk failing only that page. `pages_with_a_library` shows
+pyarrow reading the damaged file silently and refusing it with `page_checksum_verification`, and
+the crate's page reader (now built with `crc`) refusing it too. `report::pages` stays for `pqlab
+pages` and the figures.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -260,8 +270,7 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch06 and ch07: a page header and a compressed page by hand; column chunk `compression` and
-   sizes from both libraries.
+1. ch07: a compressed page by hand; column chunk `compression` and sizes from both libraries.
 2. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
    `pq.read_table` compared with the reader's plan.
 3. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if

@@ -98,11 +98,12 @@ def zigzag_decode(n: int) -> int:
 
 
 def crc32(data: bytes) -> int:
-    """The CRC-32 checksum of ``data``: the IEEE polynomial, as zlib and Ethernet compute it.
+    """The CRC-32 checksum of ``data``: the IEEE polynomial, as zlib and Ethernet compute
+    it.
 
-    Parquet page headers may carry one over the page body, so a reader can tell a damaged page
-    from a page whose values happen to look odd. Computed a bit at a time: slower than a table,
-    and short enough to read.
+    Parquet page headers may carry one over the page body, so a reader can tell a damaged
+    page from a page whose values happen to look odd. Computed a bit at a time: slower than
+    a table, and short enough to read.
     """
     crc = 0xFFFF_FFFF
     for b in data:

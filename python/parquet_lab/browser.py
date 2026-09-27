@@ -15,7 +15,6 @@ FILES: list[tuple[str, bytearray]] = []
 
 EXPERIMENTS = (
     "anatomy",
-    "pages",
     "compression",
     "statistics",
     "skipping",
@@ -75,19 +74,6 @@ def structure(id: int) -> str:
 def interpret(id: int, offset: int) -> str:
     data = _file(id)
     return _no_such_file(id) if data is None else report.dumps(report.interpret(data, int(offset)))
-
-
-def _per_column(report_fn):
-    def call(id: int, column: int, *rest) -> str:
-        data = _file(id)
-        if data is None:
-            return _no_such_file(id)
-        return report.dumps(report_fn(data, int(column), *rest))
-
-    return call
-
-
-pages = _per_column(report.pages)
 
 
 def compression(id: int, column: int, page: int) -> str:

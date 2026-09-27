@@ -157,14 +157,14 @@ check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
   await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
   await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
   "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
-await page.goto(base + "pages.html");
+await page.goto(base + "compression.html");
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="pages"]');
+  const el = document.querySelector('.lab[data-experiment="compression"]');
   return el?.dataset.engine === "python" && el.dataset.ready === "true";
 }, null, { timeout: 180000 });
 check(true, "the engine choice holds on another page");
-await page.locator('.lab[data-experiment="pages"] .engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="pages"]').dataset.engine === "rust");
+await page.locator('.lab[data-experiment="compression"] .engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.engine === "rust");
 // ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
@@ -243,24 +243,21 @@ if (shots) {
     `ch05's url column is decoded in the page: ${steps.length} steps and its values, as the reader decodes them`);
 }
 
-// ch06: pages. The page list, and a checksum failing after damage, are the reader's.
-await page.goto(base + "pages.html");
-const pagesLab = page.locator('.lab[data-experiment="pages"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="pages"]')?.dataset.state === "ok");
-const nativePages = native(["pages", "fixtures/pages.parquet", "1"]);
-check(await pagesLab.getAttribute("data-pages") === String(nativePages.pages.length),
-  `country's chunk holds the reader's ${nativePages.pages.length} pages`);
-await pagesLab.locator(".lab-head select").selectOption("pages-v2.parquet");
-await page.waitForFunction(() => /^(ok,)+ok$/.test(document.querySelector('.lab[data-experiment="pages"]').dataset.crc || ""));
-check(true, "every v2 page's checksum matches");
-const v2 = native(["pages", "fixtures/pages-v2.parquet", "1"]);
-const target = v2.pages[1].values[0];
-await pagesLab.locator(`.hex .b[data-o="${target}"]`).click();
-await pagesLab.locator('.inspector input[name="byte"]').fill("ff");
-await pagesLab.locator(".inspector form.edit button[type=submit]").click();
-await page.waitForFunction(() => (document.querySelector('.lab[data-experiment="pages"]').dataset.crc || "").split(",")[1] === "bad");
-check(true, `damaging byte ${target} makes page 1's checksum fail, and only page 1's`);
-if (shots) await pagesLab.screenshot({ path: path.join(shots, "pages-lab.png") });
+// ch06: pages. The book's Python reader walks country's pages in the page, and after one bit of
+// the last page's body is flipped, only that page's checksum fails, as the native reader finds.
+{
+  await page.goto(base + "pages.html");
+  check(await page.locator(".lab").count() === 0, "ch06 has no panels: its steps walk the pages");
+  const nativePages = native(["pages", "fixtures/pages-v2.parquet", "1"]);
+  const step = page.locator('figure.walkthrough[data-file$="damage_a_page.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "the reader's walk:" }).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const walked = nativePages.pages.map((p, i) => (i === nativePages.pages.length - 1 ? "False" : "True"));
+  check(nativePages.pages.every((p) => p.crc_ok === true) && out.includes(`the reader's walk: [${walked.join(", ")}]`) &&
+    out.includes("matches the header: True") && out.includes("matches the header: False"),
+    `ch06's damaged page is found in the page: the last of ${nativePages.pages.length} checksums fails`);
+}
 
 // ch07: compression. The tokens and the rebuilt page are the Rust decompressor's.
 await page.goto(base + "compression.html");

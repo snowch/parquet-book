@@ -119,10 +119,6 @@ importlib.invalidate_caches()
     return this.#run(() => this.api.structure(id));
   }
 
-  pages(id, column) {
-    return this.#run(() => this.api.pages(id, column));
-  }
-
   /** `page` omitted or null: the first data page. */
   compression(id, column, page = null) {
     return this.#run(() => this.api.compression(id, column, page === null ? 0xffffffff : page));

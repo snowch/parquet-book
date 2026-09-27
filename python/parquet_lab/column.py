@@ -185,7 +185,8 @@ def decode_pages(file: bytes, chunk: ColumnChunk, leaf: Leaf, pages: list[Page])
         levels_bytes = _decompress(codec, body, page, page.uncompressed_page_size) if whole else body
         levels_base = page.body_span.start
         r = ByteReader(levels_bytes, levels_base)
-        # Version 2 moves the level lengths into the header and never compresses the levels.
+        # Version 2 moves the level lengths into the header, and never compresses the
+        # levels.
         v2 = page.v2
         rep_len = max(v2.repetition_levels_byte_length, 0) if v2 else None
         def_len = max(v2.definition_levels_byte_length, 0) if v2 else None

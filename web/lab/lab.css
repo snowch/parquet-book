@@ -151,10 +151,7 @@
   .table-grid .p-files { border-right: 0; }
 }
 
-/* Column pickers (ch06), and the notes under a panel. */
-.column-picker button { margin: 0 .3rem .3rem 0; }
-.column-picker button[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); }
-.column-picker small { color: var(--faint); }
+/* The notes under a panel. */
 .lab .note { color: var(--faint); font-size: 12.5px; margin: .4rem 0; }
 
 /* A stepper through a list of steps (ch07), a list of values (ch08) and bars (ch09). */
@@ -170,8 +167,7 @@
 .bar-row .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }
 .bar-row .bar i { display: block; height: 100%; background: var(--accent); opacity: .7; }
 
-/* Ch06: pages. */
-.p-pages { border-bottom: 1px solid var(--edge); }
+/* A table of pages or rows (ch07 and the later panels). */
 .pages-list { border-collapse: collapse; font-size: 12.5px; width: 100%; }
 .pages-list th, .pages-list td { padding: .22rem .45rem; border-bottom: 1px solid var(--edge); text-align: left; white-space: nowrap; }
 .pages-list th { font-size: 10.5px; }

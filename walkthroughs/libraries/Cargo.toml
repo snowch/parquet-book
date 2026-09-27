@@ -14,8 +14,9 @@ license = "Apache-2.0"
 publish = false
 
 [dependencies]
-# The format only, without Arrow or async, and Snappy, which ch15's table is compressed with.
-parquet = { version = "60", default-features = false, features = ["snap"] }
+# The format only, without Arrow or async; Snappy, which ch15's table is compressed with; and the
+# page checksums ch06 damages, which the crate checks only with its `crc` feature.
+parquet = { version = "60", default-features = false, features = ["snap", "crc"] }
 # The byte buffers a Parquet reader hands the crate, for ch01's step that counts what it reads.
 bytes = "1"
 

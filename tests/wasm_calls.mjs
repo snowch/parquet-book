@@ -34,7 +34,6 @@ const out = calls.map((c) => {
   switch (c.call) {
     case "footer": return lab.footerLab(id(c.file), c.options);
     case "structure": return lab.structure(id(c.file));
-    case "pages": return lab.pages(id(c.file), c.column);
     case "table": return lab.table(c.keys.map((k) => { if (!ids.has(k)) ids.set(k, lab.load(k, readFileSync(`fixtures/${k}`))); return ids.get(k); }), c.sql, c.discovery, 4);
     case "changes": return lab.changes(c.keys.map((k) => { if (!ids.has(k)) ids.set(k, lab.load(k, readFileSync(`fixtures/${k}`))); return ids.get(k); }), c.snapshot, c.op, c.options);
     case "encryption": return lab.encryption(id(c.file));
