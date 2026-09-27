@@ -12,8 +12,8 @@ What is inside a column chunk, and how does a reader walk it?
 [ch04](#nested-data) and [ch05](#encodings) decoded the values in a page, and every column chunk
 they read held one data page, or a dictionary page and one data page. Real column chunks hold
 many pages. A writer ends a page when it reaches a size limit, and each page is the smallest unit
-a reader must decode, and later decompress, to reach any value inside it. This chapter walks
-column chunks page by page, and compares the two versions of the data page.
+a reader must decode, and later decompress, to reach any value inside it. Here you walk column
+chunks page by page, and compare the two versions of the data page.
 
 ## The experiment
 
@@ -99,9 +99,11 @@ Every reader a file will meet must support version 2 before a writer should prod
 ### Checksums
 
 A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page
-from one whose values happen to be unusual. Writers leave it out by default; `pages-v2.parquet`
-was written with it on. The panel's checksum column is the reader recomputing each body's CRC and
-comparing it with the header's.
+from one whose values happen to be unusual. Whether a writer includes it depends on the
+implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
+parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on. The
+panel's checksum column is the reader recomputing each body's CRC and comparing it with the
+header's.
 
 ### How big a page should be
 
@@ -218,8 +220,9 @@ offset and row range so a reader can go straight to one. [ch09](#skipping-data) 
 real data depends on how it compresses and how selectively it is read, which
 [ch11](#writing-parquet-well) measures.
 
-**Index pages.** The format defines a third page type that no writer produces. The reader reports
-one as unexpected rather than guessing at it.
+**Index pages.** Besides the two data page versions and the dictionary page, the format defines
+an `INDEX_PAGE` type that no writer produces. The reader reports one as unexpected rather than
+guessing at it.
 
 ## Key takeaways
 

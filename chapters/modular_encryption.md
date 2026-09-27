@@ -150,9 +150,9 @@ A module is read from its length prefix alone, and an encrypted column chunk is 
 
 ### A signed plaintext footer
 
-The footer decoder from [ch02](#anatomy-of-a-parquet-file) refused bytes left over after the
-`FileMetaData`. An encrypted file with a plaintext footer leaves exactly a signature's worth, and
-says it uses encryption:
+The reader's footer decoder, the `metadata` module, refuses bytes left over after the
+`FileMetaData`: they mean the trailer's length and the structure disagree. An encrypted file with
+a plaintext footer leaves exactly a signature's worth, and says it uses encryption:
 
 ::::{tab-set}
 :::{tab-item} Python

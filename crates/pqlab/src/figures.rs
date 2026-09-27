@@ -2613,7 +2613,8 @@ fn changes_writes(root: &Path) -> Result<String, String> {
         .find(|f| !written.data_files.contains(f))
         .ok_or("copy-on-write changed no file")?;
     let delete = &mor.delete_files[0];
-    let row = old.file_size.div_ceil(old.record_count as u64);
+    // Whole bytes, rounded down, as the table_files walkthrough step prints them.
+    let row = old.file_size / old.record_count as u64;
     // Either way, the writer first finds the row: a lookup in the snapshot before.
     let find_it = lookup(
         changes_store(root)?,

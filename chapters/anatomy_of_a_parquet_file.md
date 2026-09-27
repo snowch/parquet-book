@@ -117,8 +117,8 @@ they say, so it starts that many bytes earlier:
 :::
 ::::
 
-Those bytes are the footer. The rest of this chapter follows a reader to them, and
-[ch03](#the-type-system) decodes them field by field.
+Those bytes are the footer. The rest of this chapter follows a reader to them and decodes their
+Thrift fields. [ch03](#the-type-system) reads the schema out of them.
 
 **Break it.** Change one byte of the length and do the same arithmetic:
 
@@ -231,8 +231,9 @@ Here is what each combination costs on both fixtures, computed by the same reade
 ```
 
 The last row for each file is the pattern most production readers use: one suffix read of a few
-tens of kilobytes, on the bet that the footer fits. For these files it does. [ch08](#metadata-and-statistics)
-shows files where it does not.
+tens of kilobytes, on the bet that the footer fits. For these files it does. A footer grows with
+every row group, and [ch11](#writing-parquet-well) writes one table with small row groups and
+shows its footer many times larger than with one row group.
 
 ### The whole file
 
@@ -532,7 +533,8 @@ how long your reads will take.
 
 **Whether a prefetch fits a real footer.** The fixtures have footers smaller than a kilobyte. A
 footer grows with the number of row groups times the number of columns, and a wide table's footer
-can be far larger than any sensible prefetch. [ch08](#metadata-and-statistics) measures that.
+can be far larger than any sensible prefetch. No fixture in this book has a footer that large.
+[ch11](#writing-parquet-well) shows how fast one grows with the number of row groups.
 
 **What lies between the data and the footer.** Page indexes and Bloom filters, when a writer
 includes them, sit after the row groups and before the footer. The fixtures have neither, so here

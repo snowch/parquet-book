@@ -209,6 +209,12 @@ to damage) were parameters of one call, so ch02 now makes the call: `open_with_t
 bytes the reader never asked for. The footer lab is gone; `report::footer_lab` still serves the
 CLI's `footer` command and the byte map.
 
+## Done: prose fixes from the chapter review
+
+Stale cross-references, typed numbers and factual slips corrected across ch02 to ch15, each
+checked against the reader, the fixtures or the writers' sources; ch04 now includes its `email`
+levels figure, and ch15's bytes-a-row figure rounds down as its walkthrough step does.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,

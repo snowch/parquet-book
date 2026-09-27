@@ -57,8 +57,9 @@ group:
 ```
 
 - **`min_value` and `max_value`** are the bounds in the column's own sort order.
-- **`min` and `max`** are older fields with the same purpose. They are deprecated, and pyarrow
-  writes them only where their old order happens to be right, as the table shows.
+- **`min` and `max`** are older fields with the same purpose. They are deprecated. pyarrow still
+  writes them, as copies of `min_value` and `max_value`, for every column whose order is signed,
+  as the table shows.
 - **`null_count`** counts the nulls. A chunk whose null count equals its value count holds no
   values at all.
 - **`is_min_value_exact` and `is_max_value_exact`** say whether each bound is a value in the
@@ -119,7 +120,9 @@ from that history:
 - Use `min_value` and `max_value` when the footer has `column_orders`. Without it, their order is
   undefined.
 - Use `min` and `max` only where signed comparison is the right order and the values are not
-  byte arrays.
+  byte arrays. That rules out `amount`, a decimal stored in bytes. pyarrow's copies for it are
+  right, but a reader cannot tell pyarrow's from the old writer's, which compared every byte as
+  signed. For a decimal's bytes after the first, that order is wrong.
 - Never use a bound that is NaN.
 
 Some readers go further, and ignore statistics from particular releases of particular writers,
@@ -149,7 +152,8 @@ All of it costs bytes, in a place every reader must fetch:
 
 In a small file the footer can outweigh the data. A table with hundreds of columns and many row
 groups can have a footer of megabytes, and every query pays for reading and decoding it before it
-reads anything else. [ch10](#how-readers-read) measures that.
+reads anything else. [ch11](#writing-parquet-well) shows a footer growing with the number of row
+groups.
 
 ## Building it
 

@@ -34,9 +34,9 @@ fixture: nested.parquet
 column: 2
 ```
 
-The panel reads one column at a time, from its page bytes, and shows three things: the fields on
-the column's path with the levels at which each appears, the levels as the page stores them, and
-one row per value slot. Try these:
+The panel reads one column at a time, from its page bytes, and shows four things: the fields on
+the column's path with the levels at which each appears, the levels as the page stores them, one
+triple of levels and value per value slot, and the records rebuilt from the triples. Try these:
 
 1. **Start with `tags[]`.** Read the triples top to bottom beside the records they rebuild. Each
    row's meaning is the reader's own reading of its two levels.
@@ -85,6 +85,13 @@ These are the four orders' `tags`, read from the page:
 
 A null list and an empty list store no value, but each still takes a slot. Without it, the
 reader would not know those records existed.
+
+`email` is the simplest case. One optional field is on its path, so its maximum definition level
+is 1: a `d` of 0 is a null and a `d` of 1 is a value. No field on the path is repeated, so the
+page stores no repetition levels, and the reader takes every `r` as zero:
+
+```{include} _generated/nested-levels-email.md
+```
 
 ### Two lists deep
 
@@ -170,9 +177,10 @@ order explicit:
 
 ### Splitting a page into levels and values
 
-A data page body holds the repetition levels, then the definition levels, then the values. Each
-level stream starts with a four-byte length, and is present only when the column's maximum for
-it is above zero:
+A data page body holds the repetition levels, then the definition levels, then the values. A
+level stream is present only when the column's maximum for it is above zero. In a version-1 data
+page each stream starts with a four-byte length. The second version of the data page, which
+[ch06](#pages) reads, gives both lengths in its header instead, so its streams have no prefix:
 
 ::::{tab-set}
 :::{tab-item} Python

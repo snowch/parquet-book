@@ -58,10 +58,10 @@ The whole file under each codec:
 ```{include} _generated/codec-files.md
 ```
 
-The codecs fall into pairs. Snappy and LZ4 land close together. GZIP and ZSTD land close
-together and smaller. Brotli is smallest here. The two groups differ in method, which the next
-sections take apart: the first pair only replaces repeated bytes with references to earlier
-ones, and the others also give common bytes shorter codes.
+The codecs fall into two groups. Snappy and LZ4 land close together. GZIP, ZSTD and Brotli all
+land smaller, and Brotli is smallest here. The two groups differ in method, which the next
+sections take apart: Snappy and LZ4 only replace repeated bytes with references to earlier ones,
+and the other three also give common bytes shorter codes.
 
 The same measurement column by column says more:
 

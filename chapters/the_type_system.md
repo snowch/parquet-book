@@ -102,7 +102,7 @@ logical type:
 ```
 
 Read down the last two columns. Where there is no logical type, the physical reading is the
-value. Where there is one, the physical reading is a number nobody meant:
+value. Where there is one, the physical reading is often a number nobody meant:
 
 - **`order_date`** is an `INT32` with the logical type `DATE`: a count of days since
   1970-01-01.
@@ -111,11 +111,14 @@ value. Where there is one, the physical reading is a number nobody meant:
   reading with no zone (`local`). The two look identical in the bytes and differ in meaning.
 - **`amount`** is a `DECIMAL`: an integer to be divided by a power of ten, here with two digits
   after the point. pyarrow stored it in a `FIXED_LEN_BYTE_ARRAY`, and there the integer is
-  big-endian: the most significant byte first. It is the one place Parquet stores a number the
-  other way round.
+  big-endian: the most significant byte first. A decimal stored as bytes is big-endian in a
+  `BYTE_ARRAY` too, and so is a `UUID`'s sixteen bytes. Every other number Parquet stores is
+  little-endian.
 - **`quantity`** and **`store_id`** are both `INT32`. The logical type says one is an 8-bit
-  signed integer and the other a 16-bit unsigned one. A reader that ignored it would read a large
-  unsigned value as negative.
+  signed integer and the other a 16-bit unsigned one. Both ranges fit in a signed 32-bit integer,
+  so here the two readings agree. They part for unsigned 32-bit and 64-bit integers, stored in
+  `INT32` and `INT64`: a reader that ignored the logical type would read a large value as
+  negative.
 - **`country`** is a `BYTE_ARRAY` with `STRING`: the bytes are UTF-8 text. Without the annotation
   they are opaque bytes, and a reader should not assume otherwise.
 

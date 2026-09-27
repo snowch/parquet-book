@@ -41,8 +41,8 @@ The panel plans `SELECT *` with the condition, row group by row group, and says 
 mechanism decided and why. It also reads the whole column to count the matching rows, so every
 plan is checked against the answer. Try these:
 
-1. **As loaded.** Statistics rule out three row groups. In the fourth, the page index keeps one
-   page, and the reader reads that page of every column.
+1. **As loaded.** Statistics rule out three row groups and keep row group 2. There the page
+   index keeps one page, and the reader reads that page of every column.
 2. **Untick the page index.** The reader now reads the whole of the remaining row group.
 3. **Switch to `pruning-shuffled.parquet`.** Every row group and every page covers nearly the
    whole range of order numbers, and nothing is skipped.
@@ -119,10 +119,10 @@ added. All set means it may have been: other values may have set those bits.
 ```{include} _generated/bloom-rate.md
 ```
 
-The writer sized each filter for a false-positive rate of one in twenty, and the measured rate is
-lower, because the filter's size is rounded up. False positives cost a read and nothing else: in
-the first table, the sorted file's filter passed `424242` in one row group, so the reader read a
-row group with no match in it. A filter never produces a false negative, so it never costs a row.
+The writer sized each filter for the false-positive rate the table's note gives, and the
+measured rate is lower, because the filter's size is rounded up. False positives cost a read and
+nothing else: in the first table, the sorted file's filter passed `424242` in one row group, so
+the reader read a row group with no match in it. A filter never produces a false negative, so it never costs a row.
 
 ### What each mechanism adds
 

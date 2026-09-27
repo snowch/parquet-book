@@ -46,8 +46,9 @@ Try these:
    still cannot.
 5. **Read 64 KiB for the footer.** The file is smaller than that, so the tail read brings all
    of it, and no other request is needed.
-6. **Change the network.** Set the latency to 1 ms and the bandwidth to 1 MB/s, and compare the
-   last two strategies again.
+6. **Change the network.** Set the latency to 1 ms and the bandwidth to 10 MB/s, the slowest the
+   panel offers, and compare the last two strategies again. The gap between them nearly closes.
+   On a slower link still, the table under *When bytes matter* shows the smaller read winning.
 
 ### Phases
 
@@ -73,10 +74,10 @@ The same query, with each change made in turn:
 
 The first rows follow [ch09](#skipping-data): skipping row groups by statistics cuts both bytes
 and requests. Then the page index cuts bytes further but adds requests, one for each index and
-each page, and the query gets slower. Bytes were not the problem. At twenty milliseconds a
-request, the number of requests decides the time, and every row below that attacks it: a larger
-tail brings the indexes with the footer, merging turns neighbouring pages into one request, and
-connections run requests side by side.
+each page, and the query gets slower. Bytes were not the problem. At the latency the table's
+note gives, the number of requests decides the time, and every row below that attacks it: a
+larger tail brings the indexes with the footer, merging turns neighbouring pages into one
+request, and connections run requests side by side.
 
 For a file this small, the fastest strategy is the crudest: read all of it. That is a real
 answer: a reader that knows a file is small can fetch all of it before parsing anything.
@@ -89,10 +90,11 @@ requests are made:
 ```{include} _generated/scan-full.md
 ```
 
-One request per column chunk, one at a time, pays the latency sixteen times. More connections
-overlap them, and the footer's three requests remain, since each depends on the last. Merging
-chunks that touch needs no extra bytes at all: a row group's chunks are written end to end, so
-the whole data region is one range.
+One request per column chunk, one at a time, pays the latency for every request in turn: the
+footer's three, then one per column chunk. More connections overlap the column chunks'
+requests, but the footer's three stay in sequence, since each depends on the last. Merging chunks
+that touch needs no extra bytes at all: a row group's chunks are written end to end, so the whole
+data region is one range.
 
 ### When bytes matter
 

@@ -18,7 +18,7 @@ the same rows seven ways and measures each by what queries against it cost.
 
 ### Seven files, one table
 
-The `writing-*.parquet` files hold the same eight hundred orders. `writing-baseline.parquet` is
+The `writing-*.parquet` files hold the same orders. `writing-baseline.parquet` is
 sorted by `order_id`, dictionary-encoded, compressed with Snappy, and written in four row groups
 of small pages with a page index. Each other file changes one of those settings.
 [Appendix B](#the-fixtures) lists them.
@@ -52,7 +52,7 @@ The files themselves, before any query:
 Every setting has a price somewhere:
 
 - **Row group size.** Each row group repeats the metadata for every column: a column chunk entry
-  in the footer, statistics, page index entries, and a dictionary page per column. Twenty row
+  in the footer, statistics, page index entries, and a dictionary page per column. Small row
   groups made the footer many times larger than one row group did, and the file larger with it.
 - **Dictionary encoding.** It shrank `country`, which repeats a few values, and grew `order_id`,
   whose values are all different: [ch05](#encodings)'s lesson, at the scale of a file.
@@ -160,9 +160,10 @@ cargo test -p parquet-lab --test fixtures
 
 ## What this cannot tell you
 
-**How the settings behave at scale.** Eight hundred rows make every row group small, and the
-proportions change with size: a footer that is a fifth of a small file is a rounding error in a
-large one. The direction of each effect holds; the sizes do not.
+**How the settings behave at scale.** The fixtures hold few enough rows that every row group is
+small, and the proportions change with size. A footer that is a large share of a small file, as
+in the table of files above, is a rounding error in a large one. The direction of each effect
+holds; the sizes do not.
 
 **What the settings cost the writer.** Larger row groups need more memory while writing, and
 sorting needs the rows first. This chapter measures only readers.

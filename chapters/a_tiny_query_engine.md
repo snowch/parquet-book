@@ -89,7 +89,7 @@ that cannot, strings compared byte by byte, unsigned and negative integers, and 
 
 ### Parsing
 
-The parser is a tokenizer and a recursive-descent parser, one function per piece of the grammar.
+The parser is a tokeniser and a recursive-descent parser, one function per piece of the grammar.
 A condition, for example:
 
 ::::{tab-set}

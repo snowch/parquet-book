@@ -38,9 +38,9 @@ record of how it read the values: every step, with the bytes it read. Step throu
 
 1. **`order_id`** goes up by one each row. Step through it: a header, one block, and miniblocks
    with a bit width of zero. The values take no bytes at all beyond the header and the block's
-   smallest delta.
-2. **`ordered_at`** is a timestamp about a minute apart each row. The deltas vary a little, and a
-   miniblock packs them in two bits each.
+   own header: its smallest delta and one bit-width byte per miniblock.
+2. **`ordered_at`** is a plain `INT64` with no logical type: a count of seconds since 1970, with
+   rows about a minute apart. The deltas vary a little, and a miniblock packs them in two bits each.
 3. **`url`** shares a long prefix with the previous value. Look at the prefix lengths, then the
    suffixes: most suffixes are a single character.
 4. **`weight_kg`** is a float. Its encoding stores the same number of bytes as PLAIN. Look at the
@@ -57,9 +57,13 @@ The same measurement for every column of both files:
 
 Every saving in the table comes from a pattern in the values, and so does the one loss. The
 dictionary made `order_id` larger than PLAIN: every value is distinct, so the dictionary holds
-all of them, and the indices come on top. A writer avoids this by falling back. It caps the
-dictionary's size, and when a column chunk exceeds the cap it writes the remaining pages with
-another encoding. A column with many distinct values ends up without a dictionary.
+all of them, and the indices come on top.
+
+pyarrow falls back from a dictionary on its size, not on what it saves. It caps the dictionary's
+size, and when a column chunk's dictionary outgrows the cap it writes the remaining pages with
+another encoding. `order_id`'s dictionary is far below the default cap, so pyarrow kept it, and
+the loss stands. A column of distinct values escapes its dictionary only once there are enough of
+them to fill the cap. Some other writers also drop a dictionary that saves nothing.
 
 ### Dictionary encoding
 
@@ -75,7 +79,8 @@ Four distinct countries need two bits each. The header `05` is binary `101`: a b
 two groups of eight, so the twelve indices are packed with four slots of padding after them.
 Dictionary encoding also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in
 the dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip
-the whole column chunk. [ch09](#skipping-data) uses that.
+the whole column chunk. Some readers do both. The reader in this book does neither, as
+[ch09](#skipping-data) notes.
 
 The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 name it
 `PLAIN_DICTIONARY`, which is decoded the same way.
@@ -85,12 +90,13 @@ The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 
 For integers that are sorted or change slowly, storing the differences between values is far
 cheaper than storing the values. `DELTA_BINARY_PACKED` writes a header, then blocks. Each block
 subtracts its smallest delta from all of its deltas, so every adjusted delta is zero or more, and
-splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs:
+splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs. The
+block starts with its smallest delta and one byte per miniblock giving that miniblock's width:
 
 ```{include} _generated/delta-ordered-at.md
 ```
 
-The timestamps are about a minute apart, so the smallest delta is large, but the adjusted deltas
+The values are about a minute apart, so the smallest delta is large, but the adjusted deltas
 are all small and fit in two bits. Deltas that never vary, like `order_id`'s, adjust to zero and
 pack into a width of zero: a miniblock with no bytes at all.
 
@@ -113,13 +119,16 @@ hierarchical keys, shrink the most:
 
 `BYTE_STREAM_SPLIT` does not make anything smaller. It rearranges a column of fixed-width values
 into one stream per byte position: every value's first byte, then every value's second byte, and
-so on. The low bytes of a float's mantissa look random; its sign and exponent byte barely changes:
+so on. Each byte position varies in its own way:
 
 ```{include} _generated/split-weights.md
 ```
 
-The last stream holds the sign and exponent, and has almost no variety. Written PLAIN, those
-bytes are scattered one in every four. Written split, they sit together, where a compressor can
+The last stream holds the sign and most of the exponent, and has almost no variety. The stream
+before it, the top of the mantissa, varies most. The two low streams repeat a few bytes, because
+these weights go up in steps of a twentieth, and the mantissa of such a fraction repeats one bit
+pattern. In measured data the low bytes usually vary far more. Written PLAIN, the exponent bytes
+are scattered one in every four. Written split, they sit together, where a compressor can
 find the repetition. [ch07](#compression) measures what that is worth.
 
 ### Which encodings writers use
