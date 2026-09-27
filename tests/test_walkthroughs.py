@@ -97,6 +97,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(readers_facts())
     known.update(writing_facts())
     known.update(query_facts())
+    known.update(encryption_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -809,6 +810,94 @@ def query_facts() -> dict:
             "python": [f"row groups kept: {kept}\n", *counts],
             "rust": [f"row groups kept: {[f'Some({g})' for g in kept]}\n".replace("'", ""), *counts],
         },
+    }
+
+
+def encryption_facts() -> dict:
+    """What ch13's steps must print, from the manifests of the two encrypted files, whose
+    generator records the footer mode and the keys pyarrow was given, and from pyarrow's own
+    refusals without keys. The module's length, nonce and tag are the file's bytes; the test
+    checks that the module and the one after it fill email's column chunk, as the prose says."""
+    import pyarrow.parquet as pq
+
+    quoted = {"python": lambda t: repr(t), "rust": lambda t: json.dumps(t)}
+    shown = {"python": lambda m: repr(m.encode()), "rust": lambda m: json.dumps(m)}
+    modes, keys = {"python": [], "rust": []}, {"python": [], "rust": []}
+    manifests = {}
+    for name in ("plaintext-footer", "encrypted-footer"):
+        manifest = json.loads((ROOT / "fixtures" / f"{name}.json").read_text())
+        manifests[name] = manifest
+        crypto = manifest["generator"]["encryption"]
+        magic = "PAR1" if crypto["plaintext_footer"] else "PARE"
+        # Column keys in the order of their columns, then the footer key. An encrypted footer
+        # holds the column keys' metadata inside itself, so only the footer key is in the clear.
+        order = [c["name"] for c in manifest["schema"]]
+        column_keys = sorted(crypto["column_keys"], key=lambda k: order.index(crypto["column_keys"][k][0]))
+        named = [("column", k) for k in column_keys] if crypto["plaintext_footer"] else []
+        named.append(("footer", crypto["footer_key"]))
+        for language in ("python", "rust"):
+            q = quoted[language]
+            modes[language].append(
+                f"{name}.parquet starts {shown[language](magic)} and ends {shown[language](magic)}\n"
+            )
+            lines = [f"  {kind} key {q(key)}, wrapped data key " for kind, key in named]
+            keys[language].append(f"{name}.parquet, keys named in the clear: {len(named)}\n{lines[0]}")
+            keys[language].extend(lines[1:])
+
+    plain = manifests["plaintext-footer"]
+    path = ROOT / "fixtures" / "plaintext-footer.parquet"
+    data = path.read_bytes()
+    email = next(c for c in plain["row_groups"][0]["columns"] if c["path"] == "email")
+    start, size = email["data_page_offset"], email["total_compressed_size"]
+    n = int.from_bytes(data[start : start + 4], "little")
+    after = start + 4 + n
+    assert after + 4 + int.from_bytes(data[after : after + 4], "little") == start + size, (
+        "the prose says email's chunk is two modules, a page header and a page"
+    )
+    module = [
+        f"email: bytes {start} to {start + size}, statistics None\n",
+        f"a module at byte {start}: length {n}\n",
+        f"  nonce: {data[start + 4 : start + 16].hex(' ')}\n",
+        f"  ciphertext: {n - 12 - 16} bytes\n",
+        f"  tag: {data[after - 16 : after].hex(' ')}\n",
+        f"the next module starts at byte {after}\n",
+    ]
+
+    def refusal(read) -> str:
+        with pytest.raises(OSError) as refused:
+            read()
+        return str(refused.value)
+
+    stats = {c["path"]: c["statistics"] for c in plain["row_groups"][0]["columns"]}
+    encrypted = [c for cs in plain["generator"]["encryption"]["column_keys"].values() for c in cs]
+    rows = plain["num_rows"]
+    unencrypted = [c for c in stats if c not in encrypted]
+    python = [f"plaintext-footer.parquet: {rows} rows\n"]
+    python += [f"  {c}: statistics {stats[c]['min']} to {stats[c]['max']}\n" for c in unencrypted]
+    python += [
+        f"  read {unencrypted}: {rows} rows\n",
+        f"  read ['email']: {refusal(lambda: pq.read_table(path, columns=['email']))}\n",
+        "encrypted-footer.parquet: "
+        + refusal(lambda: pq.read_metadata(ROOT / "fixtures" / "encrypted-footer.parquet")),
+    ]
+    rust = [f"plaintext-footer.parquet: {rows} rows\n"]
+    rust += [
+        f"  {c}: statistics {json.dumps(stats[c]['min'])} to {json.dumps(stats[c]['max'])}\n"
+        if c not in encrypted
+        else f"  {c}: statistics none\n"
+        for c in stats
+    ]
+    rust += [
+        # Without its encryption feature the crate reads the module's length as a page header.
+        "  email's first row: Parquet error: ",
+        "encrypted-footer.parquet: Parquet error: ",
+        "encryption feature is disabled",
+    ]
+    return {
+        ("modular_encryption", "footer_modes"): modes,
+        ("modular_encryption", "keys_by_name"): keys,
+        ("modular_encryption", "one_module"): module,
+        ("modular_encryption", "encryption_with_a_library"): {"python": python, "rust": rust},
     }
 
 

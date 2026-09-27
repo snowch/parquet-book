@@ -47,7 +47,8 @@ def read_module(r: ByteReader) -> Module:
     start = r.offset()
     n = r.read_le_u32()
     if n < NONCE_LEN + TAG_LEN:
-        raise CryptoError(f"a module at offset {start} claims {n} bytes, fewer than a nonce and a tag")
+        why = f"a module at offset {start} claims {n} bytes, fewer than a nonce and a tag"
+        raise CryptoError(why)
     _, body = r.read_bytes(n)
     return Module(
         span=Span(start, body.end),
@@ -82,10 +83,11 @@ class EncryptedFooter:
 
 
 def encrypted_footer(file: bytes) -> EncryptedFooter:
-    """Read an encrypted-footer file's footer, as far as anyone without the footer key can."""
+    """Read an encrypted-footer file's footer, as far as a reader without its key can."""
     size = len(file)
     if size < 12 or file[:4] != MAGIC_ENCRYPTED or file[-4:] != MAGIC_ENCRYPTED:
-        raise CryptoError("not an encrypted-footer file: it does not start and end with PARE")
+        why = "not an encrypted-footer file: it does not start and end with PARE"
+        raise CryptoError(why)
     length = int.from_bytes(file[-8:-4], "little")
     footer = footer_span(size, length)
     r = ByteReader(file[footer.start : footer.end], footer.start)
@@ -99,7 +101,7 @@ def encrypted_footer(file: bytes) -> EncryptedFooter:
     key_metadata = key.node.value if key and isinstance(key.node.value, bytes) else None
     module = read_module(r)
     if not r.is_at_end():
-        raise CryptoError(
-            f"{footer.end - r.offset()} bytes follow the encrypted FileMetaData inside the footer"
-        )
+        left = footer.end - r.offset()
+        why = f"{left} bytes follow the encrypted FileMetaData inside the footer"
+        raise CryptoError(why)
     return EncryptedFooter(footer, crypto_metadata, algorithm, key_metadata, module)

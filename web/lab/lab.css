@@ -133,8 +133,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
-  .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
   .table-grid .p-files { border-right: 0; }
 }
@@ -215,15 +213,7 @@
 .pipeline .detail { margin: .15rem 0 .3rem; color: var(--muted); overflow-wrap: anywhere; }
 
 /* Ch13: encryption. */
-.crypt-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-              grid-template-areas: "seen unseen" "cols cols"; border-bottom: 1px solid var(--edge); }
-.crypt-grid .p-seen { grid-area: seen; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.crypt-grid .p-unseen { grid-area: unseen; border-bottom: 1px solid var(--edge); }
-.crypt-grid .p-crypt-cols { grid-area: cols; }
-.crypt-grid ul { margin: 0; padding-left: 1.1rem; font-size: 13px; }
-.crypt-grid li { margin-bottom: .35rem; }
-.crypt-grid li.mode { list-style: none; margin-left: -1.1rem; }
-.crypt-grid .detail { color: var(--muted); overflow-wrap: anywhere; }
+.crypt-grid { border-bottom: 1px solid var(--edge); }
 .crypt-grid button.span { font: 12px var(--chrome); padding: 0 .3rem; background: var(--code); border-color: var(--edge); text-align: left; }
 
 /* Ch14: tables. */
@@ -266,8 +256,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .crypt-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seen" "unseen" "cols"; }
-  .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
   .table-grid .p-files { border-right: 0; }
   .lab-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hex" "tree" "inspect"; }

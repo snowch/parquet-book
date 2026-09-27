@@ -87,12 +87,13 @@ pub struct EncryptedFooter {
 
 /// Read an encrypted-footer file's footer, as far as anyone without the footer key can.
 pub fn encrypted_footer(file: &[u8]) -> Result<EncryptedFooter, String> {
-    let size = file.len() as u64;
-    if size < 12 || file[..4] != MAGIC_ENCRYPTED || file[file.len() - 4..] != MAGIC_ENCRYPTED {
-        return Err("not an encrypted-footer file: it does not start and end with PARE".into());
+    let n = file.len();
+    if n < 12 || file[..4] != MAGIC_ENCRYPTED || file[n - 4..] != MAGIC_ENCRYPTED {
+        let why = "not an encrypted-footer file: it does not start and end with PARE";
+        return Err(why.into());
     }
-    let length = u32::from_le_bytes(file[file.len() - 8..file.len() - 4].try_into().unwrap());
-    let footer = crate::format::footer_span(size, length).map_err(|e| e.to_string())?;
+    let length = u32::from_le_bytes(file[n - 8..n - 4].try_into().unwrap());
+    let footer = crate::format::footer_span(n as u64, length).map_err(|e| e.to_string())?;
     let bytes = &file[footer.start as usize..footer.end as usize];
     let mut r = ByteReader::new(bytes, footer.start);
     let crypto_metadata = read_struct(&mut r).map_err(|e| format!("FileCryptoMetaData: {e}"))?;

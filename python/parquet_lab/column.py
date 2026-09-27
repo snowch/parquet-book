@@ -149,13 +149,13 @@ def read_column_pages(
 
 
 def refuse_encrypted(chunk: ColumnChunk) -> None:
-    """An encrypted column chunk's pages are encrypted modules (ch13). Without its key they
-    cannot be read, and the reader says so rather than decoding ciphertext."""
+    """An encrypted column chunk's pages are encrypted modules (ch13). Without its key
+    they cannot be read, and the reader says so rather than decoding ciphertext."""
     if chunk.crypto is not None:
         key = "its own key" if chunk.crypto.with_column_key else "the footer key"
-        raise ColumnError(
-            f"column {chunk.dotted_path()} is encrypted with {key}, and this reader has no keys"
-        )
+        path = chunk.dotted_path()
+        why = f"column {path} is encrypted with {key}, and this reader has no keys"
+        raise ColumnError(why)
 
 
 def decode_pages(file: bytes, chunk: ColumnChunk, leaf: Leaf, pages: list[Page]) -> ColumnData:

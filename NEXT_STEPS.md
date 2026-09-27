@@ -117,7 +117,8 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Reader: `crypto.rs` (modules by their lengths; an encrypted footer's crypto metadata and
   module); signed plaintext footers; column crypto metadata; encrypted columns refused by name;
   the structure view shows modules, signatures and `PARE` files.
-- Experiment: what a reader without keys can and cannot see. Problems 13.1 and 13.2; 13.3 open.
+- Experiment: what a reader without keys can and cannot see, since slimmed to its byte map and
+  column table (below). Problems 13.1 and 13.2; 13.3 open.
 
 ## Done: ch14, lakehouse and beyond
 
@@ -304,6 +305,15 @@ with `read_column` and counts countries, and `run_a_query`, which runs the same 
 groups and groups with `count_all`; the crate keeps them with a predicate and counts its rows. The
 engine panel is gone; `pqlab query` stays for the Run buttons.
 
+## Done: ch13 in code
+
+ch13 opens on `footer_modes` (`PAR1` or `PARE` at both ends), `keys_by_name` (the key metadata's
+JSON found in the raw bytes: three keys in the clear with a plaintext footer, the footer key alone
+with an encrypted one) and `one_module` (email's first module: length, nonce, ciphertext, tag). In
+`encryption_with_a_library`, pyarrow and the crate open the plaintext footer without keys and fail
+on email; the step never asks pyarrow for an encrypted column's metadata, which aborts the process.
+The panel keeps its byte map and column table; its see and cannot-see lists are gone.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -330,7 +340,7 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch13 and ch14: a query in DuckDB or DataFusion only if
+1. ch14: a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

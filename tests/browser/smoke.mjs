@@ -432,18 +432,45 @@ await page.goto(base + "writing-parquet-well.html");
     `pyarrow groups in the page: it keeps row groups [${kept}] and counts as the engine does`);
 }
 
-// ch13: encryption. What is visible is what the reader could read.
-await page.goto(base + "modular-encryption.html");
-const cryptLab = page.locator('.lab[data-experiment="encryption"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]')?.dataset.state === "ok");
-const plain = native(["encryption", "fixtures/plaintext-footer.parquet"]);
-check(await cryptLab.getAttribute("data-mode") === "plaintext footer" &&
-  await cryptLab.getAttribute("data-hidden") === String(plain.hidden.length),
-  `a plaintext footer hides the reader's ${plain.hidden.length} items`);
-await cryptLab.locator(".lab-head select").selectOption("encrypted-footer.parquet");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]').dataset.mode === "encrypted footer");
-check((await cryptLab.locator(".p-tree").innerText()).includes("Encrypted FileMetaData"), "the structure view shows the encrypted footer as one module");
-if (shots) await cryptLab.screenshot({ path: path.join(shots, "encryption-lab.png") });
+// ch13: encryption. The panel's columns are what the reader could read. pyarrow, without keys,
+// reads the plain columns in the page and refuses the encrypted ones with an error, never by
+// stopping the worker; the next step still runs after it.
+{
+  await page.goto(base + "modular-encryption.html");
+  const cryptLab = page.locator('.lab[data-experiment="encryption"]');
+  await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]')?.dataset.state === "ok");
+  const plain = native(["encryption", "fixtures/plaintext-footer.parquet"]);
+  const encrypted = plain.columns.filter((c) => c.encrypted);
+  check(await cryptLab.getAttribute("data-mode") === "plaintext footer" &&
+    await cryptLab.getAttribute("data-encrypted") === String(encrypted.length) &&
+    await cryptLab.locator(".crypt-cols tbody tr").count() === plain.columns.length,
+    `the column table lists ${plain.columns.length} columns, ${encrypted.length} encrypted, as the native reader does`);
+  await cryptLab.locator(".crypt-cols button.span", { hasText: "email" }).click();
+  const email = plain.columns.find((c) => c.path === "email");
+  check(await cryptLab.locator(".hex .b.hl").count() === email.span[1] - email.span[0],
+    `selecting email marks its column chunk, bytes ${email.span[0]} to ${email.span[1]}`);
+  await cryptLab.locator(".lab-head select").selectOption("encrypted-footer.parquet");
+  await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]').dataset.mode === "encrypted footer");
+  check((await cryptLab.locator(".p-tree").innerText()).includes("Encrypted FileMetaData"), "the structure view shows the encrypted footer as one module");
+  if (shots) await cryptLab.screenshot({ path: path.join(shots, "encryption-lab.png") });
+
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const { num_rows: rows } = JSON.parse(await readFile("fixtures/plaintext-footer.json", "utf8"));
+  const library = await runStep("encryption_with_a_library", "encrypted-footer.parquet:");
+  check(library.includes(`plaintext-footer.parquet: ${rows} rows`) &&
+    library.includes(`read ['order_id', 'country']: ${rows} rows`) &&
+    library.some((l) => l.startsWith("read ['email']: Cannot decrypt")),
+    "pyarrow without keys in the page reads the plain columns and refuses email with an error");
+  const length = (await readFile("fixtures/plaintext-footer.parquet")).readUInt32LE(email.span[0]);
+  const module = await runStep("one_module", "next module");
+  check(module.includes(`a module at byte ${email.span[0]}: length ${length}`),
+    "the worker outlives pyarrow's refusal: the next step runs, and reads email's first module");
+}
 
 // ch14: a table of files. What is read is what the reader's plan kept.
 await page.goto(base + "lakehouse-and-beyond.html");

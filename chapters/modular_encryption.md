@@ -23,23 +23,71 @@ two encrypted files without their keys, and reports exactly where the reader sto
 same keys. `email` is encrypted with one key and `amount_cents` with another; `order_id` and
 `country` are not encrypted. The files differ in one choice: whether the footer is encrypted too.
 
-```lab
-experiment: encryption
-fixture: plaintext-footer.parquet
-fixtures: plaintext-footer.parquet, encrypted-footer.parquet
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name.
+
+**Footer modes.** A Parquet file starts and ends with its magic, as
+[ch02](#anatomy-of-a-parquet-file) found. Read the first and last four bytes of both files:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/modular_encryption/footer_modes.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/footer_modes.rs
+:language: rust
+```
+:::
+::::
 
-The panel lists what the reader could read and what it could not, and each item marks the bytes
-it concerns. Try these:
+The plaintext-footer file starts and ends with `PAR1`, like every file so far, and a reader that
+knows nothing of encryption opens it as usual. The encrypted-footer file has `PARE` at both ends,
+and such a reader refuses it at the magic. Add `"tiny"` to the list of files: it ends with
+`PAR1` too, so the magic alone cannot tell a plaintext footer from a file with no encryption at
+all. Problem 13.2 asks you to tell the three apart.
 
-1. **As loaded.** The schema, the row count, and the unencrypted columns' values and statistics
-   are all readable. So are the names of the keys that protect the other two columns.
-2. **Open `email` in the structure view.** Its pages are two encrypted modules: a page header and
-   a page, each with a length, a nonce, ciphertext and a tag.
-3. **Find the signature.** In the structure view, after the `FileMetaData`, a nonce and a tag
-   sign the footer.
-4. **Switch to `encrypted-footer.parquet`.** The file starts and ends with `PARE`. The reader can
-   name the algorithm and the footer key, and nothing else.
+### Keys by name
+
+Neither file holds a key. Each encrypted piece carries **key metadata**, which names a key
+without revealing it. pyarrow writes it as JSON, so a search of the raw bytes finds it.
+
+**Keys by name.** Find every piece of key metadata in both files, and print the key it names:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/modular_encryption/keys_by_name.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/keys_by_name.rs
+:language: rust
+```
+:::
+::::
+
+The plaintext-footer file names three keys in the clear: one for each encrypted column, and one
+for the footer. The encrypted-footer file names only the footer key. The columns' key metadata is
+still there, inside the footer, and the footer is encrypted. Print all of the JSON: it also
+records whether the data key was wrapped once or twice and, for the footer key, which key service
+to ask.
+
+The scheme is envelope encryption. Each column is encrypted with a random data key. That data key
+is wrapped, encrypted, with a master key that stays inside a key management service: the
+`wrappedDEK` the step printed is the wrapped data key. A reader sends it to the service, which
+unwraps it only for a reader allowed to have it. Different columns can use different master
+keys, so one reader may see `amount_cents` and not `email`.
+
+The fixtures use a toy key service that wraps by XOR with master keys published in
+`fixtures/generate.py`. It protects nothing, on purpose: the files exist to show what encryption
+hides from a reader without keys, and anyone may regenerate them.
 
 ### Modules
 
@@ -52,6 +100,31 @@ Parquet encrypts **modules**, not files. Every encrypted piece is laid out the s
 [tag: 16 bytes]                AES-GCM's check that nothing was changed
 ```
 
+**One module.** The plaintext footer still says where `email`'s column chunk is. Read the first
+module of the chunk from its length prefix:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/modular_encryption/one_module.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/one_module.rs
+:language: rust
+```
+:::
+::::
+
+The footer gives the chunk's place and size, but no statistics: those are in the encrypted copy
+of the column's metadata. The module's length counts the nonce, the ciphertext and the tag, and
+the next module starts where it ends. Set `at` to that byte and run the step again: the second
+module ends exactly where the chunk ends. The first module is the page's header and the second
+the page. Change the column to `amount_cents` and read its first module the same way. Walking
+every module of a chunk is problem 13.1.
+
 Encrypting each page separately keeps what earlier chapters built. A reader with the keys can
 still fetch one page from the middle of a file and decrypt it alone, as [ch10](#how-readers-read)
 fetched pages. And a reader without the keys can still find every module, by its length prefix,
@@ -63,6 +136,27 @@ to its place in the file, its row group, column and page number, through the dat
 authenticates alongside the ciphertext, so a module cannot be moved from one place to another
 unnoticed. A second algorithm, `AES_GCM_CTR_V1`, authenticates the metadata but encrypts pages
 with plain counter mode, which is faster and leaves the pages unauthenticated.
+
+### The file, module by module
+
+The panel lays out both files as the reader parsed them, in the structure and byte views of
+[ch02](#anatomy-of-a-parquet-file)'s panel, and lists the columns as a reader without keys finds
+them. Select a column's name to mark its bytes.
+
+```lab
+experiment: encryption
+fixture: plaintext-footer.parquet
+fixtures: plaintext-footer.parquet, encrypted-footer.parquet
+```
+
+Try these:
+
+1. **Select `email`.** Its chunk is the two modules the step read, a page header and a page. The
+   structure view splits each into its length, nonce, ciphertext and tag.
+2. **Find the signature.** In the structure view, after the `FileMetaData`, a nonce and a tag
+   sign the footer.
+3. **Switch to `encrypted-footer.parquet`.** No column can be located. The structure view shows a
+   plaintext `FileCryptoMetaData` and one encrypted module where the `FileMetaData` should be.
 
 ### What a plaintext footer shows
 
@@ -90,28 +184,9 @@ plaintext `FileCryptoMetaData`, naming the algorithm and the footer key, followe
 `FileMetaData` as one module. Even the unencrypted columns cannot be read: their bytes are there
 in plain form, but the footer that says where they are is not.
 
-### Keys by name
-
-Neither file holds a key. Each encrypted piece carries **key metadata**, which names a key
-without revealing it. pyarrow writes it as JSON:
-
-```text
-{"keyMaterialType":"PKMT1", ..., "masterKeyID":"pii", "wrappedDEK":"…", ...}
-```
-
-The scheme is envelope encryption. Each column is encrypted with a random data key. That data key
-is wrapped, encrypted, with a master key that stays inside a key management service. A reader
-sends the wrapped data key to the service, which unwraps it only for a reader allowed to have
-it. Different columns can use different master keys, so one reader may see `amount_cents` and
-not `email`.
-
-The fixtures use a toy key service that wraps by XOR with master keys published in
-`fixtures/generate.py`. It protects nothing, on purpose: the files exist to show what encryption
-hides from a reader without keys, and anyone may regenerate them.
-
 ### What still leaks
 
-Encryption hides values, not shape. From the tables above and the structure view, a reader
+Encryption hides values, not shape. From the steps, the tables above and the panel, a reader
 without keys still learns:
 
 - **the file's size, and in a plaintext footer every column chunk's size and offset;**
@@ -125,9 +200,14 @@ without the footer key.
 
 ## Building it
 
+The steps read the magic, the key metadata and one module by hand, and stopped where a key would
+be needed. The reader does the same for every module, in both footer modes, and says where it
+stops.
+
 ### Walking modules
 
-A module is read from its length prefix alone, and an encrypted column chunk is a run of them:
+A module is read from its length prefix alone, as the step read one, and an encrypted column chunk
+is a run of them:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -148,9 +228,34 @@ A module is read from its length prefix alone, and an encrypted column chunk is 
 :::
 ::::
 
+### An encrypted footer
+
+A file that ends with `PARE` has a footer in two parts. The reader decodes the first, the
+plaintext `FileCryptoMetaData`, for the algorithm and the footer key's metadata, and reads the
+rest as one module, which must end where the footer does:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/crypto.py
+:language: python
+:start-at: def encrypted_footer(file: bytes)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/crypto.rs
+:language: rust
+:start-at: pub fn encrypted_footer(
+:end-before: #[cfg(test)]
+```
+:::
+::::
+
 ### A signed plaintext footer
 
-The reader's footer decoder, the `metadata` module, refuses bytes left over after the
+In the step that read one module, `open_bytes` decoded the plaintext footer with the reader's
+footer decoder, the `metadata` module. That decoder refuses bytes left over after the
 `FileMetaData`: they mean the trailer's length and the structure disagree. An encrypted file with
 a plaintext footer leaves exactly a signature's worth, and says it uses encryption:
 
@@ -176,7 +281,7 @@ a plaintext footer leaves exactly a signature's worth, and says it uses encrypti
 ### Refusing what it cannot read
 
 The column reader refuses an encrypted column by name, rather than decoding ciphertext as if it
-were a page:
+were a page, which is what a library without encryption does under *Ask a library* below:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -223,6 +328,49 @@ cargo test -p parquet-lab --test fixtures encrypt
 Encryption uses a fresh nonce for every module and a fresh data key for every file, so these two
 fixtures cannot be regenerated byte for byte. They were written once; the generator's check
 decrypts them with the published keys and confirms they still hold exactly the intended rows.
+
+### Ask a library
+
+At work a library reads these files, with keys from a key service. Without keys, pyarrow and the
+`parquet` crate stop where the book's reader stops, though not in the same way:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/modular_encryption/encryption_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/encryption_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+Both open the plaintext footer and count the rows. pyarrow gives the statistics of `order_id` and
+`country` and reads those two columns. Asked for `email`, it refuses, because it cannot decrypt
+the column's metadata. The crate, built here without its `encryption` feature, finds no
+statistics for the two encrypted columns, as the book's reader found none. But it does not know
+that `email`'s pages are encrypted: it reads the first module's length prefix as the start of a
+page header, and fails on a field the header lacks. The book's reader refuses the column by name
+before it reads a page. Neither library opens the encrypted footer without keys.
+
+The Python step keeps away from one call. pyarrow's metadata for an encrypted column,
+`metadata.row_group(0).column(2)`, needs that column's key. Without the key, pyarrow does not
+raise an error: it stops the whole Python process, and in the page that stops every step. A
+reader with keys passes decryption properties from `pyarrow.parquet.encryption`, as the pyarrow
+documentation under *Where to go next* shows. Ask for the other encrypted column,
+`amount_cents`, instead of `email`: both libraries fail on it as they did on `email`.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encryption_with_a_library
+```
 
 ## What this cannot tell you
 
