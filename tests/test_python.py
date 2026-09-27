@@ -260,8 +260,9 @@ def test_the_encryption_lab_matches(tmp_path):
         assert python(report.encryption(path.read_bytes())) == rust("encryption", path), path.name
 
 
-def test_the_table_lab_matches():
-    """ch14: every table query, with the files found each way, over one to eight connections."""
+def test_the_table_command_matches():
+    """ch14: every table query, with the files found each way, over one to eight connections, as
+    the reader's steps and figures run them."""
     from parquet_lab.table import Discovery
 
     listing = json.loads((ROOT / "fixtures" / "table.json").read_text())

@@ -131,7 +131,7 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   together by the ch12 engine, with partition columns from the paths). The object store gained
   `LIST` and whole-object reads.
 - Experiment: a query over the table with the files found by listing, by listing and pruning by
-  path, or by the log. Problems 14.1 (partition values) and 14.2 (plan from the log); 14.3 open.
+  path, or by the log, since replaced by code (below). Problems 14.1 (partition values) and 14.2 (plan from the log); 14.3 open.
 
 ## Done: the Python reader
 
@@ -314,6 +314,16 @@ with an encrypted one) and `one_module` (email's first module: length, nonce, ci
 on email; the step never asks pyarrow for an encrypted column's metadata, which aborts the process.
 The panel keeps its byte map and column table; its see and cannot-see lists are gone.
 
+## Done: ch14 in code
+
+ch14 opens on `list_the_table` (each file's partition and size, from the directories),
+`read_the_log` (each `add` and the `order_id` range its statistics record, parsed twice) and
+`query_the_table` (`table.query` from the log, each file's decision and every request). In
+`table_with_a_library`, pyarrow's hive dataset rules out by path and then by each footer's
+statistics, since it does not read Delta logs; the crate walks the directories and reads each
+footer. The table panel is gone; `pqlab table` and `pqlab query` stay. The discovery table is one
+small table per query.
+
 ## Done: the problems editor first
 
 - Every Problems section opens with its workbench, where a reader on a phone meets it, rather than
@@ -336,12 +346,9 @@ ch12's SQL box), make it a code step with the parameters in the call, as ch02 di
 whose value is a picture (ch02's byte map, ch07's tokens, the request timelines of ch10 and
 ch15).
 
-In order, each a walkthrough by hand at the start of the experiment and an "Ask a library" step
-at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
-where a picture beats printed output, and trimmed or cut elsewhere:
-
-1. ch14: a query in DuckDB or DataFusion only if
-   it adds something the reader cannot show, and pyarrow's dataset API for many files.
+Every chapter from ch01 to ch15 now has its walkthrough by hand and its "Ask a library" step, in
+both languages, tested against the manifest. What remains: a query in DuckDB or DataFusion for
+ch14, only if it adds something the reader cannot show.
 
 ## Trying: Rust compiled in the page
 

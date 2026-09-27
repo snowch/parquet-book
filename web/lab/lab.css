@@ -133,8 +133,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
-  .table-grid .p-files { border-right: 0; }
 }
 
 /* The notes under a panel. */
@@ -202,11 +200,7 @@
 .timeline .req.idx { background: var(--warn); }
 .timeline .req.data { background: var(--accent); }
 
-/* A query's form (ch14), and the stages of a pipeline (ch14, ch15). */
-.engine-form { padding: .6rem 1rem; border-bottom: 1px solid var(--edge); }
-.engine-form textarea { width: 100%; font: 13px/1.5 var(--mono); padding: .4rem .5rem; background: var(--code);
-  color: var(--ink); border: 1px solid var(--edge); border-radius: 4px; resize: vertical; }
-.engine-form .row { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .4rem; font-size: 13px; }
+/* The stages of a pipeline (ch15). */
 .pipeline { margin: 0; padding-left: 1.3rem; font-size: 12.5px; }
 .pipeline li { margin-bottom: .7rem; }
 .pipeline .flow { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -215,15 +209,6 @@
 /* Ch13: encryption. */
 .crypt-grid { border-bottom: 1px solid var(--edge); }
 .crypt-grid button.span { font: 12px var(--chrome); padding: 0 .3rem; background: var(--code); border-color: var(--edge); text-align: left; }
-
-/* Ch14: tables. */
-.table-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
-              grid-template-areas: "files reqs" "answer answer"; border-bottom: 1px solid var(--edge); }
-.table-grid .p-files { grid-area: files; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.table-grid .p-t-reqs { grid-area: reqs; border-bottom: 1px solid var(--edge); }
-.table-grid .p-t-answer { grid-area: answer; }
-.table-grid tr.skipped td { color: var(--faint); }
-.table-grid .pages-list td { white-space: normal; }
 
 /* Ch15: a changing table. */
 .changes-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
@@ -256,8 +241,6 @@
   .comp-grid .p-tokens { border-right: 0; border-bottom: 1px solid var(--edge); }
   .scan-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sum" "time"; }
   .scan-grid .p-scan-sum { border-right: 0; border-bottom: 1px solid var(--edge); }
-  .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
-  .table-grid .p-files { border-right: 0; }
   .lab-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hex" "tree" "inspect"; }
   .lab-grid .p-hex { border-right: 0; border-bottom: 1px solid var(--edge); }
   .hex { font-size: 11px; }

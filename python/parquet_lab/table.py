@@ -155,7 +155,7 @@ def read_log(text: str) -> tuple[list[TableFile], list[str]]:
         raw = add.get("stats")
         if isinstance(raw, str):
             try:
-                stats = _stats(json.loads(raw))
+                stats = _file_stats(json.loads(raw))
             except ValueError:
                 stats = None
         size = add.get("size")
@@ -163,7 +163,7 @@ def read_log(text: str) -> tuple[list[TableFile], list[str]]:
     return files, columns
 
 
-def _stats(s: object) -> FileStats:
+def _file_stats(s: object) -> FileStats:
     def pairs(k: str) -> dict:
         v = s.get(k) if isinstance(s, dict) else None
         return v if isinstance(v, dict) else {}

@@ -19,7 +19,6 @@ import { mountAnatomy } from "./footer.js";
 import { mountCompression } from "./compression.js";
 import { mountScan } from "./scan.js";
 import { mountEncryption } from "./encryption.js";
-import { mountTable } from "./table.js";
 import { mountChanges } from "./changes.js";
 import { mountWorkbench } from "./workbench.js";
 import { mountCommands } from "./commands.js";
@@ -29,7 +28,6 @@ const EXPERIMENTS = {
   compression: mountCompression,
   scan: mountScan,
   encryption: mountEncryption,
-  table: mountTable,
   changes: mountChanges,
 };
 

@@ -159,8 +159,46 @@ const FIGURES: &[Figure] = &[
         render: table_log,
     },
     Figure {
-        file: "table-discovery.md",
-        render: table_discovery,
+        file: "table-every-order.md",
+        render: |root| table_discovery(root, "SELECT count(*) FROM orders"),
+    },
+    Figure {
+        file: "table-by-country.md",
+        render: |root| {
+            table_discovery(
+                root,
+                "SELECT count(*), sum(amount_cents) FROM orders WHERE country = 'UK'",
+            )
+        },
+    },
+    Figure {
+        file: "table-by-order-id.md",
+        render: |root| {
+            table_discovery(
+                root,
+                "SELECT order_id, country, amount_cents FROM orders WHERE order_id >= 431 AND \
+                 order_id < 436 ORDER BY order_id",
+            )
+        },
+    },
+    Figure {
+        file: "table-by-status.md",
+        render: |root| {
+            table_discovery(
+                root,
+                "SELECT country, count(*) FROM orders WHERE status = 'refunded' GROUP BY country \
+                 ORDER BY country",
+            )
+        },
+    },
+    Figure {
+        file: "table-by-both.md",
+        render: |root| {
+            table_discovery(
+                root,
+                "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200",
+            )
+        },
     },
     Figure {
         file: "changes-snapshots.md",
@@ -2036,19 +2074,14 @@ fn table_log(root: &Path) -> Result<String, String> {
             .unwrap_or_default()
     };
     let mut rows = vec![
-        "| File | Partition | Bytes | Rows | `order_id` from | to |".to_string(),
-        "|---|---|--:|--:|--:|--:|".to_string(),
+        "| File | Bytes | Rows | `order_id` |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
     for f in &files {
         let s = f.stats.as_ref().ok_or("an add with no statistics")?;
         rows.push(format!(
-            "| `{}` | {} | {} | {} | {} | {} |",
+            "| `{}` | {} | {} | {} to {} |",
             f.key,
-            f.partition
-                .iter()
-                .map(|(k, v)| format!("`{k}={v}`"))
-                .collect::<Vec<_>>()
-                .join(", "),
             thousands(f.size),
             thousands(s.num_records as u64),
             stat(&s.min),
@@ -2063,59 +2096,67 @@ fn table_log(root: &Path) -> Result<String, String> {
     ))
 }
 
-fn table_discovery(root: &Path) -> Result<String, String> {
+/// One query over the table with the files found each of the three ways. The figure fails to
+/// build if any answer differs from pyarrow's.
+fn table_discovery(root: &Path, sql: &str) -> Result<String, String> {
     use parquet_lab::table::{query, Discovery};
     let text = std::fs::read_to_string(root.join("fixtures/queries.json"))
         .map_err(|e| format!("cannot read queries.json: {e}"))?;
     let queries = Json::parse(&text).map_err(|e| e.to_string())?;
+    let theirs = arr(Some(&queries))
+        .iter()
+        .find(|q| {
+            q.get("file").and_then(Json::as_str) == Some("table")
+                && q.get("sql").and_then(Json::as_str) == Some(sql)
+        })
+        .and_then(|q| q.get("rows").map(Json::to_json))
+        .ok_or(format!("pyarrow has no answer for {sql}"))?;
     let model = NetworkModel::default();
     let mut rows = vec![
-        "| Query | Files found by | Files read | Requests | Bytes fetched | Time | Same as pyarrow |"
-            .to_string(),
-        "|---|---|--:|--:|--:|--:|---|".to_string(),
+        "| Files found by | Files read | Requests | Bytes fetched |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
     ];
-    let mut files = 0;
-    for q in arr(Some(&queries))
-        .iter()
-        .filter(|q| q.get("file").and_then(Json::as_str) == Some("table"))
-    {
-        let sql = q.get("sql").and_then(Json::as_str).ok_or("no sql")?;
-        let theirs = q.get("rows").map(Json::to_json).unwrap_or_default();
-        for (d, label) in [
-            (Discovery::List, "listing"),
-            (Discovery::ListAndPrune, "listing, pruned by path"),
-            (Discovery::Log, "the log"),
-        ] {
-            let a = query(table_store(root)?, "table/", sql, d, 4, model)?;
-            files = a.files.len();
-            let mine = Json::Arr(
-                a.answer
-                    .rows
-                    .iter()
-                    .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()))
-                    .collect(),
-            )
-            .to_json();
-            rows.push(format!(
-                "| `{}` | {label} | {} of {} | {} | {} | {} | {} |",
-                cell(sql),
-                a.files.iter().filter(|f| f.read).count(),
-                a.files.len(),
-                a.requests.len(),
-                thousands(a.bytes_fetched),
-                ms_of(a.elapsed_us),
-                if mine == theirs { "yes" } else { "**no**" }
+    let (mut files, mut times) = (0, Vec::new());
+    for (d, label) in [
+        (Discovery::List, "listing"),
+        (Discovery::ListAndPrune, "listing, pruned by path"),
+        (Discovery::Log, "the log"),
+    ] {
+        let a = query(table_store(root)?, "table/", sql, d, 4, model)?;
+        files = a.files.len();
+        let mine = Json::Arr(
+            a.answer
+                .rows
+                .iter()
+                .map(|r| Json::Arr(r.iter().map(|v| v.to_json()).collect()))
+                .collect(),
+        )
+        .to_json();
+        if mine != theirs {
+            return Err(format!(
+                "the reader and pyarrow disagree on {sql} by {label}"
             ));
         }
+        rows.push(format!(
+            "| {label} | {} of {} | {} | {} |",
+            a.files.iter().filter(|f| f.read).count(),
+            a.files.len(),
+            a.requests.len(),
+            thousands(a.bytes_fetched)
+        ));
+        times.push(ms_of(a.elapsed_us));
     }
     Ok(format!(
-        "{}\n\n*Computed by the reader over the {files} data files of `fixtures/table/`, fetching \
-         through the simulated store with four connections, {} ms before each request's first \
-         byte and {} MB/s after it. The answers are compared with pyarrow's, from \
-         `fixtures/queries.json`.*\n",
+        "{}\n\n*`{}`, by the reader over the {files} data files of `fixtures/table/`, with four \
+         connections, {} ms before each request's first byte and {} MB/s after it. It took {}, \
+         {} and {}, in the table's order, and each way gave pyarrow's answer.*\n",
         rows.join("\n"),
+        cell(sql),
         model.latency_us / 1000,
-        model.bandwidth_bytes_per_sec / 1_000_000
+        model.bandwidth_bytes_per_sec / 1_000_000,
+        times[0],
+        times[1],
+        times[2]
     ))
 }
 

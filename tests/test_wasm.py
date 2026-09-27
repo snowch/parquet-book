@@ -122,14 +122,6 @@ def cases():
         for offset in (0, 4, size // 2, size - 8, size - 1):
             calls.append({"call": "interpret", "file": f, "offset": offset})
             native.append(("interpret", f, str(offset)))
-    listing = json.loads((ROOT / "fixtures" / "table.json").read_text())
-    keys = [o["key"] for o in listing["objects"]]
-    for q in json.loads((ROOT / "fixtures" / "queries.json").read_text()):
-        if q["file"] != "table":
-            continue
-        for discovery, flag in (("list", "list"), ("prune", "prune"), ("log", "log")):
-            calls.append({"call": "table", "keys": keys, "sql": q["sql"], "discovery": discovery})
-            native.append(("table", "fixtures/table.json", q["sql"], "--discovery", flag))
     listing = json.loads((ROOT / "fixtures" / "changes.json").read_text())
     keys = [o["key"] for o in listing["objects"]]
     for snapshot in listing["snapshots"]:

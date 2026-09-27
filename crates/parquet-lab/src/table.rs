@@ -150,21 +150,7 @@ pub fn read_log(text: &str) -> Result<(Vec<TableFile>, Vec<String>), String> {
             .get("stats")
             .and_then(Json::as_str)
             .and_then(|s| Json::parse(s).ok())
-            .map(|s| {
-                let pairs = |k: &str| match s.get(k) {
-                    Some(Json::Obj(kv)) => kv.clone(),
-                    _ => Vec::new(),
-                };
-                FileStats {
-                    num_records: s.get("numRecords").and_then(Json::as_i64).unwrap_or(0),
-                    min: pairs("minValues"),
-                    max: pairs("maxValues"),
-                    null_count: pairs("nullCount")
-                        .into_iter()
-                        .map(|(k, v)| (k, v.as_i64().unwrap_or(0)))
-                        .collect(),
-                }
-            });
+            .map(|s| file_stats(&s));
         files.push(TableFile {
             key: key.to_string(),
             partition,
@@ -175,6 +161,22 @@ pub fn read_log(text: &str) -> Result<(Vec<TableFile>, Vec<String>), String> {
         });
     }
     Ok((files, columns))
+}
+
+fn file_stats(s: &Json) -> FileStats {
+    let pairs = |k: &str| match s.get(k) {
+        Some(Json::Obj(kv)) => kv.clone(),
+        _ => Vec::new(),
+    };
+    FileStats {
+        num_records: s.get("numRecords").and_then(Json::as_i64).unwrap_or(0),
+        min: pairs("minValues"),
+        max: pairs("maxValues"),
+        null_count: pairs("nullCount")
+            .into_iter()
+            .map(|(k, v)| (k, v.as_i64().unwrap_or(0)))
+            .collect(),
+    }
 }
 
 /// A literal as the engine's value: a number if it reads as one, text otherwise.

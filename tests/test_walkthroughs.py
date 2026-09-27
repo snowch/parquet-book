@@ -98,6 +98,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(writing_facts())
     known.update(query_facts())
     known.update(encryption_facts())
+    known.update(lakehouse_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -898,6 +899,72 @@ def encryption_facts() -> dict:
         ("modular_encryption", "keys_by_name"): keys,
         ("modular_encryption", "one_module"): module,
         ("modular_encryption", "encryption_with_a_library"): {"python": python, "rust": rust},
+    }
+
+
+def lakehouse_facts() -> dict:
+    """What ch14's steps must print for country = 'UK' AND order_id < 200: each file's partition
+    and size from the generator's listing, its rows and order_id range from pyarrow's reading of
+    its footer (the log must record the same), what the reader decides about it, and the count,
+    from pyarrow's reading of the rows."""
+    import pyarrow.parquet as pq
+
+    listing = json.loads((ROOT / "fixtures" / "table.json").read_text())
+    log_key = next(o["key"] for o in listing["objects"] if "_delta_log" in o["key"])
+    log = (ROOT / "fixtures" / log_key).read_text().splitlines()
+    files, limit = [], 200
+    for o in listing["objects"]:
+        if o["key"].endswith(".parquet"):
+            md = pq.read_metadata(ROOT / "fixtures" / o["key"])
+            assert md.num_row_groups == 1, "the steps read one row group a file"
+            s = md.row_group(0).column(0).statistics
+            key = o["key"].removeprefix("table/")
+            country = key.split("/")[0].split("=")[1]
+            files.append((key, country, o["size"], md.num_rows, s.min, s.max))
+    kept = [f for f in files if f[1] == "UK" and f[4] < limit]
+    uk = [
+        pq.read_table(ROOT / "fixtures" / "table" / f[0], columns=["order_id"]) for f in files if f[1] == "UK"
+    ]
+    count = sum(n < limit for t in uk for n in t["order_id"].to_pylist())
+
+    def why(key, country, size, rows, low, high) -> str:
+        if country != "UK":
+            return f"{key}: skipped: country = UK, and its partition is country={country}\n"
+        if low >= limit:
+            ranges = f"the log says order_id runs from {low} to {high}"
+            return f"{key}: skipped: order_id < {limit}, and {ranges}\n"
+        return f"{key}: read: nothing rules it out\n"
+
+    assert [f[0] for f in kept] == ["country=UK/part-0.parquet"], "the prose follows one file read"
+    return {
+        ("lakehouse_and_beyond", "list_the_table"): [
+            f"{key}: country is {country}, {size} bytes\n" for key, country, size, *_ in files
+        ],
+        ("lakehouse_and_beyond", "read_the_log"): [
+            *(f"line {n}: {next(iter(json.loads(line)))}\n" for n, line in enumerate(log[:2], 1)),
+            *(f"add {key}, {rows} rows, order_id {low} to {high}\n" for key, _, _, rows, low, high in files),
+        ],
+        ("lakehouse_and_beyond", "query_the_table"): [
+            *(why(*f) for f in files),
+            f"GET {log_key}, {len((ROOT / 'fixtures' / log_key).read_bytes())} bytes\n",
+            *(f"GET table/{key}, {size} bytes\n" for key, _, size, *_ in kept),
+            f"count(*)\n{count}\n",
+        ],
+        ("lakehouse_and_beyond", "table_with_a_library"): {
+            "python": [
+                "country: string",
+                *(
+                    f"fixtures/table/{key}: order_id {low} to {high}, row groups kept {[0] if low < limit else []}\n"
+                    for key, country, _, _, low, high in files
+                    if country == "UK"
+                ),
+                f"rows: {count}\n",
+            ],
+            "rust": [
+                f"{key}: {rows} rows, order_id {low} to {high}, kept {str(country == 'UK' and low < limit).lower()}\n"
+                for key, country, _, rows, low, high in files
+            ],
+        },
     }
 
 

@@ -186,7 +186,7 @@ there is a Parquet file to open, so it has no *Building it*, and its problems ar
 reason about rather than tests. It ends on the same table as a Parquet file pyarrow wrote, and
 hands over to ch02, where the method starts.
 
-ch02 and ch15 are the models for the method; ch03 to ch14 predate it and are being revised to it
+ch02 and ch15 are the models for the method; ch03 to ch14 predate it and have been revised to it
 (NEXT_STEPS.md).
 
 The experiment comes before the code on purpose. A reader who has watched the requests happen

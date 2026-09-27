@@ -263,7 +263,7 @@ _CHAPTERS = (
         "beyond_one_file",
         "How does one Parquet file become one part of a larger analytical system?",
         "Many files, partitions, a table log and file pruning over the same object store.",
-        ("table",),
+        (),
         ("table.json",),
     ),
     (
@@ -307,6 +307,5 @@ EXPERIMENTS = (
     "compression",
     "scan",
     "encryption",
-    "table",
     "changes",
 )

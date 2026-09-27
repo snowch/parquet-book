@@ -71,21 +71,6 @@ export class Lab {
   }
 
   /**
-   * SQL over a table: `ids` are loaded files named by their object keys. `discovery` is "list",
-   * "prune" or "log".
-   */
-  table(ids, sql, discovery = "log", connections = 4, latencyUs = 20000, bandwidth = 100000000) {
-    const idBytes = new Uint8Array(ids.length * 4);
-    const view = new DataView(idBytes.buffer);
-    ids.forEach((id, i) => view.setUint32(i * 4, id, true));
-    const idPtr = this.#copyIn(idBytes);
-    const text = encoder.encode(sql);
-    const sqlPtr = this.#copyIn(text);
-    const d = { list: 0, prune: 1, log: 2 }[discovery] ?? 2;
-    return this.#result(this.exports.pl_table(idPtr, ids.length, sqlPtr, text.length, d, connections, latencyUs, bandwidth));
-  }
-
-  /**
    * An operation on a snapshot of a changing table (ch15): `ids` are loaded files named by their
    * object keys. `op` is "scan", "lookup" (of `key`) or "compact" (with `targetRows` and
    * `smallRows`).

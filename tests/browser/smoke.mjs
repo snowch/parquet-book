@@ -472,21 +472,29 @@ await page.goto(base + "writing-parquet-well.html");
     "the worker outlives pyarrow's refusal: the next step runs, and reads email's first module");
 }
 
-// ch14: a table of files. What is read is what the reader's plan kept.
-await page.goto(base + "lakehouse-and-beyond.html");
-const tableLab = page.locator('.lab[data-experiment="table"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="table"]')?.dataset.state === "ok", null, { timeout: 60000 });
-const ukSql = "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200";
-const byLog = native(["table", "fixtures/table.json", ukSql, "--discovery", "log"]);
-check(await tableLab.getAttribute("data-files-read") === String(byLog.totals.files_read) &&
-  await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
-  `reading the log, the reader reads ${byLog.totals.files_read} of ${byLog.totals.files} files and answers ${JSON.stringify(byLog.rows)}`);
-await tableLab.locator('input[name="discovery"][value="list"]').check();
-const byList = native(["table", "fixtures/table.json", ukSql, "--discovery", "list"]);
-await page.waitForFunction((n) => document.querySelector('.lab[data-experiment="table"]').dataset.filesRead === String(n), byList.totals.files_read);
-check(await tableLab.getAttribute("data-answer") === JSON.stringify(byLog.rows),
-  `listing, it reads all ${byList.totals.files_read} files and answers the same`);
-if (shots) await tableLab.screenshot({ path: path.join(shots, "table-lab.png") });
+// ch14: a table of files. The book's Python reader plans the chapter's query in the page, file by
+// file, as the native reader does; pyarrow's dataset module reads the partitioned directory too.
+{
+  await page.goto(base + "lakehouse-and-beyond.html");
+  check(await page.locator(".lab").count() === 0, "ch14 has no panels: its steps print each file's fate");
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const ukSql = "SELECT count(*) FROM orders WHERE country = 'UK' AND order_id < 200";
+  const byLog = native(["table", "fixtures/table.json", ukSql, "--discovery", "log"]);
+  const count = String(byLog.rows[0][0]);
+  const lines = await runStep("query_the_table", "count(*)");
+  check(byLog.files.every((f) => lines.includes(`${f.key}: ${f.why}`)) && lines.filter(Boolean).at(-1) === count,
+    `reading the log in the page, the reader reads ${byLog.totals.files_read} of ${byLog.totals.files} files and counts ${count}, as it does natively`);
+  const library = await runStep("table_with_a_library", "rows:");
+  check(library.some((l) => l.includes("country: string")) && library.includes(`rows: ${count}`) &&
+    byLog.files.filter((f) => f.partition.includes("country=UK")).every((f) =>
+      library.some((l) => l.startsWith(`fixtures/table/${f.key}: `) && l.endsWith(f.read ? "kept [0]" : "kept []"))),
+    "pyarrow's dataset in the page reads the partition from the paths, and keeps the file the log keeps");
+}
 
 // ch15: a changing table. A lookup's chain of requests is the native reader's, and a scan of
 // every snapshot counts the rows the native reader counts.
