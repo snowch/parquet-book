@@ -9,8 +9,9 @@ start = dictionary or first
 print(f"{chunk.path_in_schema}: bytes {start} to {start + chunk.total_compressed_size}")
 print(f"the dictionary page at {dictionary}, the first data page at {first}")
 
-def country(source, **options):
-    return pq.read_table(source, columns=["country"], **options)["country"].to_pylist()
+def country(source, **options):  # one thread: a refused read must not leave workers behind
+    table = pq.read_table(source, columns=["country"], use_threads=False, **options)
+    return table["country"].to_pylist()
 
 data = bytearray(open(path, "rb").read())
 data[start + chunk.total_compressed_size - 2] ^= 1  # the bit damage_a_page flipped
