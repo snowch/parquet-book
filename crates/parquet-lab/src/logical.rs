@@ -257,8 +257,8 @@ pub fn decimal(unscaled: i128, scale: i64) -> String {
 
 /// A big-endian two's-complement integer, of any length up to 16 bytes.
 ///
-/// Decimals stored as `FIXED_LEN_BYTE_ARRAY` or `BYTE_ARRAY` use this, and they are the one place
-/// Parquet puts the most significant byte first. Everything else is little-endian.
+/// Decimals stored as `FIXED_LEN_BYTE_ARRAY` or `BYTE_ARRAY` use this. They and `UUID` are where
+/// Parquet puts the most significant byte first; every other number it stores is little-endian.
 pub fn be_twos_complement(bytes: &[u8]) -> Option<i128> {
     if bytes.is_empty() || bytes.len() > 16 {
         return None;

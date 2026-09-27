@@ -47,10 +47,6 @@ const FIGURES: &[Figure] = &[
         render: footer_strategies,
     },
     Figure {
-        file: "types-schema-flat.md",
-        render: types_schema_flat,
-    },
-    Figure {
         file: "types-schema-text.md",
         render: types_schema_text,
     },
@@ -598,38 +594,6 @@ fn text_of(j: Option<&Json>) -> String {
     }
 }
 
-fn types_schema_flat(root: &Path) -> Result<String, String> {
-    let (bytes, j) = types_schema(root)?;
-    let mut s = String::from(HEADER);
-    s.push_str("| # | Name | Children | Repetition | Physical type | Logical type |\n|--:|---|--:|---|---|---|\n");
-    for e in j
-        .get("elements")
-        .and_then(Json::as_array)
-        .ok_or("no elements")?
-    {
-        let physical = text_of(e.get("physical_type"));
-        let physical = match e.get("type_length").and_then(Json::as_i64) {
-            Some(n) if !physical.is_empty() => format!("{physical}({n})"),
-            _ => physical,
-        };
-        s.push_str(&format!(
-            "| {} | `{}` | {} | {} | {} | {} |\n",
-            text_of(e.get("index")),
-            text_of(e.get("name")),
-            text_of(e.get("num_children")),
-            text_of(e.get("repetition")).to_lowercase(),
-            if physical.is_empty() {
-                "(group)".into()
-            } else {
-                physical
-            },
-            text_of(e.get("logical_type")),
-        ));
-    }
-    s.push_str(&conditions("types.parquet", &bytes, None));
-    Ok(s)
-}
-
 fn types_schema_text(root: &Path) -> Result<String, String> {
     let (bytes, j) = types_schema(root)?;
     let mut s = String::from(HEADER);
@@ -644,8 +608,8 @@ fn types_values(root: &Path) -> Result<String, String> {
     let (bytes, j) = types_schema(root)?;
     let mut s = String::from(HEADER);
     s.push_str(
-        "| Column | Physical type | Logical type | Minimum, as stored | Read as the physical type | Read through the logical type |\n\
-         |---|---|---|---|---|---|\n",
+        "| Column | Minimum, as stored | Read as the physical type | Read through the logical type |\n\
+         |---|---|---|---|\n",
     );
     for l in j
         .get("leaves")
@@ -662,13 +626,8 @@ fn types_values(root: &Path) -> Result<String, String> {
             }
         };
         s.push_str(&format!(
-            "| `{}` | {} | {} | {} | {} | {} |\n",
+            "| `{}` | {} | {} | {} |\n",
             text_of(l.get("path")),
-            text_of(l.get("physical_type")),
-            match text_of(l.get("logical_type")) {
-                t if t.is_empty() => "·".to_string(),
-                t => t,
-            },
             cell("hex"),
             cell("physical"),
             cell("logical"),

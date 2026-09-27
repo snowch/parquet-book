@@ -157,14 +157,14 @@ check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
   await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
   await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
   "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
-await page.goto(base + "the-type-system.html");
+await page.goto(base + "nested-data.html");
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="schema"]');
+  const el = document.querySelector('.lab[data-experiment="levels"]');
   return el?.dataset.engine === "python" && el.dataset.ready === "true";
 }, null, { timeout: 180000 });
-check(true, "the engine choice holds on the next page");
-await page.locator('.lab[data-experiment="schema"] .engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="schema"]').dataset.engine === "rust");
+check(true, "the engine choice holds on another page");
+await page.locator('.lab[data-experiment="levels"] .engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]').dataset.engine === "rust");
 // ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
@@ -193,22 +193,21 @@ if (shots) {
   await page.screenshot({ path: path.join(shots, "chapter-dark.png") });
 }
 
-// ch03: the schema. The leaf count and the date reading are the reader's.
-await page.goto(base + "the-type-system.html");
-const schemaLab = page.locator('.lab[data-experiment="schema"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="schema"]')?.dataset.state === "ok");
-const nativeSchema = native(["schema", "fixtures/types.parquet"]);
-check(await schemaLab.getAttribute("data-leaves") === String(nativeSchema.leaves.length),
-  `schema panel shows the reader's ${nativeSchema.leaves.length} leaf columns`);
-const dateRow = schemaLab.locator(".values-table tr", { hasText: "order_date" });
-const expectedDate = nativeSchema.leaves.find((l) => l.path === "order_date").statistics.min.logical;
-check((await dateRow.innerText()).includes(expectedDate), `order_date's minimum reads as ${expectedDate}`);
-await dateRow.locator("td:nth-child(4) button.span").click();
-const minSpan = nativeSchema.leaves.find((l) => l.path === "order_date").statistics.min.span;
-const litDate = await schemaLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
-check(litDate[0] === minSpan[0] && litDate.length === minSpan[1] - minSpan[0],
-  `clicking the minimum highlights its bytes [${minSpan[0]}, ${minSpan[1]})`);
-if (shots) await schemaLab.screenshot({ path: path.join(shots, "schema-lab.png") });
+// ch03: the schema, rebuilt by hand in the page. The walk's levels and the count of columns the
+// book's reader finds are the native reader's.
+{
+  await page.goto(base + "the-type-system.html");
+  check(await page.locator(".lab").count() === 0, "ch03 has no panels: its steps print the schema");
+  const nativeSchema = native(["schema", "fixtures/types.parquet"]);
+  const step = page.locator('figure.walkthrough[data-file$="rebuild_the_tree.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "columns" }).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const city = nativeSchema.leaves.find((l) => l.path === "shipping.city");
+  check(out.includes(`finds ${nativeSchema.leaves.length} columns`) &&
+    out.includes(`city  max levels: definition ${city.max_definition_level}, repetition ${city.max_repetition_level}`),
+    `ch03's tree is rebuilt in the page: ${nativeSchema.leaves.length} columns, shipping.city's levels as the reader counts them`);
+}
 
 // ch04: levels. The records the page rebuilds are the reader's.
 await page.goto(base + "nested-data.html");

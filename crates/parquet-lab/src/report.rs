@@ -790,8 +790,9 @@ pub fn open_bytes(file: &[u8]) -> Result<FileMetaData, String> {
         .map_err(|e| e.to_string())
 }
 
-/// Ch03's experiment: the schema as the footer stores it, as the reader rebuilds it, and what
-/// each column's statistics mean once its logical type is applied.
+/// Ch03's schema, for `pqlab schema` and the chapter's figures: the schema as the footer stores
+/// it, as the reader rebuilds it, and what each column's statistics mean once its logical type is
+/// applied.
 pub fn schema(file: &[u8]) -> Json {
     use crate::logical;
     use crate::schema::{build, leaves, to_text};

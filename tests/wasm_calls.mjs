@@ -34,7 +34,6 @@ const out = calls.map((c) => {
   switch (c.call) {
     case "footer": return lab.footerLab(id(c.file), c.options);
     case "structure": return lab.structure(id(c.file));
-    case "schema": return lab.schema(id(c.file));
     case "levels": return lab.levels(id(c.file), c.column);
     case "encodings": return lab.encodings(id(c.file), c.column);
     case "pages": return lab.pages(id(c.file), c.column);

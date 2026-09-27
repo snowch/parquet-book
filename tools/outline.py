@@ -147,7 +147,7 @@ _CHAPTERS = (
         "the_file",
         "How do a handful of storage types carry strings, dates, decimals and timestamps?",
         "The schema tree rebuilt from the footer, with maximum levels, and logical types applied to values.",
-        ("schema",),
+        (),
         ("types.parquet",),
     ),
     (
@@ -304,7 +304,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
     "anatomy",
-    "schema",
     "levels",
     "encodings",
     "pages",

@@ -188,16 +188,6 @@ pub extern "C" fn pl_interpret(id: u32, offset: f64) -> usize {
     }
 }
 
-/// Ch03's experiment: the flat schema, the rebuilt tree, and each column's statistics read
-/// through its logical type. See `report::schema`.
-#[no_mangle]
-pub extern "C" fn pl_schema(id: u32) -> usize {
-    match with_file(id, |f| report::schema(&f.bytes)) {
-        Some(json) => emit(json),
-        None => no_such_file(id),
-    }
-}
-
 /// Ch04's experiment: one column's levels, values, and rebuilt records. See `report::levels`.
 #[no_mangle]
 pub extern "C" fn pl_levels(id: u32, column: u32) -> usize {

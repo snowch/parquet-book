@@ -19,7 +19,8 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Reader: full logical types (`logical.rs`) applied to values, the schema tree rebuilt from the
   flat list with maximum levels (`schema.rs`), statistics value spans.
 - Fixture: `types.parquet`; every manifest now records pyarrow's reading of each leaf.
-- Experiment: the schema panel (flat list, rebuilt tree, statistics read through logical types).
+- Experiment: the schema panel (flat list, rebuilt tree, statistics read through logical types);
+  since replaced by code (below).
 - Problems 3.1 to 3.3 with tests; 3.4 about the reader's own schema.
 
 ## Done: ch04, nested data
@@ -215,6 +216,14 @@ Stale cross-references, typed numbers and factual slips corrected across ch02 to
 checked against the reader, the fixtures or the writers' sources; ch04 now includes its `email`
 levels figure, and ch15's bytes-a-row figure rounds down as its walkthrough step does.
 
+## Done: ch03 in code
+
+ch03 opens on three steps instead of its schema panel: `schema_as_stored` prints the footer's
+flat list, `rebuild_the_tree` rebuilds it with a few lines of recursion and the leaves' levels (and
+a byte to damage, which the reader's `build` refuses), and `same_bytes_two_ways` reads three
+minimums by hand, little- and big-endian. `schema_with_a_library` asks pyarrow and the crate. The
+schema panel is gone from every layer; `report::schema` stays for `pqlab schema` and the figures.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
@@ -226,14 +235,12 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch03: decode a few Thrift fields of the footer by hand; `ParquetFile.schema`, `schema_arrow`,
-   and the crate's `SchemaDescriptor`.
-2. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
-3. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
+1. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
+2. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
    `encodings`, `compression` and sizes from both libraries.
-4. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
+3. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
    `pq.read_table` compared with the reader's plan.
-5. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+4. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

@@ -134,11 +134,7 @@
 .inspector td:nth-child(2) { white-space: nowrap; }
 .inspector form.edit { margin-top: .6rem; display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 
-/* Ch03: the schema. */
-.schema-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); border-bottom: 1px solid var(--edge); }
-.schema-grid .p-flat { border-right: 1px solid var(--edge); }
 @media (max-width: 90rem) {
-  .schema-grid { grid-template-columns: minmax(0, 1fr); }
   .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
@@ -155,26 +151,7 @@
   .table-grid .p-files { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
-  .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
 }
-.flat-list, .values-table { border-collapse: collapse; font-size: 12.5px; width: 100%; }
-.flat-list th, .flat-list td, .values-table th, .values-table td { padding: .22rem .45rem;
-  border-bottom: 1px solid var(--edge); text-align: left; vertical-align: top; }
-.flat-list th, .values-table th { font-size: 10.5px; }
-.p-flat .flat { overflow-x: auto; }
-.values-table button.span, .flat-list td.num { white-space: nowrap; }
-.flat-list td.num { text-align: right; font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
-.flat-list tr { cursor: pointer; }
-.flat-list tr:hover, .schema-text .line[data-span]:hover { background: var(--wash); }
-.schema-picked { background: var(--wash); box-shadow: inset 2px 0 0 var(--accent); }
-.schema-text { margin: 0; font-size: 12.5px; line-height: 1.6; }
-.schema-text .line { display: block; }
-.schema-text .line[data-span] { cursor: pointer; }
-.schema-text .levels { color: var(--faint); margin-left: 1.2rem; font-size: 11px; }
-.p-values { border-bottom: 1px solid var(--edge); }
-.values-table td.logical { font-weight: 600; }
-.values-table td.same { color: var(--faint); }
-.values-table button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
 
 /* Ch04: levels. */
 .column-picker button { margin: 0 .3rem .3rem 0; }
@@ -205,6 +182,7 @@
 .enc-grid .p-summary { grid-area: summary; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
 .enc-grid .p-dict { grid-area: dict; border-right: 1px solid var(--edge); }
 .enc-grid .p-steps-enc { grid-area: steps; }
+.p-values { border-bottom: 1px solid var(--edge); }
 .enc-grid .p-values { grid-area: values; border-top: 1px solid var(--edge); }
 .stepper { display: flex; gap: .4rem; align-items: center; margin-bottom: .4rem; }
 .stepper .where { color: var(--faint); font-size: 12.5px; }
@@ -383,7 +361,6 @@
 .lab .table-wrap { margin: .7rem 0; }
 
 @media (max-width: 52rem) {
-  .schema-grid { grid-template-columns: minmax(0, 1fr); }
   .enc-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "summary" "steps" "dict" "values"; }
   .enc-grid .p-summary, .enc-grid .p-dict { border-right: 0; }
   .comp-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "chunks" "pages" "tokens" "output"; }
@@ -400,7 +377,6 @@
   .table-grid .p-files { border-right: 0; }
   .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
   .levels-grid .p-path { border-right: 0; }
-  .schema-grid .p-flat { border-right: 0; border-bottom: 1px solid var(--edge); }
   .lab-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hex" "tree" "inspect"; }
   .lab-grid .p-hex { border-right: 0; border-bottom: 1px solid var(--edge); }
   .hex { font-size: 11px; }

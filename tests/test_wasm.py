@@ -79,8 +79,6 @@ def cases():
         native.append(("encryption", f))
         calls.append({"call": "structure", "file": f})
         native.append(("structure", f))
-        calls.append({"call": "schema", "file": f})
-        native.append(("schema", f))
         for column in range(12):
             calls.append({"call": "levels", "file": f, "column": column})
             native.append(("levels", f, str(column)))

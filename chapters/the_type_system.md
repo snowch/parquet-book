@@ -21,50 +21,103 @@ unsigned number, and only the schema says which.
 
 ## The experiment
 
-### The schema, stored and rebuilt
+### Read the schema yourself
 
-The panel runs the reader on `types.parquet`: three orders, with a column for each physical type
-and the common logical types on top of them. [Appendix B](#the-fixtures) lists how pyarrow wrote
-it.
+`types.parquet` holds three orders, with a column for each physical type and the common logical
+types on top of them. [Appendix B](#the-fixtures) says how pyarrow wrote it. Each step below is a
+few lines of code. In Python, run them in the page, change them with **Edit**, and run them again.
+In Rust, open them in a Codespace, or run one at a desk with `cargo run -p walkthroughs --bin` and
+its name. Each step finds the footer as [ch02](#anatomy-of-a-parquet-file) did, and hands its
+bytes to the book's reader, which decodes the Thrift fields the way ch02 built it to.
 
-```lab
-experiment: schema
-fixture: types.parquet
-fixtures: types.parquet, tiny.parquet, multiple-row-groups.parquet
+**The schema as stored.** The footer's second field is the schema. Print every element of it:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/the_type_system/schema_as_stored.py
+:language: python
 ```
-
-Try these:
-
-1. **Click `shipping` in the flat list.** Its bytes light up in the footer. It has a number of
-   children and no type: it is a group. The elements after it in the list are its children.
-2. **Compare the two views.** The flat list is the order the footer stores the schema in. The
-   tree is what the reader rebuilt from it, using nothing but each element's count of children.
-3. **Read the levels beside each leaf.** `country` is optional, and `shipping.city` is optional
-   inside an optional group. The reader counts those optional fields on the way down, and
-   [ch04](#nested-data) needs the counts to decode the values.
-4. **Click `order_date`'s minimum bytes** in the lower table. The inspector reads them as a
-   little-endian integer, a count of days. The table shows the date that count means. Do the same
-   for `amount`, and read its bytes the other way round.
-5. **Damage the schema.** In the structure view, open `FileMetaData › schema › [0]` and select
-   its `num_children` value byte. Change it to `12`, which is the zigzag varint for one child
-   fewer. The reader refuses the file: some elements now belong to no group.
-
-### Stored flat
-
-The footer does not store a tree. It stores this list, in depth-first order:
-
-```{include} _generated/types-schema-flat.md
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/schema_as_stored.rs
+:language: rust
 ```
+:::
+::::
 
-The first element is the root. It names the whole record and says how many top-level fields
-follow. A group, such as `shipping`, gives its own count of children, and they follow it
-immediately. A leaf has no children and a physical type. Every leaf is one column of the file, in
-this order, and the column chunks in every row group follow the same order.
+One line per element, in the footer's order. The first is the root, `schema`. It has children and
+no type, and it names the whole record. Most of the others have a physical type and no children:
+they are *leaves*, and each leaf is one column of the file. The leaves come in column order, and
+the column chunks in every row group follow the same order.
+
+`shipping` is neither a leaf nor the root. It has children and no type: it is a *group*, and the
+elements after it are its children. Nothing in the list says where a group ends. Its count of
+children is the only clue. Change the path to `fixtures/nested.parquet` and run the step again:
+a list is a group too, with a `REPEATED` field inside it.
+
+**The tree, rebuilt.** A count of children is enough to rebuild the tree. Take an element; if it
+has children, take that many subtrees after it, each the same way:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/the_type_system/rebuild_the_tree.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/rebuild_the_tree.rs
+:language: rust
+```
+:::
+::::
+
+The walk consumes the list from the front, and the indentation is its depth. On the way down it
+counts the fields that may be absent. `country` is optional, so each of its values needs a level
+saying whether it is there. `shipping.city` is optional inside an optional group, so it needs a
+level that can say which of the two is missing. These counts are each leaf's *maximum levels*,
+and [ch04](#nested-data) needs them to decode the values. The book's reader then rebuilds the same
+tree with `schema.build`, and finds the same columns.
+
+Now damage the list. The step writes the root's count of children back to the byte that holds it,
+as the zigzag varint `0x14`. Change it to `0x12`, one child fewer, and run the step again. The
+walk prints a shorter tree without complaint: it never looks at the elements after the root's
+last child. `shipping` and its children now belong to no one, and the reader's `build` refuses the
+file for that reason.
+
+**The same bytes, read two ways.** Each column chunk's statistics hold its smallest value, as
+bytes. Read three of them, first as the physical type stores them and then as the logical type
+says:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/the_type_system/same_bytes_two_ways.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/same_bytes_two_ways.rs
+:language: rust
+```
+:::
+::::
+
+`order_date`'s bytes are a little-endian `INT32`, and as a number they mean little. Its logical
+type, `DATE`, says the number counts days since 1970-01-01, and then it is a date. `paid_at` is
+the same idea at a finer grain: an `INT64` count of microseconds. `amount` is the odd one out. Its
+integer is read most significant byte first, which is *big-endian*, and it counts hundredths.
+Change `"big"` to `"little"` (`from_be_bytes` to `from_le_bytes` in Rust), and the same bytes are
+a number nobody meant. Only the schema says which reading is right.
 
 ### Rebuilt as a tree
 
-Rebuilt, the same list is the schema in the textual notation that Parquet tools print, which
-comes from the Dremel paper:
+The tree you rebuilt is the schema. Parquet tools print it in a textual notation that comes from
+the Dremel paper:
 
 ```{include} _generated/types-schema-text.md
 ```
@@ -81,7 +134,7 @@ follows in brackets.
 **A leaf's path** is the names from the root's child down to it: `shipping.city`. A column chunk
 records its path, and the path is how a query names a nested column.
 
-### The same bytes, read two ways
+### Every column, read two ways
 
 A physical type is a storage format. There are eight:
 
@@ -111,9 +164,8 @@ value. Where there is one, the physical reading is often a number nobody meant:
   reading with no zone (`local`). The two look identical in the bytes and differ in meaning.
 - **`amount`** is a `DECIMAL`: an integer to be divided by a power of ten, here with two digits
   after the point. pyarrow stored it in a `FIXED_LEN_BYTE_ARRAY`, and there the integer is
-  big-endian: the most significant byte first. A decimal stored as bytes is big-endian in a
-  `BYTE_ARRAY` too, and so is a `UUID`'s sixteen bytes. Every other number Parquet stores is
-  little-endian.
+  big-endian. A decimal stored as bytes is big-endian in a `BYTE_ARRAY` too, and so is a `UUID`'s
+  sixteen bytes. Every other number Parquet stores is little-endian.
 - **`quantity`** and **`store_id`** are both `INT32`. The logical type says one is an 8-bit
   signed integer and the other a 16-bit unsigned one. Both ranges fit in a signed 32-bit integer,
   so here the two readings agree. They part for unsigned 32-bit and 64-bit integers, stored in
@@ -138,10 +190,41 @@ Table formats use it to match columns between files written years apart
 
 ## Building it
 
+The steps above called three parts of the book's reader: the decoding of each schema element, the
+rebuild of the tree, and the reading of a value through its logical type. This section builds
+them, in both languages, and the tabs switch every excerpt on the page between them.
+
+### Schema elements
+
+`decode_file_metadata`, which ch02 built, gives the footer's Thrift fields their names. Its field
+2 is the schema: a list of structs, each decoded into a `SchemaElement` by field id:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/metadata.py
+:language: python
+:start-at: def schema_element(node: Node)
+:end-before: def row_group(node: Node)
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/metadata.rs
+:language: rust
+:start-at: fn schema_element(node: &Node)
+:end-before: fn row_group(node: &Node)
+```
+:::
+::::
+
+Only the name is required. A group has `num_children` and no physical type; a leaf has a physical
+type and no children. The logical type is a struct of its own, decoded below.
+
 ### Rebuilding the tree
 
-The rebuild reads an element, and if it has children, reads that many subtrees after it, each
-the same way. The recursion consumes the list from the front:
+The rebuild is the walk you ran, with checks. It starts at the root and requires the root's
+subtree to use up the whole list:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -157,6 +240,28 @@ the same way. The recursion consumes the list from the front:
 ```{literalinclude} ../crates/parquet-lab/src/schema.rs
 :language: rust
 :start-at: pub fn build(elements: &[SchemaElement])
+:end-before: fn subtree(elements
+```
+:::
+::::
+
+Each subtree reads an element, and if it has children, reads that many subtrees after it, each the
+same way. The recursion consumes the list from the front:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/schema.py
+:language: python
+:start-at: def _subtree(
+:end-before: def max_levels(
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/schema.rs
+:language: rust
+:start-at: fn subtree(elements
 :end-before: /// The largest definition
 ```
 :::
@@ -164,7 +269,7 @@ the same way. The recursion consumes the list from the front:
 
 Two checks make a damaged schema an error rather than a wrong tree. A group that claims more
 children than the list has left is refused. So is a list with elements left over after the root's
-subtree ends, which is what the experiment's damaged byte produced.
+subtree ends, which is what the byte you changed in the walk produced.
 
 ### Maximum levels
 
@@ -198,7 +303,8 @@ are not zero.
 
 The logical type arrives from the footer as a Thrift union: a struct with exactly one field set,
 whose id names the type. The `logical` module decodes it into a value naming the type and its
-parameters. Applying it is a match on the pair of physical and logical type:
+parameters. Applying it is a match on the pair of physical and logical type. Its first cases
+include the date and the timestamp you read by hand:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -206,7 +312,7 @@ parameters. Applying it is a match on the pair of physical and logical type:
 ```{literalinclude} ../python/parquet_lab/logical.py
 :language: python
 :start-at: def interpret(physical: int
-:end-before: def int96_timestamp(
+:end-before: if physical in (1, 2) and name == "TIME"
 ```
 :::
 :::{tab-item} Rust
@@ -214,13 +320,34 @@ parameters. Applying it is a match on the pair of physical and logical type:
 ```{literalinclude} ../crates/parquet-lab/src/logical.rs
 :language: rust
 :start-at: pub fn interpret(physical: PhysicalType
-:end-before: /// An `INT96` value
+:end-before: (1 | 2, LogicalType::Time
 ```
 :::
 ::::
 
-The decimal case is the one that reads bytes most significant first. Its helper sign-extends from
-the top bit of the first byte:
+The rest follow the same pattern: `TIME`, then `DECIMAL`, then text, `FLOAT16` and `UUID`. A
+decimal can be stored in an `INT32`, an `INT64` or bytes, and only the bytes are big-endian:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/logical.py
+:language: python
+:start-at: if physical in (1, 2) and name == "DECIMAL"
+:end-before: if physical in (6, 7) and name in ("STRING"
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/logical.rs
+:language: rust
+:start-at: (1, LogicalType::Decimal { scale, .. })
+:end-before: (6 | 7, LogicalType::String
+```
+:::
+::::
+
+The helper for the bytes sign-extends from the top bit of the first byte:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -262,6 +389,41 @@ cargo test -p parquet-lab --test fixtures
 :::
 ::::
 
+### Ask a library
+
+pyarrow and the `parquet` crate both rebuild the tree when they open a file, and print it in the
+Dremel notation. pyarrow's `schema.column(i)` and the crate's `SchemaDescriptor` give each leaf's
+path, physical type and maximum levels, the ones you counted by hand:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/the_type_system/schema_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/schema_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+The two part over the statistics. pyarrow reads each minimum through its logical type and hands
+you a `datetime.date` and a `Decimal`. The crate, without its Arrow feature, hands you the bytes
+the third step read, and the logical reading is yours to do. The two also name the logical types
+differently: pyarrow's `Int(bitWidth=8, isSigned=true)` is the crate's `INTEGER(8,true)`. pyarrow
+prints `field_id=-1` for a field with no field id, which is every field of the fixtures.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin schema_with_a_library
+```
+
 ## What this cannot tell you
 
 **How nested values are stored.** The levels tell a reader how deep a value is defined and where
@@ -294,6 +456,8 @@ loses information. [ch11](#writing-parquet-well) looks at those choices from the
   among each row group's column chunks.
 - **Optional and repeated fields set a leaf's maximum levels.** A column whose path is all
   required stores no levels at all.
+- **A library reads the same schema.** pyarrow and the `parquet` crate rebuild the tree and report
+  each leaf's levels. Whether they read a value through its logical type depends on the library.
 :::
 
 ## Problems

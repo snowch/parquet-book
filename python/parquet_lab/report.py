@@ -535,8 +535,9 @@ def _open(file: bytes) -> FileMetaData | str:
 
 
 def schema(file: bytes) -> dict:
-    """Ch03's experiment: the schema as the footer stores it, as the reader rebuilds it, and what
-    each column's statistics mean once its logical type is applied."""
+    """Ch03's schema, for ``python -m parquet_lab schema``: the schema as the footer stores it, as
+    the reader rebuilds it, and what each column's statistics mean once its logical type is
+    applied."""
     md = _open(file)
     if isinstance(md, str):
         return {"ok": False, "error": md}

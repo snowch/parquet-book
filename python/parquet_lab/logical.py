@@ -162,8 +162,9 @@ def decimal(unscaled: int, scale: int) -> str:
 def be_twos_complement(data: bytes) -> int | None:
     """A big-endian two's-complement integer, of any length up to 16 bytes.
 
-    Decimals stored as ``FIXED_LEN_BYTE_ARRAY`` or ``BYTE_ARRAY`` use this, and they are the one
-    place Parquet puts the most significant byte first. Everything else is little-endian.
+    Decimals stored as ``FIXED_LEN_BYTE_ARRAY`` or ``BYTE_ARRAY`` use this. They and ``UUID`` are
+    where Parquet puts the most significant byte first; every other number it stores is
+    little-endian.
     """
     if not 1 <= len(data) <= 16:
         return None

@@ -84,6 +84,7 @@ def facts(chapter: str, step: str) -> list[str]:
     }
     known.update(changes_facts())
     known.update(formats_facts())
+    known.update(types_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     return known[(chapter, step)]
 
@@ -116,6 +117,67 @@ def formats_facts() -> dict:
         ("why_parquet_exists", "columns_with_a_library"): [
             f"of {parquet_size} bytes",
             f"amount_cents in the UK: {uk}",
+        ],
+    }
+
+
+def types_facts() -> dict:
+    """What ch03's steps must print, from pyarrow's reading of types.parquet's schema and
+    statistics."""
+    from datetime import date
+
+    import pyarrow.parquet as pq
+
+    md = pq.read_metadata(ROOT / "fixtures" / "types.parquet")
+    arrow = md.schema.to_arrow_schema()
+    columns = [md.schema.column(i) for i in range(md.num_columns)]
+
+    def field(path: str):
+        f, *rest = path.split(".")
+        f = arrow.field(f)
+        for name in rest:
+            f = f.type.field(name)
+        return f
+
+    def repetition(f) -> str:
+        return "OPTIONAL" if f.nullable else "REQUIRED"
+
+    # pyarrow names the integer logical type INT, where the format and the book say INTEGER.
+    logical = {
+        c.path: {"NONE": "", "INT": "INTEGER"}.get(t, t) for c in columns for t in [c.logical_type.type]
+    }
+    groups = [f for f in arrow if f.type.num_fields]
+    stats = {c.path: md.row_group(0).column(i).statistics for i, c in enumerate(columns)}
+    day = stats["order_date"].min
+    amount, scale = stats["amount"], next(c.scale for c in columns if c.path == "amount")
+    paid = stats["paid_at"].min
+    return {
+        ("the_type_system", "schema_as_stored"): [
+            f"schema {len(arrow)} children REQUIRED",
+            *(f"{f.name} {f.type.num_fields} children {repetition(f)}" for f in groups),
+            *(
+                f"{c.name} {repetition(field(c.path))} {c.physical_type} {logical[c.path]}".rstrip()
+                for c in columns
+            ),
+        ],
+        ("the_type_system", "rebuild_the_tree"): [
+            *(
+                f"\n{'  ' * (c.path.count('.') + 1)}{c.name}  max levels: "
+                f"definition {c.max_definition_level}, repetition {c.max_repetition_level}\n"
+                for c in columns
+            ),
+            f"the reader's build finds {md.num_columns} columns",
+        ],
+        ("the_type_system", "same_bytes_two_ways"): [
+            f"order_date {stats['order_date'].min_raw.to_bytes(4, 'little').hex(' ')} -> "
+            f"{(day - date(1970, 1, 1)).days} -> {day.isoformat()}",
+            f"-> {paid.date().isoformat()}",
+            paid.strftime("%H:%M:%S"),
+            f"amount {amount.min_raw.hex(' ')} -> {int(amount.min.scaleb(scale))} -> {amount.min}",
+        ],
+        ("the_type_system", "schema_with_a_library"): [
+            f"{c.path}: max levels {c.max_definition_level} {c.max_repetition_level}, {c.physical_type}, min"
+            for c in columns
         ],
     }
 

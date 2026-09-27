@@ -70,10 +70,6 @@ export class Lab {
     return this.#result(this.exports.pl_structure(id));
   }
 
-  schema(id) {
-    return this.#result(this.exports.pl_schema(id));
-  }
-
   /**
    * SQL over a table: `ids` are loaded files named by their object keys. `discovery` is "list",
    * "prune" or "log".
