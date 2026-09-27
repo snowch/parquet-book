@@ -1,16 +1,13 @@
-// The layouts laboratory (ch01): one table, stored by rows and by columns, and what a query
-// costs against each.
+// The layouts picture (ch01): one table, stored by rows and by columns, with the bytes a query
+// needs lit in each.
 //
-// `report::layouts` in Rust encodes the table both ways, works out the byte ranges the query
-// needs in each layout, and reads them through the simulated object store twice: range by
-// range, and as one whole-object GET. This draws the answer: which bytes the query needed,
-// how many separate ranges that is, and what each way of fetching them cost.
+// `report::layouts` encodes the table both ways and works out the byte ranges the query needs in
+// each layout. This draws them. What those ranges cost to fetch is measured in the chapter, in
+// code, on real files; this is the picture of why.
 
 import { escapeHtml } from "./hexview.js";
-import { engineNote } from "./footer.js";
 
 const fmt = (n) => Number(n).toLocaleString("en-GB");
-const ms = (us) => `${(us / 1000).toLocaleString("en-GB", { maximumFractionDigits: 1 })} ms`;
 
 export function mountLayouts(root, lab) {
   const first = lab.layouts({ columns: [] });
@@ -18,8 +15,7 @@ export function mountLayouts(root, lab) {
   const rows = first.rows;
 
   root.insertAdjacentHTML("beforeend", `
-    <div class="lab-head"><span class="lab-title">Row layout or column layout</span>
-      <span class="lab-note">${engineNote(root)}</span></div>
+    <div class="lab-head"><span class="lab-title">Row layout or column layout</span></div>
     <form class="controls">
       <fieldset><legend>Columns the query needs</legend>
         ${cols.map((c, i) => `<label><input type="checkbox" name="col" value="${i}"${i === 2 || i === 3 ? " checked" : ""}> <code>${escapeHtml(c)}</code></label>`).join("")}
@@ -29,22 +25,17 @@ export function mountLayouts(root, lab) {
         <label><input type="radio" name="rows" value="one"> one order:
           <select name="row">${rows.map((r, i) => `<option value="${i}">order_id ${escapeHtml(r[0])}</option>`).join("")}</select></label>
       </fieldset>
-      <fieldset><legend>Simulated network</legend>
-        <label>latency <input type="number" name="latency" min="0" max="1000" value="20"> ms per request</label>
-      </fieldset>
     </form>
     <p class="sql"></p>
     <div class="table-wrap"><table class="data"></table></div>
-    <div class="strips"></div>
-    <div class="table-wrap"><table class="costs"></table></div>`);
+    <div class="strips"></div>`);
 
   const form = root.querySelector("form");
   const run = () => {
     const columns = Array.from(form.querySelectorAll("input[name=col]:checked"), (x) => Number(x.value));
     const one = form.querySelector("input[name=rows]:checked").value === "one";
     const row = one ? Number(form.row.value) : -1;
-    const latencyUs = Math.max(0, Number(form.latency.value) || 0) * 1000;
-    const r = lab.layouts({ columns, row, latencyUs, bandwidth: 100e6 });
+    const r = lab.layouts({ columns, row });
     draw(root, r, one);
     root.dataset.rowsRanges = String(r.rows_layout.needed.length);
     root.dataset.columnsRanges = String(r.columns_layout.needed.length);
@@ -70,19 +61,6 @@ function draw(root, r, one) {
 
   const strips = root.querySelector(".strips");
   strips.innerHTML = [r.rows_layout, r.columns_layout].map((L) => strip(L, r)).join("");
-
-  // One column per layout, so the table fits a phone: what the query needs, and what each way
-  // of fetching it costs.
-  const [R, C] = [r.rows_layout, r.columns_layout];
-  const requests = (L) => `${fmt(L.by_range.requests.length)} request${L.by_range.requests.length === 1 ? "" : "s"}`;
-  const row = (name, f) => `<tr><th scope="row">${name}</th><td class="num">${f(R)}</td><td class="num">${f(C)}</td></tr>`;
-  root.querySelector("table.costs").innerHTML =
-    `<thead><tr><th></th><th class="num">By rows</th><th class="num">By columns</th></tr></thead><tbody>` +
-    row("Bytes the query needs", (L) => `${fmt(L.needed_bytes)} of ${fmt(L.total_bytes)}`) +
-    row("Separate ranges", (L) => fmt(L.needed.length)) +
-    row("Fetch range by range", (L) => `${ms(L.by_range.elapsed_us)}<small>${requests(L)}</small>`) +
-    row("Fetch the whole object", (L) => `${ms(L.whole.elapsed_us)}<small>${fmt(L.whole.bytes)} bytes</small>`) +
-    "</tbody>";
 }
 
 // One layout's bytes, a cell per byte, coloured by column and lit where the query needs them.

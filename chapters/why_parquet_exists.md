@@ -108,10 +108,8 @@ Try these:
    column. Reading a row back out of columns is called *reconstructing* it, and its cost grows
    with the number of columns. This is the trade Parquet makes, and the reason it is not a
    database format.
-4. **Raise the latency.** Fetching range by range gets expensive fast. Fetching the whole object
-   costs one request, but moves bytes the query did not need.
 
-The panel is computed by the book's reader, in its `layout` module
+The picture is drawn from the book's reader, its `layout` module
 (`python/parquet_lab/layout.py`, or `crates/parquet-lab/src/layout.rs`). The book does not walk
 through that module, because it is not Parquet. The rest of the reader is.
 
@@ -159,8 +157,8 @@ show what a column's encoding and compression do.
 does not name while they parse. Each still reads every byte, because only reading a line finds
 where the next one begins.
 
-**What your storage charges.** The counting files read from a local disk, and the panel's store
-charges a fixed latency per request. A local disk, an object store and a memory cache have very
+**What your storage charges.** The counting files read from a local disk, where a request costs
+little. A local disk, an object store and a memory cache have very
 different request costs, and the best way to fetch changes with them. The shape of the result
 does not: a column layout turns a scan into a few large reads.
 
