@@ -15,7 +15,6 @@ FILES: list[tuple[str, bytearray]] = []
 
 EXPERIMENTS = (
     "anatomy",
-    "levels",
     "encodings",
     "pages",
     "compression",
@@ -89,7 +88,6 @@ def _per_column(report_fn):
     return call
 
 
-levels = _per_column(report.levels)
 encodings = _per_column(report.encodings)
 pages = _per_column(report.pages)
 

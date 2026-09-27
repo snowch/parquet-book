@@ -119,10 +119,6 @@ importlib.invalidate_caches()
     return this.#run(() => this.api.structure(id));
   }
 
-  levels(id, column) {
-    return this.#run(() => this.api.levels(id, column));
-  }
-
   encodings(id, column) {
     return this.#run(() => this.api.encodings(id, column));
   }

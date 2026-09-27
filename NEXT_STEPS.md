@@ -29,7 +29,8 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
   (`plain.rs`), data page v1 bodies split into levels and values (`column.rs`), path levels,
   plain-English explanations of each triple, and record assembly (`nested.rs`), checked against
   pyarrow's rows for every column of every fixture.
-- Fixture: `nested.parquet`. Experiment: the levels panel. Problems 4.1, 4.2 with tests; 4.3 open.
+- Fixture: `nested.parquet`. Experiment: the levels panel, since replaced by code (below).
+  Problems 4.1, 4.2 with tests; 4.3 open.
 
 ## Done: ch05, encodings
 
@@ -224,23 +225,30 @@ a byte to damage, which the reader's `build` refuses), and `same_bytes_two_ways`
 minimums by hand, little- and big-endian. `schema_with_a_library` asks pyarrow and the crate. The
 schema panel is gone from every layer; `report::schema` stays for `pqlab schema` and the figures.
 
+## Done: ch04 in code
+
+ch04 opens on two steps instead of its levels panel: `unpack_the_levels` unpacks a page's two
+level streams by hand (length, run header, bits lowest first), and `levels_of_a_column` prints the
+reader's triples and rebuilt records. `levels_with_a_library` shows pyarrow's offsets and validity
+beside the crate's levels. The panel is gone from every layer; `report::levels` stays for `pqlab
+levels` and the figures.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
 ch12's SQL box), make it a code step with the parameters in the call, as ch02 did; keep panels
-whose value is a picture (ch02's byte map, ch04's levels, ch07's tokens, the
-request timelines of ch10 and ch15).
+whose value is a picture (ch02's byte map, ch07's tokens, the request timelines of ch10 and
+ch15).
 
 In order, each a walkthrough by hand at the start of the experiment and an "Ask a library" step
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch04: levels from a page by hand; pyarrow's nested columns and `max_definition_level`.
-2. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
+1. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
    `encodings`, `compression` and sizes from both libraries.
-3. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
+2. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
    `pq.read_table` compared with the reader's plan.
-4. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
+3. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
    it adds something the reader cannot show, and pyarrow's dataset API for many files.
 
 ## Trying: Rust compiled in the page

@@ -156,7 +156,7 @@ _CHAPTERS = (
         "the_file",
         "How can nested, nullable records live in flat columns without losing their shape?",
         "The RLE/bit-packing hybrid for levels, a column read into triples, and records rebuilt from them.",
-        ("levels",),
+        (),
         ("nested.parquet",),
     ),
     (
@@ -304,7 +304,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
     "anatomy",
-    "levels",
     "encodings",
     "pages",
     "compression",

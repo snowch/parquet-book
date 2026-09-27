@@ -149,32 +149,13 @@
   .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
   .table-grid .p-files { border-right: 0; }
-  .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
-  .levels-grid .p-path { border-right: 0; }
 }
 
-/* Ch04: levels. */
+/* Column pickers (ch05, ch06), and the notes under a panel. */
 .column-picker button { margin: 0 .3rem .3rem 0; }
 .column-picker button[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); }
 .column-picker small { color: var(--faint); }
-.levels-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-               grid-template-areas: "path runs" "triples triples" "records records"; border-bottom: 1px solid var(--edge); }
-.levels-grid .p-path { grid-area: path; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.levels-grid .p-runs { grid-area: runs; border-bottom: 1px solid var(--edge); }
-.levels-grid .p-triples { grid-area: triples; border-bottom: 1px solid var(--edge); }
-.levels-grid .p-records { grid-area: records; }
-.path-table, .triples-table { border-collapse: collapse; font-size: 12.5px; width: 100%; }
-.path-table th, .path-table td, .triples-table th, .triples-table td { padding: .22rem .45rem;
-  border-bottom: 1px solid var(--edge); text-align: left; vertical-align: top; }
-.path-table th, .triples-table th { font-size: 10.5px; }
-.triples-table tr.record-start td { border-top: 2px solid var(--rule); }
-.triples-table td.meaning { color: var(--muted); }
 .lab .note { color: var(--faint); font-size: 12.5px; margin: .4rem 0; }
-.stream-title { margin: .4rem 0 .2rem; font-weight: 600; font-size: 12.5px; }
-.runs-list, .records-list { margin: 0; padding-left: 1.4rem; font-size: 12.5px; }
-.records-list code { white-space: pre-wrap; }
-.levels-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
-.levels-picked { outline: 2px solid var(--accent); }
 
 /* Ch05: encodings. */
 .enc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
@@ -375,8 +356,6 @@
   .crypt-grid .p-seen { border-right: 0; }
   .table-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "files" "reqs" "answer"; }
   .table-grid .p-files { border-right: 0; }
-  .levels-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "path" "runs" "triples" "records"; }
-  .levels-grid .p-path { border-right: 0; }
   .lab-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hex" "tree" "inspect"; }
   .lab-grid .p-hex { border-right: 0; border-bottom: 1px solid var(--edge); }
   .hex { font-size: 11px; }

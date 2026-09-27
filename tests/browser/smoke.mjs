@@ -157,14 +157,14 @@ check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
   await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
   await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
   "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
-await page.goto(base + "nested-data.html");
+await page.goto(base + "encodings.html");
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="levels"]');
+  const el = document.querySelector('.lab[data-experiment="encodings"]');
   return el?.dataset.engine === "python" && el.dataset.ready === "true";
 }, null, { timeout: 180000 });
 check(true, "the engine choice holds on another page");
-await page.locator('.lab[data-experiment="levels"] .engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]').dataset.engine === "rust");
+await page.locator('.lab[data-experiment="encodings"] .engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]').dataset.engine === "rust");
 // ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
@@ -209,23 +209,22 @@ if (shots) {
     `ch03's tree is rebuilt in the page: ${nativeSchema.leaves.length} columns, shipping.city's levels as the reader counts them`);
 }
 
-// ch04: levels. The records the page rebuilds are the reader's.
-await page.goto(base + "nested-data.html");
-const levelsLab = page.locator('.lab[data-experiment="levels"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]')?.dataset.state === "ok");
-const nativeLevels = native(["levels", "fixtures/nested.parquet", "2"]);
-check(await levelsLab.getAttribute("data-records") === JSON.stringify(nativeLevels.records),
-  `tags[] rebuilds to the reader's records: ${JSON.stringify(nativeLevels.records)}`);
-await levelsLab.locator('button[data-column="4"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="levels"]').dataset.triples === "6");
-const deep = native(["levels", "fixtures/nested.parquet", "4"]);
-check(await levelsLab.getAttribute("data-records") === JSON.stringify(deep.records),
-  "switching column reruns the reader: items[].discounts[] rebuilt");
-await levelsLab.locator(".runs-list button.span").first().click();
-const hdr = deep.pages[0].repetition_levels.runs[0].header;
-const litHdr = await levelsLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
-check(litHdr[0] === hdr[0] && litHdr.length === hdr[1] - hdr[0], `a run header highlights its byte [${hdr[0]}, ${hdr[1]})`);
-if (shots) await levelsLab.screenshot({ path: path.join(shots, "levels-lab.png") });
+// ch04: the levels of tags[], read by the book's Python reader in the page. The triples and the
+// records it prints are the native reader's.
+{
+  await page.goto(base + "nested-data.html");
+  check(await page.locator(".lab").count() === 0, "ch04 has no panels: its steps print the levels");
+  const nativeLevels = native(["levels", "fixtures/nested.parquet", "2"]);
+  const step = page.locator('figure.walkthrough[data-file$="levels_of_a_column.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "r d value" }).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const rows = nativeLevels.triples.map((t) => `${t.rep} ${t.def} ${JSON.stringify(t.value)}`);
+  const flat = out.replace(/\s/g, "");
+  check(rows.every((row) => out.split("\n").includes(row)) &&
+    nativeLevels.records.every((r) => flat.includes(JSON.stringify(r))),
+    `ch04's tags[] levels are read in the page: ${rows.length} triples and ${nativeLevels.records.length} records, as the reader reads them`);
+}
 
 // ch05: encodings. The decoded values and the stepper are the reader's.
 await page.goto(base + "encodings.html");

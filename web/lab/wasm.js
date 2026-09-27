@@ -164,10 +164,6 @@ export class Lab {
     return this.#result(this.exports.pl_encodings(id, column));
   }
 
-  levels(id, column) {
-    return this.#result(this.exports.pl_levels(id, column));
-  }
-
   interpret(id, offset) {
     return this.#result(this.exports.pl_interpret(id, offset));
   }

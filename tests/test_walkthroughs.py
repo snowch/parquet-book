@@ -44,8 +44,10 @@ def tiny():
     return data, json.loads((ROOT / "fixtures" / "tiny.json").read_text())
 
 
-def facts(chapter: str, step: str) -> list[str]:
-    """What a step's output must contain, from the fixture and pyarrow's manifest."""
+def facts(chapter: str, step: str, language: str) -> list[str]:
+    """What a step's output must contain, from the fixture and pyarrow's manifest. Where two
+    libraries expose different things (pyarrow has no levels), a step's facts are given per
+    language."""
     data, manifest = tiny()
     n, length = len(data), manifest["footer_length"]
     start = n - 8 - length
@@ -85,8 +87,10 @@ def facts(chapter: str, step: str) -> list[str]:
     known.update(changes_facts())
     known.update(formats_facts())
     known.update(types_facts())
+    known.update(nested_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
-    return known[(chapter, step)]
+    found = known[(chapter, step)]
+    return found[language] if isinstance(found, dict) else found
 
 
 def formats_facts() -> dict:
@@ -182,6 +186,81 @@ def types_facts() -> dict:
     }
 
 
+def shred(value, steps: list[str], r: int = 0, d: int = 0, rep: int = 0):
+    """Dremel's (r, d, value) for one optional field's value, computed from pyarrow's reading of
+    the record rather than from the file's levels. ``steps`` walks down from the field: ``"[]"``
+    for a standard three-level list (its optional group, repeated ``list`` and optional element)
+    and a name for an optional field of a struct."""
+    if value is None:
+        yield r, d, None
+        return
+    d += 1
+    if not steps:
+        yield r, d, value
+    elif steps[0] == "[]":
+        if not value:
+            yield r, d, None
+        for i, element in enumerate(value):
+            yield from shred(element, steps[1:], r if i == 0 else rep + 1, d + 1, rep + 1)
+    else:
+        yield from shred(value[steps[0]], steps[1:], r, d, rep)
+
+
+def nested_facts() -> dict:
+    """What ch04's steps must print: the levels of tags[] and items[].discounts[], shredded here
+    from pyarrow's reading of nested.parquet's records, and the Arrow arrays pyarrow reads them
+    into, computed from the same records."""
+    import pyarrow.parquet as pq
+
+    path = ROOT / "fixtures" / "nested.parquet"
+    md, rows = pq.read_metadata(path), pq.read_table(path).to_pylist()
+    columns = {md.schema.column(i).path: md.schema.column(i) for i in range(md.num_columns)}
+    tags = [t for row in rows for t in shred(row["tags"], ["[]"])]
+    discounts = [t for row in rows for t in shred(row["items"], ["[]", "discounts", "[]"])]
+
+    def unpacked(name: str, levels: list[int], most: int) -> str:
+        groups, width = -(-len(levels) // 8), most.bit_length()
+        header = f"{1 + groups * width} bytes, header {groups << 1 | 1:02x}"
+        packed = " ".join(map(str, levels))
+        return f"{name}: {header}, bit-packed, {groups} group: {packed} (+{8 * groups - len(levels)} padding)"
+
+    deep = columns["items.list.element.discounts.list.element"]
+    leaf = columns["tags.list.element"]
+    most = f"definition {leaf.max_definition_level}, repetition {leaf.max_repetition_level}"
+    records = [{"tags": row["tags"]} for row in rows]
+    values = [v for row in rows for v in row["tags"] or []]
+    offsets = [0]
+    for row in rows:
+        offsets.append(offsets[-1] + len(row["tags"] or []))
+    return {
+        ("nested_data", "unpack_the_levels"): [
+            unpacked("rep", [r for r, _, _ in discounts], deep.max_repetition_level),
+            unpacked("def", [d for _, d, _ in discounts], deep.max_definition_level),
+        ],
+        ("nested_data", "levels_of_a_column"): {
+            language: [
+                f"tags[]  max levels: {most}\nr d value\n",
+                *(f"\n{r} {d} {json.dumps(v)}\n" for r, d, v in tags),
+                *(json.dumps(record, separators=separators) for record in records),
+            ]
+            for language, separators in [("python", None), ("rust", (",", ":"))]
+        },
+        ("nested_data", "levels_with_a_library"): {
+            "python": [
+                f"offsets: {offsets}",
+                f"null lists: {[row['tags'] is None for row in rows]}",
+                f"values: {values}",
+            ],
+            "rust": [
+                f"{len(rows)} records",
+                f"rep: {[r for r, _, _ in tags]}",
+                f"def: {[d for _, d, _ in tags]}",
+                f"values: {json.dumps([v for v in values if v is not None], separators=(', ', ': '))}",
+            ],
+        },
+    }
+
+
 def the_least_a_parquet_reader_reads() -> int:
     """The trailer, the footer and the two columns' chunks, from pyarrow's own metadata."""
     import pyarrow.parquet as pq
@@ -274,8 +353,11 @@ def test_every_step_has_a_twin():
 @pytest.mark.parametrize(("chapter", "step"), STEPS, ids=[f"{c}/{s}" for c, s in STEPS])
 def test_a_step_prints_the_same_facts_in_both_languages(built, chapter, step):
     py, rs = run_python(chapter, step), run_rust(step)
-    for fact in facts(chapter, step):
-        assert fact in py.replace("True", "true"), f"Python {step} should print {fact!r}:\n{py}"
+    for fact in facts(chapter, step, "python"):
+        # Python prints True where Rust prints true; the shared facts are written Rust's way.
+        found = fact.replace("True", "true") in py.replace("True", "true")
+        assert found, f"Python {step} should print {fact!r}:\n{py}"
+    for fact in facts(chapter, step, "rust"):
         assert fact in rs, f"Rust {step} should print {fact!r}:\n{rs}"
 
 

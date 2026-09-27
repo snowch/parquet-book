@@ -63,20 +63,8 @@ const FIGURES: &[Figure] = &[
         render: nested_columns,
     },
     Figure {
-        file: "nested-levels-email.md",
-        render: |root| nested_levels(root, "email"),
-    },
-    Figure {
-        file: "nested-levels-tags.md",
-        render: |root| nested_levels(root, "tags.list.element"),
-    },
-    Figure {
         file: "nested-levels-discounts.md",
         render: |root| nested_levels(root, "items.list.element.discounts.list.element"),
-    },
-    Figure {
-        file: "nested-runs-discounts.md",
-        render: nested_runs_discounts,
     },
     Figure {
         file: "encodings-sizes.md",
@@ -717,55 +705,6 @@ fn nested_levels(root: &Path, path: &str) -> Result<String, String> {
         s.push('\n');
     }
     s.push_str("```\n");
-    s.push_str(&conditions("nested.parquet", &bytes, None));
-    Ok(s)
-}
-
-fn nested_runs_discounts(root: &Path) -> Result<String, String> {
-    let (bytes, j) = nested_levels_json(root, "items.list.element.discounts.list.element")?;
-    let page = j
-        .get("pages")
-        .and_then(Json::as_array)
-        .and_then(|p| p.first())
-        .ok_or("no pages")?;
-    let mut s = String::from(HEADER);
-    s.push_str("| Levels | Run | Header byte | Body bytes | Values |\n|---|---|---|---|---|\n");
-    for (name, key) in [
-        ("repetition", "repetition_levels"),
-        ("definition", "definition_levels"),
-    ] {
-        let stream = page.get(key).ok_or("no levels")?;
-        for run in stream
-            .get("runs")
-            .and_then(Json::as_array)
-            .ok_or("no runs")?
-        {
-            let span_bytes = |k: &str| -> String {
-                let sp = run
-                    .get(k)
-                    .and_then(Json::as_array)
-                    .cloned()
-                    .unwrap_or_default();
-                let (a, b) = (
-                    sp.first().and_then(Json::as_u64).unwrap_or(0) as usize,
-                    sp.get(1).and_then(Json::as_u64).unwrap_or(0) as usize,
-                );
-                parquet_lab::encoding::hex(&bytes[a..b])
-            };
-            let values: Vec<String> = run
-                .get("values")
-                .and_then(Json::as_array)
-                .map(|v| v.iter().map(|x| x.to_json()).collect())
-                .unwrap_or_default();
-            s.push_str(&format!(
-                "| {name} | {} | `{}` | `{}` | {} |\n",
-                text_of(run.get("kind")),
-                span_bytes("header"),
-                span_bytes("body"),
-                values.join(", ")
-            ));
-        }
-    }
     s.push_str(&conditions("nested.parquet", &bytes, None));
     Ok(s)
 }
