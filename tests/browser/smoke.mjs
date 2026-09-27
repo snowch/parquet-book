@@ -63,7 +63,8 @@ if (process.env.PLAYWRIGHT_BROWSERS_PATH === undefined) {
 }
 const browser = await chromium.launch(launch);
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-// Pyodide, for the labs' Python engine, comes from a public CDN. Fetch it through Node, which
+// Pyodide, for the Python the page runs (walkthrough steps, Run buttons, the workbench), comes
+// from a public CDN. Fetch it through Node, which
 // trusts the same certificates as the rest of the toolchain (a proxy's included), and hand
 // Chromium the bytes: they are the same bytes either way.
 // Each file is fetched once per run and kept, and a failed fetch is tried again: a CI runner's
@@ -124,6 +125,11 @@ await anatomy.locator(".tree .node-row").first().waitFor();
 const labels = await anatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
 check(JSON.stringify(labels) === JSON.stringify(["Header", "Row group 0", "Footer", "Trailer"]),
   `anatomy regions: ${labels.join(", ")}`);
+// A panel is a picture drawn by the Rust reader: no choice of engine, and no editor of the reader.
+check(await anatomy.locator(".engine-bar, button[data-engine], button[data-edit]").count() === 0 &&
+  await page.getByRole("button", { name: "Edit the code" }).count() === 0 &&
+  (await anatomy.locator(".lab-note").innerText()).includes("Rust reader, compiled to WebAssembly"),
+  "the byte map offers no engine choice and no Edit the code: it runs on the Rust reader in WebAssembly");
 if (shots) {
   await anatomy.locator(".hex .b[data-o=\"20\"]").click();
   await anatomy.screenshot({ path: path.join(shots, "anatomy-lab.png") });
@@ -142,29 +148,6 @@ await page.goto(base + "anatomy-of-a-parquet-file.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "rust", "and the choice holds on the next page");
 await page.locator('.tab-bar button[data-code="python"]').first().click();
 
-// The same labs on the Python engine: the book's Python reader, run by Pyodide, must show what
-// the Rust reader computes natively.
-const pyAnatomy = page.locator('.lab[data-experiment="anatomy"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.state === "ok");
-await pyAnatomy.locator('.engine-bar button[data-engine="python"]').click();
-await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="anatomy"]');
-  return el.dataset.engine === "python" && el.dataset.state === "ok";
-}, null, { timeout: 180000 });
-await pyAnatomy.locator(".tree .node-row").first().waitFor();
-const pyLabels = await pyAnatomy.locator(".tree ul.root > li > ul > li > .node-row .node-label").allInnerTexts();
-check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
-  await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
-  await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
-  "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
-await page.goto(base + "compression.html");
-await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="compression"]');
-  return el?.dataset.engine === "python" && el.dataset.ready === "true";
-}, null, { timeout: 180000 });
-check(true, "the engine choice holds on another page");
-await page.locator('.lab[data-experiment="compression"] .engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]').dataset.engine === "rust");
 // ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
@@ -185,7 +168,6 @@ check(await page.locator(".lab").count() === 0, "ch01 has no panels: its picture
   const drawn = await layouts.locator(".run-output").innerText();
   check(/^by rows, 8 runs:\n[.#]+$/m.test(drawn) && /^by columns, 1 run:\n[.#]+$/m.test(drawn), "ch01's layouts step draws both layouts in the page");
 }
-await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 if (shots) {
   await page.goto(base + "anatomy-of-a-parquet-file.html");
   await page.screenshot({ path: path.join(shots, "chapter.png") });
@@ -425,39 +407,24 @@ check(await changesLab.getAttribute("data-requests") === String(mor.totals.reque
   `a scan of merge-on-read-8 applies its delete files: ${mor.answer.live_rows} rows in ${mor.totals.requests} requests`);
 if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png") });
 
-// Every lab the Python engine can run shows the same numbers on both engines: the data
-// attributes each experiment writes, on every page where it appears.
+// Every panel is a picture drawn by the Rust reader in WebAssembly, on every page that has one:
+// it draws, and offers no choice of engine and no editor of the reader.
 {
-  const { experiments } = JSON.parse(await readFile(path.join(root, "lab", "py", "package.json"), "utf8"));
   const pages = [];
   for (const f of (await readdir(root)).filter((n) => n.endsWith(".html")).sort()) {
-    const html = await readFile(path.join(root, f), "utf8");
-    const used = [...html.matchAll(/data-experiment="([a-z]+)"/g)].map((m) => m[1]);
-    if (used.some((e) => experiments.includes(e))) pages.push(f);
+    if ((await readFile(path.join(root, f), "utf8")).includes("data-experiment=")) pages.push(f);
   }
-  const settled = async (engine) => {
-    await page.evaluate((e) => localStorage.setItem("lab-engine", e), engine);
-    await page.reload();
-    await page.waitForFunction(() => [...document.querySelectorAll(".lab[data-experiment]")]
-      .every((el) => el.dataset.ready === "true" || el.dataset.ready === "error"), null, { timeout: 180000 });
-    await page.waitForTimeout(1500);
-    return page.evaluate(() => [...document.querySelectorAll(".lab[data-experiment]")].map((el) => {
-      const d = { ...el.dataset };
-      delete d.engine;
-      return d;
-    }));
-  };
   for (const f of pages) {
     await page.goto(base + f);
-    const rust = await settled("rust");
-    const python = await settled("python");
-    for (const [i, r] of rust.entries()) {
-      if (!experiments.includes(r.experiment)) continue;
-      check(JSON.stringify(python[i]) === JSON.stringify(r),
-        `${f}: the ${r.experiment} lab shows the same on the Python engine${JSON.stringify(python[i]) === JSON.stringify(r) ? "" : `: ${JSON.stringify(python[i])} vs ${JSON.stringify(r)}`}`);
-    }
+    await page.waitForFunction(() => [...document.querySelectorAll(".lab[data-experiment]")]
+      .every((el) => el.dataset.ready === "true"), null, { timeout: 60000 });
+    const labs = page.locator(".lab[data-experiment]");
+    check(await labs.count() > 0 &&
+      await labs.locator(".engine-bar, button[data-engine], button[data-edit]").count() === 0 &&
+      await page.getByRole("button", { name: "Edit the code" }).count() === 0 &&
+      await page.locator(".reader-editor").count() === 0,
+      `${f}: its panels draw on the Rust reader, with no engine choice and no Edit the code`);
   }
-  await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 }
 
 // The problems workbench: pytest, run in the page under Pyodide on the stub as it ships, must
@@ -554,33 +521,6 @@ if (shots) await changesLab.screenshot({ path: path.join(shots, "changes-lab.png
   check(await page.locator('figure.walkthrough[data-file$=".rs"] .runnable[data-codespace]').count()
     === await page.locator('figure.walkthrough[data-file$=".py"]').count(),
     "every Rust walkthrough step offers a Codespace");
-}
-
-// The reader editor: an edit to the Python reader reaches every lab on the page, and restoring
-// the book's version brings back the reader's answer.
-{
-  await page.goto(base + "anatomy-of-a-parquet-file.html");
-  await page.evaluate(() => localStorage.setItem("lab-engine", "python"));
-  await page.reload();
-  const footer = page.locator('.lab[data-experiment="anatomy"]');
-  await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 180000 });
-  const length = await footer.getAttribute("data-footer-length");
-  await footer.locator("button[data-edit]").click();
-  const editor = page.locator(".reader-editor");
-  check(await editor.locator("select").inputValue() === "metadata.py", "Edit the code opens the module the lab's chapter builds");
-  const text = await editor.locator("textarea").inputValue();
-  await editor.locator("textarea").fill(`${text}\nraise RuntimeError("an edit that breaks the reader")\n`);
-  await editor.locator('button[data-act="run"]').click();
-  await footer.and(page.locator('[data-ready="error"]')).waitFor({ timeout: 30000 });
-  check((await footer.locator(".lab-error").innerText()).includes("RuntimeError: an edit that breaks the reader")
-    && (await footer.locator(".engine-bar .edited").innerText()).includes("metadata.py"),
-    "an edit that breaks the reader shows Python's error in the lab, which says it runs the edit");
-  await editor.locator('button[data-act="restore"]').click();
-  await footer.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 30000 });
-  check(await footer.getAttribute("data-footer-length") === length
-    && await page.evaluate(() => localStorage.getItem("reader-edits")) === null,
-    `restoring the book's version brings back the reader's footer length (${length}) and forgets the edit`);
-  await page.evaluate(() => localStorage.setItem("lab-engine", "rust"));
 }
 
 // Opened from a home screen, the book starts at index.html?resume and goes back to the page the

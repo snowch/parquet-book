@@ -8,8 +8,9 @@ Parquet file: first by hand, in a few lines you run and change, then as a piece 
 then with a library you already use (pyarrow, or the Rust `parquet` crate), checked against what
 you found by hand. ch02 has all three steps; the later chapters are being revised to them. The reader is
 written twice, in Python and in Rust, each with no dependencies, and tests hold the two to
-identical answers. The pages show every step in both languages, and the experiments run either
-reader in the browser: Rust compiled to WebAssembly, or Python through Pyodide. Nothing in the
+identical answers. The pages show every step in both languages, and run both in the browser:
+Python through Pyodide in the walkthrough steps, the Run buttons and the problems workbench, and
+Rust compiled to WebAssembly behind the panels, which are pictures and nothing else. Nothing in the
 browser is a scripted animation: every byte range, request and decoded value on screen was
 computed by the reader.
 
@@ -33,12 +34,10 @@ including a headless-browser test of the experiments if Playwright is installed.
 - **Python, in the book's pages.** Every chapter opens its problems with a workbench: edit the
   Python stub and run its tests, which pytest runs in your browser under Pyodide. Every Python
   command the pages print that the browser can run, the reader's tests and its command line, has
-  a Run button. On any lab,
-  choose Python, then **Edit the code** to change the Python reader and run the page's labs on
-  your edit.
+  a Run button, and every walkthrough step has Edit and Run.
 - **Rust, in the pages and in a Codespace.** The `pqlab` commands the pages print have a Run
   button too: the page runs them on the Rust reader compiled to WebAssembly. Rust cannot compile
-  inside a web page, so every other Rust command, and "Edit the code" on the Rust engine, opens a
+  inside a web page, so every other Rust command, and every Rust walkthrough step, opens a
   Codespace, and the repository comes with a dev container for it. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
   for an editor, the pinned toolchain and every dependency in the browser; `make check`,
   `make problems` and `make serve` then work as they do at a desk. The same configuration

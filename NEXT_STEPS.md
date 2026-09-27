@@ -278,6 +278,14 @@ figures; the page index figure is gone.
   problem and says which fail, and one pair of commands at the end runs them at a desk, in Python
   and in Rust.
 
+## Done: a panel is a picture
+
+- Panels always run on the Rust reader compiled to WebAssembly; the engine choice and "Edit the
+  code" are gone, with `web/lab/python.js`, `editor.js` and `python/parquet_lab/browser.py`. The
+  Python reader runs in the page in the walkthrough steps, the Run buttons and the workbench.
+  `tests/test_python.py` still compares every report and every command through both readers, and
+  fails if one is added without a comparison.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
@@ -322,9 +330,9 @@ To consider, measuring each on the trial page before building it:
 - **A Rust Run button for the problems.** Compile the reader once, at deploy time, with rubrc's
   rustc, so a Run compiles only the reader's answer and the chapter's tests against it. Hello
   world's time suggests a few seconds on a phone.
-- **Editing the Rust reader in the page**, as "Edit the code" already does for Python: recompile
-  the reader and the labs' crate (for wasm32-wasip1, the page supplying its few WASI calls,
-  checked for the same JSON as the real module), swap it into the labs, and show what
+- **Editing the Rust reader in the page**: recompile the reader and the labs' crate (for
+  wasm32-wasip1, the page supplying its few WASI calls, checked for the same JSON as the real
+  module), swap it into the panels, and show what
   `eprintln!` and `dbg!` print, so a reader can add debugging and watch it. Measure a full
   compile at opt-level 0, and a recompile after a one-line edit with `-C incremental`, the cache
   kept in the page's filesystem between runs.

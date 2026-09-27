@@ -10,8 +10,9 @@ chapter asks a question, reads the answer out of a real Parquet file by hand, bu
 the reader, and then asks a library (pyarrow, the `parquet` crate) the same question. Labs draw
 pictures only where a picture beats printed output. ch01 is the one introduction, and builds
 nothing. The reader exists twice, in Python and in Rust, held to identical answers by tests; the
-page shows both, and the labs run either in the browser (Rust through WebAssembly, Python through
-Pyodide).
+page shows both and runs both: the Python reader under Pyodide in the walkthrough steps, the Run
+buttons and the problems workbench, and the Rust reader through WebAssembly behind the panels,
+which are pictures and nothing else.
 
 Read **PLAN.md** for the argument and the settled decisions, **AUTHORING_GUIDE.md** before
 writing or editing a page, and **STYLE.md** while editing. **NEXT_STEPS.md** is the working list.
@@ -60,7 +61,7 @@ Either way the page runs the code the tests run.
 | `chapters/_generated/` | Fragments written by `pqlab figures`. Never edited by hand. |
 | `tools/` | Python: the outline (`outline.py`), the renderer (`render.py`), the highlighter. |
 | `scripts/` | Build and check entry points. `ci-check.sh` is what CI runs. |
-| `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory, the problems workbench and the reader editor. |
+| `web/` | The site stylesheet, and `web/lab/`: the browser half of the laboratory: the panels, the problems workbench, the walkthrough steps' Edit and Run, and the Run buttons. |
 | `web/rust-trial/` | A hidden page (`rust-trial/`, linked from nowhere) that compiles Rust in the browser with rubrc and times it on the reader's device; its toolchain is fetched at deploy time by `scripts/fetch-rust-trial.mjs`. Not part of the book. |
 | `.devcontainer/` | The repository as a Codespace: the pinned toolchains, for editing and running the Rust reader online. |
 | `tests/` | Python tests of the book, the renderer, WASM/native parity; `tests/browser/` drives Chromium. |
@@ -101,13 +102,13 @@ natively through `pqlab`, and requires identical JSON. That test has already cau
 64-bit integers above 2^53 being rounded by JavaScript (`json.rs` now writes them as strings).
 
 **The Python reader gives the Rust reader's answers.** `python/parquet_lab/report.py` writes the
-same JSON as `report.rs`, and `tests/test_python.py` makes every call the Python engine supports
-through both, on every fixture and on damaged copies, requiring identical JSON, key order and
-error messages included. `python/parquet_lab/browser.py` is the Python engine's equivalent of the
-C ABI; `web/lab/python.js` loads it into Pyodide (pinned, from a CDN) behind the same methods as
-`wasm.js`. Its `EXPERIMENTS` names the labs it can run, which is every lab; the page offers the
-Python engine and the editor for those, except an introduction's lab, which is a picture with
-no code behind it on the page, and a test requires them to be exactly the chapters' experiments.
+same JSON as `report.rs`, and `tests/test_python.py` calls every report function through both
+readers, on every fixture and on damaged copies, and runs every command of both command lines
+(`pqlab`, `python -m parquet_lab`), requiring identical JSON, key order and error messages
+included; it fails if a report or a command is added without a comparison. The page runs the
+Python reader under Pyodide (pinned, from a CDN) in one worker, for the walkthrough steps, the
+Run buttons and the workbench (below). **A panel is a picture and nothing else**: it always runs
+on the Rust reader compiled to WebAssembly, and offers no choice of engine and no editor.
 
 **Experiments are fenced blocks.** A page embeds one with:
 
@@ -130,15 +131,14 @@ whose every command the page can run gets a Run button (`web/lab/commands.js`): 
 pytest` on `python/tests` or `exercises/python` and `PYTHONPATH=python python3 -m parquet_lab` run
 in that worker, and `cargo run -p pqlab -- …` runs through `pl_cli` in the WebAssembly reader,
 printing what the binary prints (`tests/test_wasm.py` holds it to the byte). A block of commands
-that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, never Run. On the Python engine, **Edit the code**
-(`web/lab/editor.js`) swaps the reader's edits into the Python reader and remounts every lab.
-Edits live in the browser's storage, never on the server. Rust cannot compile in a page, so
-`.devcontainer/` gives a Codespace with the pinned toolchain instead, and on the Rust engine
-**Edit the code** says which `crates/parquet-lab/src/*.rs` file to edit there and how to see the
-labs on the edit (`make && make serve`). A walkthrough step (a `{literalinclude}` of a file in
+that need a compiler (`cargo test`, `make`) gets Open in Codespaces instead, never Run. What
+the reader types, answers and edited steps, lives in the browser's storage, never on the server. Rust cannot compile in a page, so
+`.devcontainer/` gives a Codespace with the pinned toolchain instead, where `make && make serve`
+shows the panels drawn by an edited Rust reader. A walkthrough step (a `{literalinclude}` of a file in
 `walkthroughs/`, labelled "Try it") gets Edit and Run in Python, in the same worker, and Open in
 Codespaces in Rust. The browser test runs a workbench, Run buttons in both languages against the
-same commands at a desk, a walkthrough step and an edit.
+same commands at a desk, and walkthrough steps, one of them edited; it checks every panel draws
+what the native reader computes, with no engine choice and no editor.
 
 ## The invariants
 
@@ -165,8 +165,9 @@ same commands at a desk, a walkthrough step and an edit.
    clock or a network. The same commit builds the same book, byte for byte.
 7. **Two readers, one answer.** The Python and Rust readers cover every chapter: a chapter quotes
    every step in both languages in a `{tab-set}` (Python first, synced `python` and `rust`), ships
-   its problems in both, and offers its labs on both engines. A change
-   to one reader is made to the other in the same commit; the parity test fails otherwise.
+   its problems in both, and runs its Python steps and problems in the page; its panels, if it
+   has any, are pictures drawn by the Rust reader. A change to one reader is made to the other in
+   the same commit; the parity test fails otherwise.
 
 ## Adding things
 
@@ -177,8 +178,8 @@ reader code, then figures, then prose. A chapter's number is derived from its po
 identity is its slug. Never put a number in a slug, label or file name.
 
 **A chapter's Python half.** A new chapter is written in both readers. Write the Python twin of
-every Rust module the chapter adds in `python/parquet_lab/`, same names and same JSON; add their reports to `browser.py` and its `EXPERIMENTS`, their calls to
-`tests/test_python.py` and methods to `web/lab/python.js`; port the Rust unit and fixture tests to
+every Rust module the chapter adds in `python/parquet_lab/`, same names and same JSON; add their
+reports' calls, and any new command, to `tests/test_python.py`; port the Rust unit and fixture tests to
 `python/tests/`; write the problems in `exercises/python/`; and put every excerpt in the chapter
 in a tab set beside its Rust twin. `tests/test_book.py` checks the chapter's side of this.
 
@@ -188,11 +189,11 @@ Keep it small enough to read byte by byte. The Rust fixture tests pick it up aut
 
 **An experiment.** Add a report function in `crates/parquet-lab/src/report.rs` that runs the reader
 and returns JSON, and its twin in `python/parquet_lab/report.py`; export it from
-`crates/parquet-lab-wasm` and `python/parquet_lab/browser.py`; add a method to `web/lab/wasm.js`
-and `web/lab/python.js`, a mount function in `web/lab/`, its name to `EXPERIMENTS` in
-`web/lab/lab.js` and `tools/outline.py`, a matching subcommand in `pqlab` and in
-`python -m parquet_lab`, and its calls to `tests/test_wasm.py` and `tests/test_python.py`. JavaScript draws; it never
-computes anything Parquet-shaped.
+`crates/parquet-lab-wasm`; add a method to `web/lab/wasm.js`, a mount function in `web/lab/`, its
+name to `EXPERIMENTS` in `web/lab/lab.js` and `tools/outline.py`, a matching subcommand in
+`pqlab` and in `python -m parquet_lab`, and its calls to `tests/test_wasm.py` and
+`tests/test_python.py`. A panel is a picture, drawn by the Rust reader alone: add one only where a
+picture beats printed output. JavaScript draws; it never computes anything Parquet-shaped.
 
 **A figure.** Add a `Figure` to `crates/pqlab/src/figures.rs` that runs the reader and returns
 markdown ending with its conditions line, run `make figures`, and `{include}` the fragment.

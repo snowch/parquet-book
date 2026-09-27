@@ -249,18 +249,14 @@ def test_a_ported_chapter_quotes_both_readers(chapter):
     assert workbench in problems[: first.start()], "open the problems with their workbench, before the first"
 
 
-def test_the_python_engine_runs_exactly_the_ported_chapters_labs():
-    """The labs offer the Python engine for a chapter once its reader is ported, and not before.
-
-    An introduction's labs run on both engines from the start: the reader code behind them is
-    in both readers, though the page does not quote it."""
-    import ast
-
-    tree = ast.parse((ROOT / "python" / "parquet_lab" / "browser.py").read_text())
-    engine = next(
-        ast.literal_eval(n.value)
-        for n in tree.body
-        if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "EXPERIMENTS"
-    )
-    covered = PORTED + [c for c in WRITTEN if c.introduction]
-    assert set(engine) == {e for c in covered for e in c.experiments}
+def test_panels_are_drawn_by_the_rust_reader_alone():
+    """A panel is a picture, drawn by the Rust reader compiled to WebAssembly. The Python reader
+    runs in the page in the walkthrough steps, the Run buttons and the workbench, never behind a
+    panel, so nothing offers a panel a choice of engine or an editor of the reader."""
+    lab = (ROOT / "web" / "lab" / "lab.js").read_text()
+    imports = re.findall(r'^import .* from "\./([a-z-]+)\.js";$', lab, re.M)
+    assert "wasm" in imports
+    assert not {"python", "editor"} & set(imports), imports
+    assert not (ROOT / "python" / "parquet_lab" / "browser.py").exists()
+    for name in ("engine-bar", "data-engine", "Edit the code"):
+        assert name not in lab, name

@@ -1,9 +1,8 @@
-// Pyodide, and the book's Python files inside it: shared by the labs' Python engine (python.js),
-// the reader editor (editor.js), and the worker that runs the workbenches' tests and the Run
-// buttons' commands (python-worker.js).
+// Pyodide, and the book's Python files inside it, for the worker that runs the walkthrough steps,
+// the workbenches' tests and the Run buttons' commands (python-worker.js).
 //
 // Pyodide is CPython compiled to WebAssembly. It is several megabytes, so it is fetched only when
-// a reader asks for Python, from a pinned release on a public CDN. The book's own Python files
+// a reader runs Python, from a pinned release on a public CDN. The book's own Python files
 // come from this site, and go into Pyodide's file system in the repository's layout, so the
 // graders find the reader and the fixtures where they find them at a desk.
 
@@ -21,7 +20,7 @@ const manifests = new Map();
 
 /**
  * What the site build wrote about the Python files, from `base` (a URL in web/lab): the reader's
- * modules, the labs it runs, the problems and their graders, and the fixtures.
+ * modules, the problems and their graders, the reader's tests, and the fixtures.
  */
 export function packageList(base) {
   const url = new URL("py/package.json", base).href;

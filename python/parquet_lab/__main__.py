@@ -1,4 +1,4 @@
-"""The Python reader on the command line: the same reports the labs draw, as JSON.
+"""The Python reader on the command line: the same reports as the Rust reader's, as JSON.
 
     PYTHONPATH=python python3 -m parquet_lab footer fixtures/tiny.parquet --size suffix --prefetch 65536
     PYTHONPATH=python python3 -m parquet_lab structure fixtures/tiny.parquet

@@ -31,8 +31,11 @@ Not the order the chapter is read in.
    reader sees, and it should say where to look. Then solve each one *outside the repository* and
    check it passes. Never commit the solution. Every chapter has the same problems in
    `exercises/python/`, marked `@pytest.mark.problem`, graded the same way.
-3. **The experiment.** A report function that runs the reader, a WASM export, and a panel in
-   `web/lab/`. See CLAUDE.md, *Adding things*.
+3. **The experiment.** The walkthrough steps (below), and a panel only where a picture beats
+   printed output: a report function that runs the reader, a WASM export, and a mount function in
+   `web/lab/`. A panel is a picture and nothing else: the Rust reader, compiled to WebAssembly,
+   draws it, and it offers no choice of engine and no editor. The Python reader runs in the page
+   in the steps, the Run buttons and the workbench. See CLAUDE.md, *Adding things*.
 4. **The figures.** Every number the prose will need, as a fragment from `pqlab figures`.
 5. **The prose**, last, to serve all of the above.
 

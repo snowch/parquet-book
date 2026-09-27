@@ -37,7 +37,9 @@ question -> read the bytes by hand -> the reader does it -> a library agrees
    fixture's manifest.
 
 Labs stay where a picture beats printed output: a map of a file's bytes, a timeline of requests, a
-row group lit up by a predicate. Elsewhere the printed output is the experiment.
+row group lit up by a predicate. A panel is a picture and nothing else, drawn by the Rust reader
+compiled to WebAssembly; the code a reader runs and changes is in the steps. Elsewhere the printed
+output is the experiment.
 
 The implementation is the teaching instrument. A chapter should leave the reader with something
 concrete that works, and with the library call that does the same at work.
@@ -106,13 +108,15 @@ but it narrowed the audience: many readers who want to understand Parquet read P
 easily than Rust, and the quoted code is the explanation. So the reader also exists in Python,
 `python/parquet_lab`, module for module, with the standard library only. This is the one place the
 book accepts two implementations, and it accepts it on one condition: they cannot disagree
-unnoticed. `tests/test_python.py` makes every call the labs make through both, on every fixture and
-on damaged copies, and requires identical JSON, error messages included; each is also tested
+unnoticed. `tests/test_python.py` calls every report function, and runs every command of both
+command lines, through both readers, on every fixture and on damaged copies, and requires
+identical JSON, error messages included; each is also tested
 against pyarrow on its own, since two readers that agree can both be wrong. The page shows each
-step in both languages, in tabs that remember the reader's choice, Python first. The labs run on
-the Rust reader through WebAssembly by default, because it loads instantly; a reader can switch
-them to the Python reader, which the page runs under Pyodide, fetched from a pinned CDN release
-only when chosen. Every chapter's excerpts, problems and labs exist in both.
+step in both languages, in tabs that remember the reader's choice, Python first. The page runs
+the Python reader under Pyodide, fetched from a pinned CDN release on the first Python run, in the
+walkthrough steps, the Run buttons and the problems workbench. A panel is a picture and nothing
+else: the Rust reader draws it through WebAssembly, because it loads instantly, and it offers no
+choice of reader and no editor. Every chapter's excerpts and problems exist in both.
 
 **No dependencies in the reader.** Not for Thrift, not for JSON, not for WASM bindings. Each is
 small enough to write in the open, which is the point of the book, and `cargo build --offline`
@@ -154,8 +158,8 @@ intended rows, and the tests hold the keyless reader to pyarrow's keyed descript
 
 **Problems are tests, run in the page or at a desk.** Each chapter's Python problems run in the
 page: its workbench holds the stub, and pytest runs the chapter's graders under Pyodide in a web
-worker, unchanged from the files a desk runs. A reader can also edit the Python reader itself and
-run the page's labs on the edit. A Rust problem cannot be compiled in a browser page at reasonable
+worker, unchanged from the files a desk runs. A reader can also edit a walkthrough step and run
+the edit in the page. A Rust problem cannot be compiled in a browser page at reasonable
 cost, so the repository ships a dev container, and a Codespace gives a reader the Rust toolchain
 and an editor in the browser; at a desk the problems run with `cargo test -- --ignored` or
 `pytest --problems`, and the page shows both commands.

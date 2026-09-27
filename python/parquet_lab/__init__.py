@@ -2,8 +2,8 @@
 teaches it.
 
 The same reader exists in Rust, in ``crates/parquet-lab``. Both are tested against the files
-pyarrow wrote and against each other: for every report the browser draws, the two must return
-the same JSON. Each module here has a Rust module of the same name.
+pyarrow wrote and against each other: for every report, and every command of the command
+line, the two must return the same JSON. Each module here has a Rust module of the same name.
 
 | Module | What it does | Chapter |
 |---|---|---|
@@ -19,7 +19,6 @@ the same JSON. Each module here has a Rust module of the same name.
 | ``object_store`` | a simulated S3: ``HEAD``, ``GET``, ranges, and a trace | ch02, ch10 |
 | ``reader`` | opening a file in an object store | ch02 |
 | ``report`` | what the reader did, as JSON | all |
-| ``browser`` | the calls the browser's Python engine makes | all |
 
 It uses the standard library only, so it runs unchanged under CPython and, in the page, under
 Pyodide.

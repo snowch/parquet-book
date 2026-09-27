@@ -123,20 +123,13 @@ export function mountAnatomy(root, lab, files, initial) {
   choose();
 }
 
-/** What runs this lab, for its heading: the Rust reader or the Python one (see lab.js). */
-export function engineNote(el) {
-  return el.closest(".lab")?.dataset.engine === "python"
-    ? "running the book's Python reader, in your browser through Pyodide"
-    : "running the book's Rust reader, compiled to WebAssembly";
-}
-
 export function fileChooser(head, files, initial, open) {
   const names = files.names();
   head.innerHTML = `<span class="lab-title">Parquet laboratory</span>` +
     (names.length > 1
       ? `<label>file <select>${names.map((n) => `<option${n === initial ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>`
       : `<code>${escapeHtml(initial)}</code>`) +
-    `<span class="lab-note">${engineNote(head)}</span>`;
+    `<span class="lab-note">running the book's Rust reader, compiled to WebAssembly</span>`;
   const select = head.querySelector("select");
   if (select) select.addEventListener("change", () => open(select.value));
   return () => open(initial);

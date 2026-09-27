@@ -6,17 +6,15 @@
 // experiment. Paths are resolved from this script's own URL, so the book works wherever it is
 // served from, including a GitHub Pages project path.
 //
-// The reader exists twice, in Rust and in Python, and the tests hold them to the same JSON. A lab
-// runs on the Rust reader compiled to WebAssembly unless the reader chooses Python, which runs the
-// book's Python files under Pyodide. The choice is remembered, and offered for every lab the
-// Python reader can run, which the build reads from its EXPERIMENTS list. On Python, a reader can
-// edit the reader's code and run the labs on the edit (editor.js).
+// A panel is a picture, and it is always drawn by the Rust reader compiled to WebAssembly
+// (wasm.js). The Python reader runs in the page too, in the walkthrough steps, the Run buttons and
+// the problems workbench, all in one worker (runner.js); tests/test_python.py holds the two
+// readers to the same JSON natively.
 //
 // A chapter's problems workbench (workbench.js) mounts here too, and so do the Run buttons on
 // the Python commands a page prints (commands.js).
 
 import { Lab } from "./wasm.js";
-import { PyLab } from "./python.js";
 import { mountAnatomy } from "./footer.js";
 import { mountCompression } from "./compression.js";
 import { mountScan } from "./scan.js";
@@ -25,7 +23,6 @@ import { mountEngine } from "./engine.js";
 import { mountEncryption } from "./encryption.js";
 import { mountTable } from "./table.js";
 import { mountChanges } from "./changes.js";
-import { openEditor, openRustEditor } from "./editor.js";
 import { mountWorkbench } from "./workbench.js";
 import { mountCommands } from "./commands.js";
 
@@ -60,109 +57,32 @@ class Fixtures {
   }
 }
 
-const ENGINES = {
-  rust: { name: "Rust", detail: "compiled to WebAssembly", load: () => Lab.fromUrl(new URL("parquet_lab.wasm", import.meta.url)) },
-  python: { name: "Python", detail: "run by Pyodide", load: () => PyLab.load(import.meta.url) },
-};
-const loading = {};
-function loadEngine(engine) {
-  loading[engine] ||= ENGINES[engine].load();
-  return loading[engine];
-}
-
-function chosenEngine() {
-  try {
-    return localStorage.getItem("lab-engine") === "python" ? "python" : "rust";
-  } catch {
-    return "rust";
-  }
-}
-
-// The labs the Python reader can run, from the list the site build wrote from browser.py.
-const pythonLabs = fetch(new URL("py/package.json", import.meta.url))
-  .then((r) => (r.ok ? r.json() : { experiments: [] }))
-  .then((p) => new Set(p.experiments))
-  .catch(() => new Set());
-
-function engineBar(el, engine) {
-  const bar = document.createElement("div");
-  bar.className = "engine-bar";
-  bar.innerHTML = `<span>Run on the reader in</span>` + Object.entries(ENGINES).map(([key, e]) =>
-    `<button type="button" data-engine="${key}" aria-pressed="${key === engine}" title="The book's ${e.name} reader, ${e.detail}">${e.name}</button>`).join("") +
-    `<button type="button" class="edit-code" data-edit>Edit the code</button>`;
-  bar.addEventListener("click", (e) => {
-    if (e.target.closest("button[data-edit]")) {
-      const python = () => loadEngine("python").then((lab) => openEditor(el, lab, remountAll));
-      if (el.dataset.engine === "python") python();
-      else {
-        openRustEditor(el, () => {
-          choose("python");
-          python();
-        });
-      }
-      return;
-    }
-    const b = e.target.closest("button[data-engine]");
-    if (!b || b.dataset.engine === el.dataset.engine) return;
-    choose(b.dataset.engine);
-  });
-  return bar;
-}
-
-/** Run every lab on the page on `engine`, and remember the choice. */
-function choose(engine) {
-  try {
-    localStorage.setItem("lab-engine", engine);
-  } catch {}
-  remountAll();
-}
-
-function remountAll() {
-  for (const el of document.querySelectorAll(".lab[data-experiment]")) mount(el);
+let loading = null;
+function loadReader() {
+  loading ||= Lab.fromUrl(new URL("parquet_lab.wasm", import.meta.url));
+  return loading;
 }
 
 async function mount(el) {
-  // What the page asked for, kept from the first mount: a remount must not see what the last
-  // run wrote into the element's data attributes, so those are cleared.
-  const config = (el.labConfig ||= { ...el.dataset });
-  for (const key of Object.keys(el.dataset)) if (!(key in config)) delete el.dataset[key];
+  // What the page asked for, before the experiment writes its results into the same attributes.
+  const config = { ...el.dataset };
   const run = EXPERIMENTS[config.experiment];
-  const offersPython = (await pythonLabs).has(config.experiment);
-  const engine = offersPython ? chosenEngine() : "rust";
-  el.dataset.engine = engine;
   el.dataset.ready = "loading";
-  el.innerHTML = engine === "python"
-    ? '<p class="lab-loading">Loading Python in your browser (Pyodide, a few megabytes the first time)…</p>'
-    : '<p class="lab-loading">Loading the reader…</p>';
-  const bar = offersPython ? engineBar(el, engine) : null;
-  if (bar) el.prepend(bar);
+  el.innerHTML = '<p class="lab-loading">Loading the reader…</p>';
   try {
-    const lab = await loadEngine(engine);
-    if (el.dataset.engine !== engine) return; // the reader switched engines while this loaded
-    const edited = engine === "python" ? Object.keys(lab.edits) : [];
-    if (edited.length) {
-      const note = document.createElement("span");
-      note.className = "edited";
-      note.textContent = `running your edits to ${edited.join(", ")}`;
-      bar.querySelector("span").after(note);
-    }
-    if (engine === "python" && lab.error) throw new Error(`the edited Python reader does not import:\n${lab.error}`);
+    const lab = await loadReader();
     const names = (config.fixtures || config.fixture || "").split(",").map((s) => s.trim()).filter(Boolean);
     const files = new Fixtures(names);
     el.innerHTML = "";
-    if (bar) el.append(bar);
     await run(el, lab, files, config.fixture || names[0], config);
     el.dataset.ready = "true";
   } catch (error) {
-    // As text: a Python traceback names "<module>", which is not markup.
     const message = document.createElement("p");
     message.className = "lab-error";
     message.textContent = `The experiment could not start: ${String(error.message || error)}`;
-    el.replaceChildren(...(bar ? [bar] : []), message);
+    el.replaceChildren(message);
     el.dataset.ready = "error";
-    // An error in the reader's own edits is shown, and is theirs; any other is the book's bug.
-    const edited = engine === "python" && Object.keys((await loadEngine("python").catch(() => ({})))?.edits || {}).length;
-    if (!edited) throw error;
+    throw error;
   }
 }
 

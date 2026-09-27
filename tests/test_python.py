@@ -1,11 +1,11 @@
 """The Python reader and the Rust reader give identical answers.
 
-The book shows both, and the browser can run either, so they must never disagree. Every call the
-pages make to the Python engine is made here twice: through ``python/parquet_lab`` and natively
-through ``pqlab``. The JSON must match, key order included. Damaged copies of the fixtures are
-included, because a reader's errors are part of what the page shows.
-
-``browser.EXPERIMENTS`` names the labs the Python engine runs, which is every lab in the book.
+The book shows both, the page runs the Python reader in its walkthrough steps, Run buttons and
+workbench, and draws its panels with the Rust reader, so they must never disagree. Every report
+function is called here twice: through ``python/parquet_lab/report.py`` and natively through
+``pqlab``, on every fixture and on damaged copies, because a reader's errors are part of what the
+page shows. The JSON must match, key order included. Both command lines are run on the same
+arguments, one case per command at least, and must print the same JSON.
 """
 
 from __future__ import annotations
@@ -107,7 +107,10 @@ def test_the_schema_report_matches(tmp_path):
         assert python(report.schema(path.read_bytes())) == rust("schema", path), path.name
 
 
-@pytest.mark.parametrize("name", ["levels", "encodings", "pages", "compression"])
+COLUMN_REPORTS = ["levels", "encodings", "pages", "compression"]
+
+
+@pytest.mark.parametrize("name", COLUMN_REPORTS)
 def test_the_column_reports_match(tmp_path, name):
     """ch04 to ch07: every column of every fixture, and the damaged copies. The levels, encodings
     and pages reports of ch04 to ch06 have no panel, and stay for the command line and the
@@ -364,6 +367,8 @@ CLI = [
     ["encryption", "fixtures/plaintext-footer.parquet"],
     ["table", "fixtures/table.json", "SELECT count(*) FROM orders WHERE country = 'UK'", "--discovery", "prune",
      "--connections", "2"],
+    ["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300", "--prefetch", "65536"],
+    ["changes", "fixtures/changes.json", "--snapshot", "merge-on-read-8", "--compact", "--target-rows", "400"],
 ]  # fmt: skip
 
 
@@ -380,3 +385,33 @@ def test_the_command_lines_print_the_same(args):
         check=True,
     )
     assert json.loads(out.stdout, object_pairs_hook=list) == rust(*args)
+
+
+def test_every_report_and_every_command_is_compared():
+    """Adding a report, or a command, to the Python reader without comparing it here fails."""
+    import ast
+    import inspect
+
+    here = Path(__file__).read_text()
+    public = [
+        name
+        for name, f in inspect.getmembers(report, inspect.isfunction)
+        if f.__module__ == report.__name__ and not name.startswith("_")
+    ]
+    # Helpers the reports are built from, not reports: each is exercised through the reports.
+    helpers = {"jsonable", "dumps", "requests_json", "region", "annotate", "open_bytes", "flat_columns"}
+    missing = [
+        n for n in public if n not in helpers and f"report.{n}(" not in here and n not in COLUMN_REPORTS
+    ]
+    assert not missing, f"compare these reports with pqlab's: {missing}"
+    main = ast.parse((ROOT / "python" / "parquet_lab" / "__main__.py").read_text())
+    commands = {
+        n.args[0].value
+        for n in ast.walk(main)
+        if isinstance(n, ast.Call)
+        and getattr(n.func, "attr", "") == "add_parser"
+        and isinstance(n.args[0], ast.Constant)
+    }
+    commands |= set(COLUMN_REPORTS)  # added in a loop
+    compared = {args[0] for args in CLI}
+    assert commands <= compared, f"run these commands through both readers: {sorted(commands - compared)}"

@@ -11,20 +11,21 @@ Nothing to install. Every chapter from ch02 on opens its problems with a workben
 problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
 runs. A Python command in these pages that runs the reader's tests, a problem's tests or the
 reader's command line has a **Run** button, which runs it in the page and shows what it printed;
-a problem's tests run on your answers from its chapter's workbench. On any lab, choose **Python**, then **Edit the code**, and you can change any file of the
-Python reader and run the page's labs on your edit. Your edits stay in your browser until you
-restore them.
+a problem's tests run on your answers from its chapter's workbench. Every walkthrough step has
+**Edit** and **Run**: change the step and run your version in the page. Your answers and edits
+stay in your browser.
 
 The `cargo run -p pqlab` commands below have a Run button too. The page runs them on the Rust
-reader compiled to WebAssembly, the one the labs use, and they print what they print at a desk.
+reader compiled to WebAssembly, the one that draws the pictures, and they print what they print
+at a desk.
 
 Rust cannot compile inside a web page, so editing the Rust reader, and every other Rust command,
-needs a compiler. Their blocks have an **Open in Codespaces** button, and so does **Edit the
-code** on a lab's Rust engine: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+needs a compiler. Their blocks have an **Open in Codespaces** button, and so does every Rust
+walkthrough step: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
 opens the repository with an editor, the pinned toolchain and every dependency, in the browser.
 Edit a file there and run the command in its terminal; `make && make serve` shows the book with
-every lab on your edited reader. The configuration is in `.devcontainer/`, and works in any editor
-that supports dev containers.
+every picture drawn by your edited reader. The configuration is in `.devcontainer/`, and works
+in any editor that supports dev containers.
 
 A Codespace runs on your own GitHub account, not the book's. Personal accounts get a free
 allowance of use each month; past it, GitHub blocks further use unless you have set up billing,
@@ -44,9 +45,9 @@ the site needs the rest.
 - Node.js and the pinned MyST command-line tool, which parses the pages:
   `npm install -g mystmd@1.10.1`.
 
-Neither reader has dependencies outside the repository, so both build and run offline. The labs
-can run the Python reader in the page too, through Pyodide, which the page fetches from a public
-CDN the first time you choose Python.
+Neither reader has dependencies outside the repository, so both build and run offline. The page
+runs Python through Pyodide, which it fetches from a public CDN the first time you run Python in
+the page.
 
 ## Building and serving the book
 

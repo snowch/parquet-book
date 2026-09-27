@@ -22,12 +22,12 @@ format and answers it on the bytes of a real Parquet file, in three steps:
 [ch02](#anatomy-of-a-parquet-file) takes all three steps. The chapters after it build the reader
 and are gaining the first and third steps as the book is revised.
 
-The reader exists twice, in Python and in Rust, held to identical answers by tests. Every
-excerpt of the reader has a tab for each; pick one and the whole book follows. The same code runs
-in the tests, which check it against files written by pyarrow, a production implementation; on
-the command line; and in this page, where Python runs under Pyodide and Rust runs compiled to
-WebAssembly. When a page shows a footer length, a byte range or a request, the reader computed it
-from the bytes of the file.
+The reader exists twice, in Python and in Rust, held to identical answers by tests. Every excerpt
+of the reader has a tab for each; pick one and the whole book follows. The same code runs in the
+tests, which check it against files written by pyarrow, a production implementation; on the
+command line; and in this page, where Python runs under Pyodide in the steps you run and the
+problems you solve, and Rust, compiled to WebAssembly, draws the pictures. When a page shows a
+footer length, a byte range or a request, the reader computed it from the bytes of the file.
 
 ## How a chapter works
 

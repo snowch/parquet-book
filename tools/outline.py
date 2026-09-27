@@ -32,7 +32,7 @@ CHAPTER_SHAPE = (
 
 #: Chapters that build nothing: they set up the question the book answers, before there is a
 #: Parquet file to open. An introduction has every heading but *Building it*, its problems are
-#: questions to reason about rather than tests, and its labs still run on both engines. The
+#: questions to reason about rather than tests, and its pictures come from code. The
 #: book's method (by hand, then the reader, then a library) starts with the first real file.
 INTRODUCTIONS = frozenset({"why_parquet_exists"})
 
