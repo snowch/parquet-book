@@ -12,6 +12,7 @@ facts in the output, derived here from the manifest, never on the text.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -88,6 +89,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(formats_facts())
     known.update(types_facts())
     known.update(nested_facts())
+    known.update(encodings_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -183,6 +185,70 @@ def types_facts() -> dict:
             f"{c.path}: max levels {c.max_definition_level} {c.max_repetition_level}, {c.physical_type}, min"
             for c in columns
         ],
+    }
+
+
+def encodings_facts() -> dict:
+    """What ch05's steps must print: deltas, prefixes and dictionary indices computed here from
+    the values pyarrow reads back, and the encodings and offsets pyarrow reports."""
+    import pyarrow.parquet as pq
+
+    fixtures = ROOT / "fixtures"
+    rows = pq.read_table(fixtures / "encodings.parquet").to_pylist()
+    times = [row["ordered_at"] for row in rows]
+    deltas = [b - a for a, b in zip(times, times[1:], strict=False)]
+    width = (max(deltas) - min(deltas)).bit_length()
+
+    urls = [row["url"].encode() for row in rows]
+    shared = [0] + [len(os.path.commonprefix([a, b])) for a, b in zip(urls, urls[1:], strict=False)]
+    suffixes = b"".join(url[n:] for url, n in zip(urls, shared, strict=False))
+    values = " ".join(json.dumps(row["url"]) for row in rows[:4])
+
+    countries = [row["country"] for row in pq.read_table(fixtures / "dictionary.parquet").to_pylist()]
+    entries = list(dict.fromkeys(countries))  # in order of first appearance, as a writer adds them
+    indices = [entries.index(c) for c in countries]
+    md = pq.read_metadata(fixtures / "dictionary.parquet").row_group(0).column(1)
+    kind = next(e for e in md.encodings if e.endswith("_DICTIONARY"))
+    plain = next(e for e in md.encodings if e not in (kind, "RLE"))  # the dictionary page's
+    strings = {"python": repr, "rust": lambda v: json.dumps(v, separators=(", ", ": "))}
+    chunks = pq.read_metadata(fixtures / "encodings.parquet").row_group(0)
+    chunks = [chunks.column(i) for i in range(chunks.num_columns)]
+    return {
+        ("encodings", "delta_header"): [
+            f"{len(times)} values, first {times[0]}",
+            f"min delta {min(deltas)}; widths [{width}, ",
+            f"first deltas: {deltas[:8]}",
+        ],
+        ("encodings", "dictionary_by_hand"): {
+            language: [
+                f"DICTIONARY_PAGE {plain} {show(entries)}\n",
+                f"{kind}: ",
+                f"width {(len(entries) - 1).bit_length()}",
+                f"indices: {indices}",
+                f"values: {show(countries)}",
+            ]
+            for language, show in strings.items()
+        },
+        ("encodings", "decode_a_column"): [
+            f"{next(c for c in chunks if c.path_in_schema == 'url').encodings[-1]} page",
+            f"{len(urls)} values; the first is {shared[0]}\n",
+            f"{len(urls)} values; the first is {len(urls[0]) - shared[0]}\n",
+            f"bytes: {suffixes[:8].hex(' ')} … ({len(suffixes)} bytes)",
+            f"values: {values} …",
+        ],
+        ("encodings", "encodings_with_a_library"): {
+            "python": [
+                *(f"{c.path_in_schema} {c.encodings}" for c in chunks),
+                f"dictionary: {entries}",
+                f"indices: {indices}",
+            ],
+            "rust": [
+                *(f"{c.path_in_schema} [{', '.join(c.encodings)}]" for c in chunks),
+                f"country: dictionary page at Some({md.dictionary_page_offset})",
+                f"DICTIONARY_PAGE {plain} {len(entries)}",
+                f"DATA_PAGE {kind} {len(countries)}",
+            ],
+        },
     }
 
 

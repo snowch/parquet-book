@@ -160,10 +160,6 @@ export class Lab {
     return this.#result(this.exports.pl_pages(id, column));
   }
 
-  encodings(id, column) {
-    return this.#result(this.exports.pl_encodings(id, column));
-  }
-
   interpret(id, offset) {
     return this.#result(this.exports.pl_interpret(id, offset));
   }

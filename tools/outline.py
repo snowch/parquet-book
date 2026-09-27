@@ -165,7 +165,7 @@ _CHAPTERS = (
         "the_values",
         "How do values become compact bytes before any compressor sees them?",
         "Decoders for dictionary pages and indices, the delta encodings and BYTE_STREAM_SPLIT, each with a trace.",
-        ("encodings",),
+        (),
         ("encodings.parquet", "dictionary.parquet"),
     ),
     (
@@ -304,7 +304,6 @@ BY_ANCHOR = {x.anchor: x for x in (*CHAPTERS, *APPENDICES)}
 #: fails the build, rather than rendering an empty box.
 EXPERIMENTS = (
     "anatomy",
-    "encodings",
     "pages",
     "compression",
     "statistics",

@@ -110,7 +110,7 @@ def test_the_schema_report_matches(tmp_path):
 @pytest.mark.parametrize("name", ["levels", "encodings", "pages", "compression"])
 def test_the_column_reports_match(tmp_path, name):
     """ch04 to ch07: every column of every fixture, and the damaged copies. ch04's levels report
-    has no panel, and stays for `levels` on the command line and for the figures."""
+    and ch05's encodings report have no panel, and stay for the command line and the figures."""
     call = getattr(report, name)
     for path in files(tmp_path):
         data = path.read_bytes()

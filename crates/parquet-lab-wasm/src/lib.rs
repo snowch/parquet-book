@@ -188,15 +188,6 @@ pub extern "C" fn pl_interpret(id: u32, offset: f64) -> usize {
     }
 }
 
-/// Ch05's experiment: one column's encoding, step by step. See `report::encodings`.
-#[no_mangle]
-pub extern "C" fn pl_encodings(id: u32, column: u32) -> usize {
-    match with_file(id, |f| report::encodings(&f.bytes, column as usize)) {
-        Some(json) => emit(json),
-        None => no_such_file(id),
-    }
-}
-
 /// Ch14's experiment: SQL over a table of files. `ids` is a `pl_alloc` buffer of `count`
 /// little-endian `u32` file ids, each file loaded under its object key; `sql` is another. This
 /// call takes and frees both. `discovery`: 0 list, 1 list and prune, 2 read the log.

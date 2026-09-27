@@ -21,32 +21,110 @@ their bytes.
 
 ## The experiment
 
-### One column per encoding
+### Read the encodings yourself
 
 `encodings.parquet` holds forty orders, and each column was written with the encoding that suits
 its values. `dictionary.parquet` holds twelve orders written with the default, dictionary
-encoding. [Appendix B](#the-fixtures) says how each was written.
+encoding. [Appendix B](#the-fixtures) says how pyarrow wrote each.
 
-```lab
-experiment: encodings
-fixture: encodings.parquet
-fixtures: encodings.parquet, dictionary.parquet
+Each step below is a few lines of code. In Python, run them in the page, change them with
+**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
+`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+[ch02](#anatomy-of-a-parquet-file) did, and the reader's `walk_pages` finds a column chunk's
+pages as it did in [ch04](#nested-data). Every column in both files is required, so a data page's
+body holds values and no levels.
+
+**A run of deltas.** `ordered_at` is a plain `INT64` with no logical type: a count of seconds
+since 1970, with rows about a minute apart. pyarrow wrote it as `DELTA_BINARY_PACKED`. Read the
+start of its page by hand, with two small helpers for the varints: ULEB128, as in the run headers
+of [ch04](#nested-data), and zigzag, as in the footer's Thrift fields in [ch03](#the-type-system):
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/delta_header.py
+:language: python
 ```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/delta_header.rs
+:language: rust
+```
+:::
+::::
 
-The panel shows, for one column, what the encoding saved against PLAIN, and the decoder's own
-record of how it read the values: every step, with the bytes it read. Step through each column:
+The page body is far smaller than the values written PLAIN, at eight bytes each. It opens with a
+header of four varints: how many values a block holds, how many miniblocks a block is split into,
+how many values the page holds, and the first value. No other value is stored whole: the rest of
+the page is differences.
 
-1. **`order_id`** goes up by one each row. Step through it: a header, one block, and miniblocks
-   with a bit width of zero. The values take no bytes at all beyond the header and the block's
-   own header: its smallest delta and one bit-width byte per miniblock.
-2. **`ordered_at`** is a plain `INT64` with no logical type: a count of seconds since 1970, with
-   rows about a minute apart. The deltas vary a little, and a miniblock packs them in two bits each.
-3. **`url`** shares a long prefix with the previous value. Look at the prefix lengths, then the
-   suffixes: most suffixes are a single character.
-4. **`weight_kg`** is a float. Its encoding stores the same number of bytes as PLAIN. Look at the
-   last stream, and at how few different bytes it contains.
-5. **Switch the file to `dictionary.parquet` and pick `country`.** A dictionary page holds each
-   distinct country once, and the data page holds two-bit indices into it.
+Then comes a block. It starts with the smallest difference between neighbouring values, and one
+byte per miniblock giving a bit width. Each delta is stored as its excess over the smallest, in
+that many bits. The first deltas the step unpacked are all close to a minute, so their excess
+over the smallest fits in two bits. The page's deltas all fit in the first miniblock, and the
+others hold none: their width bytes are zero.
+
+Change `column` to 0, which is `order_id`. Its values go up by one, so every delta equals the
+smallest. Look at the bit widths, and at how many bytes the page body takes.
+
+**A dictionary.** `country` in `dictionary.parquet` repeats a handful of strings. Its column
+chunk holds two pages. Read both:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/dictionary_by_hand.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/dictionary_by_hand.rs
+:language: rust
+```
+:::
+::::
+
+The first page is a *dictionary page*: each distinct country once, written PLAIN, in the order
+the writer first met it. The data page after it holds no strings at all. It holds one byte giving
+a bit width, then a run of the RLE / bit-packing hybrid from [ch04](#nested-data), with the
+position of each row's country in the dictionary. Four entries need two bits each, so the whole
+column's values fit in the few bytes the step printed.
+
+Change `slots` to `8 * (header >> 1)`, the number of slots the run's groups hold, and look at the
+indices after the page's own.
+
+**The reader, step by step.** The book's reader decodes every encoding the steps met, and a few
+more. For each page it keeps a record of every step: a label, the bytes it read, and what it read
+from them. Ask it for `url`, which pyarrow wrote as `DELTA_BYTE_ARRAY`:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/decode_a_column.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/decode_a_column.rs
+:language: rust
+```
+:::
+::::
+
+The page holds two runs of `DELTA_BINARY_PACKED` integers and then some bytes. The first run is
+the *prefix lengths*: how many leading bytes each URL shares with the URL before it. The first
+URL shares none, and the deltas after it say that most of the others share all but their last
+character. The second run is the lengths of what is left of each URL, and the bytes are those
+suffixes, back to back. Only the first URL is stored in full.
+
+Change `name` to `"order_id"`, `"sku"` or `"weight_kg"` and run the step again. `order_id` is the
+first step's other column, read by the reader. `sku`'s strings are all the same length, and its
+lengths take no bytes beyond their header and block. `weight_kg` is a float, split into four
+streams; look at how few different bytes the last stream holds. Then open `dictionary.parquet`
+and ask for `"country"`: the reader finds the same dictionary and indices as the second step.
 
 ### What each encoding saved
 
@@ -68,18 +146,16 @@ them to fill the cap. Some other writers also drop a dictionary that saves nothi
 ### Dictionary encoding
 
 Dictionary encoding replaces each value with a small integer: its position in a list of the
-column chunk's distinct values. The list is written once, as PLAIN, in a **dictionary page** at
-the start of the column chunk. The data page then holds the indices, packed with the RLE /
-bit-packing hybrid from [ch04](#nested-data), after one byte giving their bit width:
+column chunk's distinct values. The list is written once, as PLAIN, in a dictionary page at the
+start of the column chunk. The data page then holds the indices, packed with the RLE /
+bit-packing hybrid, after one byte giving their bit width. That is the layout the second step
+read.
 
-```{include} _generated/dictionary-country.md
-```
-
-Four distinct countries need two bits each. The header `05` is binary `101`: a bit-packed run of
-two groups of eight, so the twelve indices are packed with four slots of padding after them.
-Dictionary encoding also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in
-the dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip
-the whole column chunk. Some readers do both. The reader in this book does neither, as
+The run header `05` that the step printed is binary `101`: a bit-packed run of two groups of
+eight. The page has twelve rows, so the run ends with four slots of padding. Dictionary encoding
+also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in the
+dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip the
+whole column chunk. Some readers do both. The reader in this book does neither, as
 [ch09](#skipping-data) notes.
 
 The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 name it
@@ -91,7 +167,8 @@ For integers that are sorted or change slowly, storing the differences between v
 cheaper than storing the values. `DELTA_BINARY_PACKED` writes a header, then blocks. Each block
 subtracts its smallest delta from all of its deltas, so every adjusted delta is zero or more, and
 splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs. The
-block starts with its smallest delta and one byte per miniblock giving that miniblock's width:
+block starts with its smallest delta and one byte per miniblock giving that miniblock's width.
+This is `ordered_at`'s page, as the reader decodes it:
 
 ```{include} _generated/delta-ordered-at.md
 ```
@@ -110,10 +187,14 @@ lengths cost almost nothing, and the bytes are stored without a length in front 
 
 **`DELTA_BYTE_ARRAY`** writes, for each value, how many leading bytes it shares with the value
 before it, then only the rest. Sorted strings with common prefixes, such as URLs, paths and
-hierarchical keys, shrink the most:
+hierarchical keys, shrink the most. These are the first of `url`'s prefix lengths and suffixes,
+added up from the deltas the third step printed:
 
 ```{include} _generated/delta-urls.md
 ```
+
+A URL that carries into a new digit, such as the step from `109` to `110`, shares one byte fewer
+and stores two.
 
 ### BYTE_STREAM_SPLIT
 
@@ -142,6 +223,11 @@ guess.
 
 ## Building it
 
+The steps read a delta header and a dictionary by hand, then asked the reader to decode a column.
+This section builds the reader's parts they used: the dictionary page and its indices, the delta
+decoder, and the loop that rebuilds strings from shared prefixes. The tabs switch every excerpt
+on the page between the two languages.
+
 ### A dictionary page, then indices
 
 The column reader decodes a dictionary page, when the column chunk has one, before any data page,
@@ -168,31 +254,32 @@ and keeps its entries with the bytes each came from:
 
 A data page's indices are the hybrid from [ch04](#nested-data), with the bit width in the byte
 before them. Each decoded value keeps two spans: its dictionary entry, and the run that held its
-index:
+index. The bit width and each run become a step, which the third step prints for `country`:
 
 ::::{tab-set}
 :::{tab-item} Python
 :sync: python
 ```{literalinclude} ../python/parquet_lab/decode.py
 :language: python
-:start-at: if encoding in ("RLE_DICTIONARY", "PLAIN_DICTIONARY"):
-:end-before: if encoding == "DELTA_BINARY_PACKED":
+:start-at: # One byte of bit width, then the indices
+:end-before: end = runs[-1].body.end if runs else base + 1
 ```
 :::
 :::{tab-item} Rust
 :sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/decode.rs
 :language: rust
-:start-at: "RLE_DICTIONARY" | "PLAIN_DICTIONARY" => {
-:end-before: "DELTA_BINARY_PACKED" => {
+:start-at: // One byte of bit width, then the indices
+:end-before: let end = runs.last().map(|r| r.body.end)
 ```
 :::
 ::::
 
 ### Deltas
 
-The delta decoder reads the header, then block after block until it has the value count. It
-records a step for the header, each block, and each miniblock it reads:
+The delta decoder reads the header's four varints, as the first step did, then block after block
+until it has the value count. Each block opens with its smallest delta and the miniblocks' bit
+widths:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -200,7 +287,7 @@ records a step for the header, each block, and each miniblock it reads:
 ```{literalinclude} ../python/parquet_lab/delta.py
 :language: python
 :start-at: def binary_packed(data: bytes, base: int)
-:end-before: def length_byte_array(
+:end-before: for m, w in enumerate(widths):
 ```
 :::
 :::{tab-item} Rust
@@ -208,21 +295,44 @@ records a step for the header, each block, and each miniblock it reads:
 ```{literalinclude} ../crates/parquet-lab/src/delta.rs
 :language: rust
 :start-at: pub fn binary_packed(
-:end-before: /// DELTA_LENGTH_BYTE_ARRAY:
+:end-before: for (m, &w) in widths.iter().enumerate() {
 ```
 :::
 ::::
 
-`DELTA_BYTE_ARRAY` is two decoders and one loop: the prefix lengths are `DELTA_BINARY_PACKED`,
-the suffixes are `DELTA_LENGTH_BYTE_ARRAY`, and each value is the previous value's prefix
-followed by its suffix:
+Each miniblock holds a fixed number of deltas at its own width. The decoder unpacks each one's
+bits, lowest first, adds the smallest delta back, and adds the result to the previous value. A
+miniblock past the value count has a width byte and no body:
 
 ::::{tab-set}
 :::{tab-item} Python
 :sync: python
 ```{literalinclude} ../python/parquet_lab/delta.py
 :language: python
-:start-at: def byte_array(data: bytes, base: int)
+:start-at: for m, w in enumerate(widths):
+:end-before: block += 1
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../crates/parquet-lab/src/delta.rs
+:language: rust
+:start-at: for (m, &w) in widths.iter().enumerate() {
+:end-before: block += 1;
+```
+:::
+::::
+
+`DELTA_BYTE_ARRAY` is two decoders and one loop. The prefix lengths are read with
+`binary_packed`, the suffixes with the decoder for `DELTA_LENGTH_BYTE_ARRAY`, and each value is
+the previous value's prefix followed by its suffix:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../python/parquet_lab/delta.py
+:language: python
+:start-at: prev = b""
 :end-before: def byte_stream_split(
 ```
 :::
@@ -230,7 +340,7 @@ followed by its suffix:
 :sync: rust
 ```{literalinclude} ../crates/parquet-lab/src/delta.rs
 :language: rust
-:start-at: pub fn byte_array(
+:start-at: let mut prev: Vec<u8> = Vec::new();
 :end-before: /// One BYTE_STREAM_SPLIT value
 ```
 :::
@@ -255,6 +365,42 @@ cargo test -p parquet-lab --test fixtures records_rebuilt
 ```
 :::
 ::::
+
+### Ask a library
+
+A library decodes every encoding for you, and records in the metadata which ones each column
+chunk used. pyarrow can also keep a dictionary-encoded column as a dictionary when it reads it.
+The `parquet` crate reads a column chunk page by page, and says each page's type and encoding:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/encodings_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/encodings_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+Both list each column chunk's encodings from its metadata. `RLE` appears beside the encoding of the
+values because a data page's header names an encoding for its levels, and pyarrow records it even
+for a required column that stores none. pyarrow's `read_dictionary` hands back an Arrow
+`DictionaryArray`, whose dictionary and indices are the ones the second step read by hand. The
+crate's metadata gives the offset of the dictionary page, and its page reader returns that page
+first, then the data page with its count of values.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the other
+steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encodings_with_a_library
+```
 
 ## What this cannot tell you
 
@@ -289,6 +435,9 @@ only data page version 2 uses; [ch06](#pages) returns to that.
   values together for a compressor.
 - **Every encoding is recorded in the metadata.** A reader decodes what the file says, never what
   it guesses.
+- **A library decodes every encoding for you.** pyarrow and the `parquet` crate list each column
+  chunk's encodings, and pyarrow can hand a dictionary-encoded column back as its dictionary and
+  indices.
 :::
 
 ## Problems

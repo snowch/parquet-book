@@ -157,14 +157,14 @@ check(JSON.stringify(pyLabels) === JSON.stringify(labels) &&
   await pyAnatomy.getAttribute("data-footer-length") === String(expected.trailer.footer_length) &&
   await pyAnatomy.locator(".hex .b.unfetched").count() === dim,
   "on the Python engine, the byte map shows the same regions, footer length and unfetched bytes");
-await page.goto(base + "encodings.html");
+await page.goto(base + "pages.html");
 await page.waitForFunction(() => {
-  const el = document.querySelector('.lab[data-experiment="encodings"]');
+  const el = document.querySelector('.lab[data-experiment="pages"]');
   return el?.dataset.engine === "python" && el.dataset.ready === "true";
 }, null, { timeout: 180000 });
 check(true, "the engine choice holds on another page");
-await page.locator('.lab[data-experiment="encodings"] .engine-bar button[data-engine="rust"]').click();
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]').dataset.engine === "rust");
+await page.locator('.lab[data-experiment="pages"] .engine-bar button[data-engine="rust"]').click();
+await page.waitForFunction(() => document.querySelector('.lab[data-experiment="pages"]').dataset.engine === "rust");
 // ch01 is an introduction, with code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
@@ -226,26 +226,22 @@ if (shots) {
     `ch04's tags[] levels are read in the page: ${rows.length} triples and ${nativeLevels.records.length} records, as the reader reads them`);
 }
 
-// ch05: encodings. The decoded values and the stepper are the reader's.
-await page.goto(base + "encodings.html");
-const encLab = page.locator('.lab[data-experiment="encodings"]');
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]')?.dataset.state === "ok");
-const nativeEnc = native(["encodings", "fixtures/encodings.parquet", "0"]);
-check(await encLab.getAttribute("data-values") === JSON.stringify(nativeEnc.values.map((v) => v.value)),
-  `order_id decodes to the reader's ${nativeEnc.values.length} values`);
-await encLab.locator('button[data-step="1"]').click();
-await encLab.locator('button[data-step="1"]').click();
-const step1 = nativeEnc.pages[0].steps[1].span;
-const litStep = await encLab.locator(".hex .b.hl").evaluateAll((els) => els.map((e) => Number(e.dataset.o)));
-check(litStep[0] === step1[0] && litStep.length === step1[1] - step1[0], `the second step highlights its bytes [${step1[0]}, ${step1[1]})`);
-await encLab.locator(".lab-head select").selectOption("dictionary.parquet");
-await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encodings"]').dataset.encoding === "RLE_DICTIONARY");
-await encLab.locator('button[data-column="1"]').click();
-const nativeDict = native(["encodings", "fixtures/dictionary.parquet", "1"]);
-await page.waitForFunction((v) => document.querySelector('.lab[data-experiment="encodings"]').dataset.values === v,
-  JSON.stringify(nativeDict.values.map((v) => v.value)));
-check(true, "dictionary.parquet's country decodes through its dictionary to the reader's values");
-if (shots) await encLab.screenshot({ path: path.join(shots, "encodings-lab.png") });
+// ch05: url's DELTA_BYTE_ARRAY page, decoded by the book's Python reader in the page. Every step
+// it prints, and the values, are the native reader's.
+{
+  await page.goto(base + "encodings.html");
+  check(await page.locator(".lab").count() === 0, "ch05 has no panels: its steps print the decoding");
+  const nativeUrl = native(["encodings", "fixtures/encodings.parquet", "3"]);
+  const step = page.locator('figure.walkthrough[data-file$="decode_a_column.py"]');
+  await step.locator(".run-button:not(.edit-button)").click();
+  await step.locator(".run-output").filter({ hasText: "values:" }).waitFor({ timeout: 300000 });
+  const out = await step.locator(".run-output").innerText();
+  const steps = nativeUrl.pages.flatMap((p) => p.steps);
+  const lines = out.split("\n").map((l) => l.trim());
+  check(steps.every((s) => lines.some((l) => l.startsWith(`${s.label}:`)) && lines.includes(s.detail)) &&
+    nativeUrl.values.slice(0, 4).every((v) => out.includes(JSON.stringify(v.value))),
+    `ch05's url column is decoded in the page: ${steps.length} steps and its values, as the reader decodes them`);
+}
 
 // ch06: pages. The page list, and a checksum failing after damage, are the reader's.
 await page.goto(base + "pages.html");

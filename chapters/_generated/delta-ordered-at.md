@@ -4,7 +4,7 @@
 |---|---|---|
 | header | `80 02 04 28 b0 86 c7 95 0d` | blocks of 256 values in 4 miniblocks; 40 values; the first is 1767432600 |
 | block 0 | `74 02 00 00 00` | smallest delta 58; bit widths [2, 0, 0, 0] |
-| block 0, miniblock 0 | `cf f3 3c cf f3 3c cf f3 3c 0f 00 00 … (16 bytes)` | 2 bits per delta; deltas [61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58, 61, 61, 58] |
+| block 0, miniblock 0 | `cf f3 3c cf f3 3c cf f3 3c 0f 00 00 … (16 bytes)` | 2 bits per delta; deltas [61, 61, 58, 61, 61, 58, 61, 61, … 39 in all] |
 
 The first values: 1767432600, 1767432661, 1767432722, 1767432780, 1767432841, …
 

@@ -151,20 +151,13 @@
   .table-grid .p-files { border-right: 0; }
 }
 
-/* Column pickers (ch05, ch06), and the notes under a panel. */
+/* Column pickers (ch06), and the notes under a panel. */
 .column-picker button { margin: 0 .3rem .3rem 0; }
 .column-picker button[aria-pressed="true"] { border-color: var(--accent); background: var(--wash); }
 .column-picker small { color: var(--faint); }
 .lab .note { color: var(--faint); font-size: 12.5px; margin: .4rem 0; }
 
-/* Ch05: encodings. */
-.enc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-            grid-template-areas: "summary steps" "dict steps" "values values"; border-bottom: 1px solid var(--edge); }
-.enc-grid .p-summary { grid-area: summary; border-right: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.enc-grid .p-dict { grid-area: dict; border-right: 1px solid var(--edge); }
-.enc-grid .p-steps-enc { grid-area: steps; }
-.p-values { border-bottom: 1px solid var(--edge); }
-.enc-grid .p-values { grid-area: values; border-top: 1px solid var(--edge); }
+/* A stepper through a list of steps (ch07), a list of values (ch08) and bars (ch09). */
 .stepper { display: flex; gap: .4rem; align-items: center; margin-bottom: .4rem; }
 .stepper .where { color: var(--faint); font-size: 12.5px; }
 .enc-steps { margin: 0; padding-left: 1.4rem; font-size: 12.5px; max-height: 18rem; overflow: auto; }
@@ -172,7 +165,6 @@
 .enc-steps li.current { background: var(--wash); border-radius: 4px; }
 .enc-steps .detail { color: var(--muted); overflow-wrap: anywhere; }
 .value-list { display: flex; flex-wrap: wrap; gap: .25rem .4rem; margin: 0; padding: 0; list-style: none; }
-.enc-grid button.span { font: 12px var(--mono); padding: 0 .3rem; background: var(--code); border-color: var(--edge); }
 .bars { font-size: 12.5px; }
 .bar-row { display: grid; grid-template-columns: 5.5rem 1fr 6rem; gap: .5rem; align-items: center; margin: .25rem 0; }
 .bar-row .bar { background: var(--panel); border: 1px solid var(--edge); height: .8rem; border-radius: 2px; }

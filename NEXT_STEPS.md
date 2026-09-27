@@ -37,7 +37,8 @@ The working list. PLAN.md §2 has the phases; this is the order to do them in.
 - Reader: dictionary pages and RLE_DICTIONARY indices, DELTA_BINARY_PACKED, DELTA_LENGTH_BYTE_ARRAY,
   DELTA_BYTE_ARRAY and BYTE_STREAM_SPLIT (`delta.rs`), behind one dispatcher that records every
   decode step with its bytes (`decode.rs`).
-- Fixtures: `dictionary.parquet`, `encodings.parquet`. Experiment: the encodings stepper.
+- Fixtures: `dictionary.parquet`, `encodings.parquet`. Experiment: the encodings stepper, since
+  replaced by code (below).
 - Problems 5.1 to 5.3 with tests; 5.4 about the reader's own columns.
 
 ## Done: ch06, pages
@@ -233,6 +234,14 @@ reader's triples and rebuilt records. `levels_with_a_library` shows pyarrow's of
 beside the crate's levels. The panel is gone from every layer; `report::levels` stays for `pqlab
 levels` and the figures.
 
+## Done: ch05 in code
+
+ch05 opens on three steps instead of its encodings panel: `delta_header` reads `ordered_at`'s
+delta header and first block by hand, `dictionary_by_hand` reads `country`'s dictionary page and
+indices, and `decode_a_column` prints the reader's decode steps for `url`. `encodings_with_a_library`
+asks pyarrow and the crate for each chunk's encodings and the dictionary. The panel is gone from
+every layer; `report::encodings` stays for `pqlab encodings` and the figures.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,
@@ -244,8 +253,8 @@ In order, each a walkthrough by hand at the start of the experiment and an "Ask 
 at the end of *Building it*, both in both languages, tested against the manifest; labs kept only
 where a picture beats printed output, and trimmed or cut elsewhere:
 
-1. ch05 to ch07: a PLAIN page, a dictionary page, a compressed page by hand; column chunk
-   `encodings`, `compression` and sizes from both libraries.
+1. ch06 and ch07: a page header and a compressed page by hand; column chunk `compression` and
+   sizes from both libraries.
 2. ch08 to ch10: statistics by hand; `row_group(i).column(j).statistics`, and a filtered
    `pq.read_table` compared with the reader's plan.
 3. ch11 to ch14: the writer settings in `pq.write_table`, a query in DuckDB or DataFusion only if
