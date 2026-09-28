@@ -4,7 +4,7 @@ sys.path.insert(0, "python")  # the book's reader, from the repository's python/
 from parquet_lab import engine
 
 data = open("fixtures/writing-baseline.parquet", "rb").read()
-# Try AND status = 'refunded' after the condition, avg(amount_cents), or LIMIT 3.
+# Try SELECT count(*) FROM orders, or any other query in the chapter's table.
 sql = """SELECT country, count(*) FROM orders WHERE order_id < 300
          GROUP BY country ORDER BY country"""
 answer = engine.run(data, sql)

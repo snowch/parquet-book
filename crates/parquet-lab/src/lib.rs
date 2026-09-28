@@ -27,7 +27,7 @@
 //! | [`reader`] | opening a file in an object store | ch02, ch10 |
 //! | [`prune`] | conditions judged against metadata: what a reader may skip | ch09 |
 //! | [`scan`] | a query's requests: phases, merged ranges, connections | ch10 |
-//! | [`engine`] | SQL over the reader: scan, filter, aggregate, sort, limit | ch12 |
+//! | [`engine`] | SQL over the reader: scan, filter, aggregate, sort, limit | ch12, ch14, ch15 |
 //! | [`table`] | a table of many files: listing, partitions, a log | ch14 |
 //! | [`changes`] | a changing table: lookups, delete files, compaction | ch15 |
 //! | [`report`] | what the reader did, as JSON for the browser and the book | all |

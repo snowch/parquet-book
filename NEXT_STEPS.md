@@ -177,7 +177,7 @@ step opens a Codespace.
 The book's readers are data engineers, and code is their interface, so the method is now: read
 the structure by hand, build it into the reader, then ask a library (PLAN.md, section 1).
 
-- ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): no *Building it*, no coding problems,
+- ch01 explains and builds nothing (`tools/outline.EXPLAINERS`): no *Building it*, no coding problems,
   two questions to reason about. It opens on a measurement: two columns read from a CSV file a
   row at a time, and from the Parquet file of the same table with pyarrow and the `parquet` crate,
   each through a file that counts the bytes read (`fixtures/formats/`, pyarrow's defaults). The
@@ -304,6 +304,19 @@ with `read_column` and counts countries, and `run_a_query`, which runs the same 
 `engine.run` and prints each stage. In `query_with_a_library`, pyarrow's dataset keeps the same row
 groups and groups with `count_all`; the crate keeps them with a predicate and counts its rows. The
 engine panel is gone; `pqlab query` stays for the Run buttons.
+
+## Done: ch12 explains what a query engine does
+
+ch12 is now *What a query engine does* (`what_a_query_engine_does`), and, like ch01, explains and
+builds nothing: `tools/outline.INTRODUCTIONS` became `EXPLAINERS`, and its test checks that an
+explainer quotes no reader code in either language and says what a good answer to each problem
+contains. The chapter divides the work between file and engine, recaps what ch08 to ch10 let a
+scan skip, keeps `run_a_query` and `query_with_a_library`, and tours projection, filters,
+answers from the footer, grouping, sorting with a limit, joins, wide tables and small files. Two
+figures replace the answers table: `engine-costs` (what the engine's scan read for nine queries)
+and `engine-join` (three build sides' key ranges pushed into a sorted and a shuffled probe side).
+`a_query_by_hand`, the engine's quoted code and problems 12.1 and 12.2 are gone; its four
+problems are questions. The engine stays in the reader for ch14, ch15, the figures and the tests.
 
 ## Done: ch13 in code
 

@@ -27,8 +27,8 @@ DOCS = [
     ROOT / n for n in ("README.md", "CLAUDE.md", "PLAN.md", "AUTHORING_GUIDE.md", "STYLE.md", "NEXT_STEPS.md")
 ]
 WRITTEN = [c for c in CHAPTERS if UNWRITTEN not in (ROOT / c.path).read_text()]
-#: Written chapters that build a piece of the reader; the others are introductions.
-BUILDING = [c for c in WRITTEN if not c.introduction]
+#: Written chapters that build a piece of the reader; the others explain and build nothing.
+BUILDING = [c for c in WRITTEN if not c.explainer]
 #: Chapters the Python reader covers: their problems exist in Python as well as Rust.
 PORTED = [c for c in BUILDING if (ROOT / "exercises" / "python" / f"{c.slug}.py").exists()]
 
@@ -140,19 +140,22 @@ def test_every_mounted_experiment_has_a_module():
         assert re.search(rf"\b{e}: mount", js), f"web/lab/lab.js does not mount {e}"
 
 
-@pytest.mark.parametrize("chapter", [c for c in WRITTEN if c.introduction], ids=lambda c: c.slug)
-def test_an_introductions_problems_are_questions(chapter):
-    """An introduction builds nothing, so its problems are for reasoning, with no stubs to fill."""
+@pytest.mark.parametrize("chapter", [c for c in WRITTEN if c.explainer], ids=lambda c: c.slug)
+def test_an_explainers_problems_are_questions(chapter):
+    """A chapter that explains and builds nothing has problems for reasoning, with no stubs to
+    fill, and quotes none of the reader's code: its code is the walkthrough steps it runs."""
     for path in (
         ROOT / "exercises" / "src" / f"{chapter.slug}.rs",
         ROOT / "exercises" / "python" / f"{chapter.slug}.py",
     ):
-        assert not path.exists(), f"{path.relative_to(ROOT)}: an introduction has no coding problems"
+        assert not path.exists(), f"{path.relative_to(ROOT)}: an explainer has no coding problems"
     text = (ROOT / chapter.path).read_text()
     section = text.split("\n## Problems\n", 1)[1].split("\n## Where to go next\n", 1)[0]
     assert "```problems" not in section and not [b for lang, b in fences(section) if lang == "bash"]
-    assert "A good answer" in section, "say what a good answer contains"
-    assert "{literalinclude} ../crates/parquet-lab/" not in text, "an introduction quotes no reader code"
+    problems = re.split(r"^\*\*\d+\.\d+ ", section, flags=re.M)[1:]
+    assert problems and all("A good answer" in p for p in problems), "say what a good answer contains"
+    for reader in ("../crates/parquet-lab/", "../python/parquet_lab/"):
+        assert "{literalinclude} " + reader not in text, "an explainer quotes no reader code"
 
 
 @pytest.mark.parametrize("chapter", BUILDING, ids=lambda c: c.slug)

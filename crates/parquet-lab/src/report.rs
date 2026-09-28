@@ -2206,7 +2206,8 @@ pub fn scan(
     ])
 }
 
-/// Ch12's experiment: `sql` answered from `file`, with every stage of the pipeline.
+/// `sql` answered from `file` by the engine, with every stage of the pipeline: `pqlab query`, run
+/// by ch14's Run buttons and ch12's problems.
 pub fn query(file: &[u8], sql: &str) -> Json {
     let a = match crate::engine::run(file, sql) {
         Ok(a) => a,

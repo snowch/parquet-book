@@ -8,11 +8,12 @@ Project instructions for anyone, human or AI, working on this book. They are bin
 in which the reader builds a working Parquet reader while reading. Code is the interface. Each
 chapter asks a question, reads the answer out of a real Parquet file by hand, builds that into
 the reader, and then asks a library (pyarrow, the `parquet` crate) the same question. Labs draw
-pictures only where a picture beats printed output. ch01 is the one introduction, and builds
-nothing. The reader exists twice, in Python and in Rust, held to identical answers by tests; the
-page shows both and runs both: the Python reader under Pyodide in the walkthrough steps, the Run
-buttons and the problems workbench, and the Rust reader through WebAssembly behind the panels,
-which are pictures and nothing else.
+pictures only where a picture beats printed output. Two chapters explain and build nothing
+(`tools/outline.EXPLAINERS`): ch01, why columns at all, and ch12, what a query engine does with a
+file and what each kind of query costs. The reader exists twice, in Python and in Rust, held to
+identical answers by tests; the page shows both and runs both: the Python reader under Pyodide in
+the walkthrough steps, the Run buttons and the problems workbench, and the Rust reader through
+WebAssembly behind the panels, which are pictures and nothing else.
 
 Read **PLAN.md** for the argument and the settled decisions, **AUTHORING_GUIDE.md** before
 writing or editing a page, and **STYLE.md** while editing. **NEXT_STEPS.md** is the working list.
@@ -218,9 +219,10 @@ markdown ending with its conditions line, run `make figures`, and `{include}` th
 
 British English, direct, active voice, short sentences, the reader as *you*. No em dashes. No
 "In this chapter". No *simply*, *just*, *obviously*, *basically*: `tests/test_book.py` enforces
-the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE` (an introduction,
-`INTRODUCTIONS`, has six: no *Building it*). STYLE.md is the
-checklist; run both of its passes over a page before finishing it.
+the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE` (a chapter that
+explains and builds nothing, in `EXPLAINERS`, has six: no *Building it*, no reader code quoted,
+and problems that are questions without tests). STYLE.md is the checklist; run both of its passes
+over a page before finishing it.
 
 Product and implementation names are allowed where the book describes a specific implementation's
 behaviour (pyarrow wrote the fixtures; a reader's prefetch default). They are never used as

@@ -54,7 +54,7 @@ project:
     - file: parts/writing_and_querying.md
       children:
         - file: chapters/writing_parquet_well.md
-        - file: chapters/a_tiny_query_engine.md
+        - file: chapters/what_a_query_engine_does.md
     - file: parts/beyond_one_file.md
       children:
         - file: chapters/modular_encryption.md

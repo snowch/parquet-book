@@ -365,5 +365,5 @@ cargo test -p exercises --test writing_parquet_well -- --ignored
   documents every setting used here.
 - The format's [configuration notes](https://parquet.apache.org/docs/file-format/configurations/)
   discuss row group and page sizes.
-- [ch12](#a-tiny-query-engine) builds a query engine on the reader, so that questions can be
-  asked in SQL rather than one condition at a time.
+- [ch12](#what-a-query-engine-does) asks what a query engine does with a file like these, and
+  what each kind of query costs against one.

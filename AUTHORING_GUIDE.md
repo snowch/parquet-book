@@ -46,10 +46,12 @@ Writing the prose first produces a chapter that explains what you meant to build
 `tools/outline.CHAPTER_SHAPE`, and not negotiable; `tests/test_book.py` fails a chapter that adds or
 loses one. A section the chapter needs and the shape lacks is a `###` inside one of them.
 
-An introduction (`tools/outline.INTRODUCTIONS`, ch01 alone) drops *Building it*: it comes before
-there is a file to open, quotes no reader code, and its problems are questions with no tests,
-each saying what a good answer contains. Keep it light. Do not add an introduction to dodge
-building something.
+A chapter that explains and builds nothing (`tools/outline.EXPLAINERS`: ch01 and ch12) drops
+*Building it*. ch01 comes before there is a file to open; ch12 describes what a query engine does
+with a file, and how an engine works inside would take a book of its own. Such a chapter quotes
+no reader code: its code is walkthrough steps, which may call the reader. Its problems are
+questions with no tests, each saying what a good answer contains, and it has no workbench. Keep
+it light. Do not make a chapter an explainer to dodge building something.
 
 **The question** is one question in one sentence, then a paragraph on why the previous chapter
 leaves it open. The outline holds the question; the page expands it.

@@ -948,7 +948,7 @@ def _grouped(t: pa.Table, key: str, aggs: list, names: list[str]) -> dict:
     return _rows(g, out_cols, [key] + names)
 
 
-#: Queries for ch12's engine, each answered here by pyarrow's own compute functions. The engine
+#: Queries for the reader's engine, each answered here by pyarrow's own compute functions. The engine
 #: runs the SQL; the test compares its answer with pyarrow's. (file, SQL, how pyarrow answers.)
 QUERIES = [
     (

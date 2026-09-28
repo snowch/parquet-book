@@ -357,7 +357,8 @@ cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin levels_with
 
 **How several columns become one record.** The reader rebuilds each column's view of a record on
 its own. A query engine that wants whole records runs the same splitting over several columns at
-once, in step. [ch12](#a-tiny-query-engine) does that for the columns a query needs.
+once, in step. [ch12](#what-a-query-engine-does) describes what an engine does with the columns
+a query needs.
 
 **How pages divide a record.** Each fixture column is one page. When a column spans pages, a
 record can begin in one and continue in the next under data page version 1. A version-2 data page always

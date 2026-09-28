@@ -1,7 +1,11 @@
-//! A tiny query engine: SQL answered from Parquet bytes (ch12).
+//! A small query engine: SQL answered from Parquet bytes.
 //!
 //! Every earlier chapter built a piece of a reader. This module puts them under a query language,
-//! small enough to read in full:
+//! small enough to read in full. The book does not teach its inside, which is a subject of its
+//! own. ch12 runs it to show what a query engine does with a file (its `run_a_query` step, and
+//! the figures of what each kind of query made the scan read); ch14 runs it over a table's
+//! files ([`run_sources`]), and its Run buttons call it through `pqlab query`; ch15 reads delete
+//! files with it. The language:
 //!
 //! ```text
 //! SELECT *  |  item, item, ...          item: column, count(*), count(c), sum(c), min(c),

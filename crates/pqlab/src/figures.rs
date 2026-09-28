@@ -143,8 +143,12 @@ const FIGURES: &[Figure] = &[
         render: writing_lookups,
     },
     Figure {
-        file: "engine-answers.md",
-        render: engine_answers,
+        file: "engine-costs.md",
+        render: engine_costs,
+    },
+    Figure {
+        file: "engine-join.md",
+        render: engine_join,
     },
     Figure {
         file: "encryption-plaintext-footer.md",
@@ -1972,52 +1976,118 @@ fn writing_lookups(root: &Path) -> Result<String, String> {
     ))
 }
 
-fn engine_answers(root: &Path) -> Result<String, String> {
-    let text = std::fs::read_to_string(root.join("fixtures/queries.json"))
-        .map_err(|e| format!("cannot read queries.json: {e}"))?;
-    let queries = Json::parse(&text).map_err(|e| e.to_string())?;
+/// ch12: what the engine's scan read for each kind of query, on one file. The queries are the
+/// chapter's tour, in its order: projection, filters, answers from the footer, grouping, and
+/// sorting with a limit. "Values decoded" is the rows the scan decoded times the columns it read,
+/// so `count(*)`, which reads no column, decodes none.
+fn engine_costs(root: &Path) -> Result<String, String> {
+    let name = "writing-baseline.parquet";
+    let bytes = fixture(root, name)?;
+    let md = open_bytes(&bytes)?;
+    let queries = [
+        "SELECT * FROM orders",
+        "SELECT country, amount_cents FROM orders",
+        "SELECT * FROM orders WHERE order_id < 300",
+        "SELECT * FROM orders WHERE status = 'refunded'",
+        "SELECT count(*) FROM orders",
+        "SELECT min(order_id), max(order_id) FROM orders",
+        "SELECT country, count(*) FROM orders GROUP BY country",
+        "SELECT order_id, amount_cents FROM orders ORDER BY amount_cents DESC LIMIT 5",
+        "SELECT order_id, amount_cents FROM orders ORDER BY order_id LIMIT 5",
+    ];
     let mut rows = vec![
-        "| Query | File | Rows | Row groups read |".to_string(),
+        "| Query | Bytes read | Row groups skipped | Values decoded |".to_string(),
+        "|---|--:|--:|--:|".to_string(),
+    ];
+    for sql in queries {
+        let a = parquet_lab::engine::run(&bytes, sql)?;
+        let scan = a.stages.first().ok_or("no scan stage")?;
+        let values = scan.rows_out * scan.columns.len();
+        rows.push(format!(
+            "| `{}` | {} | {} of {} | {} |",
+            cell(sql),
+            thousands(a.bytes_read),
+            a.row_groups - a.row_groups_read,
+            a.row_groups,
+            thousands(values as u64),
+        ));
+    }
+    let columns = md
+        .schema
+        .iter()
+        .filter(|e| e.num_children.is_none())
+        .count();
+    Ok(format!(
+        "{}\n\n*Each query run by the book's engine on `fixtures/{name}` ({} bytes: {} rows of {} \
+         columns in {} row groups, sorted by `order_id`). Bytes read are the column chunks the \
+         scan read, after the footer every query reads first. Values decoded are the rows the \
+         scan decoded times the columns it read.*\n",
+        rows.join("\n"),
+        thousands(bytes.len() as u64),
+        md.num_rows,
+        columns,
+        md.row_groups.len(),
+    ))
+}
+
+/// ch12: a join's build side as a filter on the probe side's scan. The engine has no joins, so
+/// this runs the part that decides the probe side's reads: the build side's smallest and largest
+/// key, found by the engine, become a range condition on the probe side's `order_id`, and the
+/// engine's scan skips the row groups whose statistics rule the range out. The probe side is the
+/// same orders twice: sorted by `order_id`, and shuffled.
+fn engine_join(root: &Path) -> Result<String, String> {
+    let builds = [
+        "table/country=UK/part-1.parquet",
+        "table/country=DE/part-0.parquet",
+        "changes/appends/append-00.parquet",
+    ];
+    let probes = ["writing-baseline.parquet", "writing-shuffled.parquet"];
+    let probe_bytes: Vec<Vec<u8>> = probes
+        .iter()
+        .map(|p| fixture(root, p))
+        .collect::<Result<_, _>>()?;
+    let mut rows = vec![
+        "| Build side | Its keys | Row groups skipped: sorted probe | Shuffled probe |".to_string(),
         "|---|---|--:|--:|".to_string(),
     ];
-    for q in queries.as_array().ok_or("queries.json is not a list")? {
-        let file = q.get("file").and_then(Json::as_str).ok_or("no file")?;
-        if file == "table" {
-            continue; // ch14's queries over the whole table
-        }
-        let sql = q.get("sql").and_then(Json::as_str).ok_or("no sql")?;
-        let bytes = fixture(root, file)?;
-        let a = parquet_lab::engine::run(&bytes, sql)?;
-        let theirs = q
-            .get("rows")
-            .and_then(Json::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let same = a.rows.len() == theirs.len()
-            && a.rows.iter().zip(&theirs).all(|(m, t)| {
-                m.iter()
-                    .zip(t.as_array().cloned().unwrap_or_default())
-                    .all(|(m, t)| match (m.to_json(), &t) {
-                        (Json::Float(x), Json::Float(y)) => (x - y).abs() < 1e-9,
-                        (m, t) => m.to_json() == t.to_json(),
-                    })
-            });
-        if !same {
-            return Err(format!("the engine and pyarrow disagree on {sql}"));
+    for build in builds {
+        let bytes = fixture(root, build)?;
+        let keys = parquet_lab::engine::run(
+            &bytes,
+            "SELECT count(*), min(order_id), max(order_id) FROM build",
+        )?;
+        let row = keys.rows.first().ok_or("no keys")?;
+        let int = |v: &parquet_lab::engine::Value| match v {
+            parquet_lab::engine::Value::Int(i) => Ok(*i),
+            other => Err(format!("{build}: expected an integer, got {other:?}")),
+        };
+        let (n, lo, hi) = (int(&row[0])?, int(&row[1])?, int(&row[2])?);
+        let mut cells = Vec::new();
+        for probe in &probe_bytes {
+            let sql = format!(
+                "SELECT order_id, amount_cents FROM orders \
+                 WHERE order_id >= {lo} AND order_id <= {hi}"
+            );
+            let a = parquet_lab::engine::run(probe, &sql)?;
+            cells.push(format!(
+                "{} of {}",
+                a.row_groups - a.row_groups_read,
+                a.row_groups
+            ));
         }
         rows.push(format!(
-            "| `{}` | `{file}` | {} | {} of {} |",
-            cell(sql),
-            a.rows.len(),
-            a.row_groups_read,
-            a.row_groups,
+            "| `{build}` | {n}, {lo} to {hi} | {} | {} |",
+            cells[0], cells[1]
         ));
     }
     Ok(format!(
-        "{}\n\n*Every query in `fixtures/queries.json`, answered by the engine from the file's \
-         bytes. Every answer is the one pyarrow computed when the fixtures were written; the \
-         figure fails to build otherwise.*\n",
-        rows.join("\n")
+        "{}\n\n*Each build side's `order_id` range, found by the book's engine, run as a condition \
+         on the probe side's scan: `fixtures/{}` (sorted by `order_id`) and `fixtures/{}` (the \
+         same orders shuffled). The engine has no joins; this is the scan a join's probe side \
+         would run.*\n",
+        rows.join("\n"),
+        probes[0],
+        probes[1],
     ))
 }
 

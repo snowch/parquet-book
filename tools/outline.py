@@ -30,11 +30,12 @@ CHAPTER_SHAPE = (
     "Where to go next",
 )
 
-#: Chapters that build nothing: they set up the question the book answers, before there is a
-#: Parquet file to open. An introduction has every heading but *Building it*, its problems are
-#: questions to reason about rather than tests, and its pictures come from code. The
-#: book's method (by hand, then the reader, then a library) starts with the first real file.
-INTRODUCTIONS = frozenset({"why_parquet_exists"})
+#: Chapters that explain and build nothing. ch01 sets up the question the book answers, before
+#: there is a Parquet file to open; ch12 describes what a query engine does with a file, and
+#: leaves how an engine works inside to other books. Such a chapter has every heading but *Building it*, quotes no
+#: reader code, and its problems are questions to reason about rather than tests. Every other
+#: chapter follows the book's method: by hand, then the reader, then a library.
+EXPLAINERS = frozenset({"why_parquet_exists", "what_a_query_engine_does"})
 
 #: What a page carries until it is written. Everything that reports progress keys off it.
 UNWRITTEN = "[To write"
@@ -60,6 +61,7 @@ class Chapter:
     #: The one question the chapter answers. Its opening paragraph expands it.
     question: str
     #: What the reader has, working, at the end of the chapter: the piece of the reader it adds.
+    #: For an explainer, which adds nothing, what the chapter shows instead.
     builds: str
     #: The experiments (``lab`` blocks) the chapter embeds.
     experiments: tuple[str, ...] = ()
@@ -72,13 +74,14 @@ class Chapter:
         return self.slug.replace("_", "-")
 
     @property
-    def introduction(self) -> bool:
-        return self.slug in INTRODUCTIONS
+    def explainer(self) -> bool:
+        """Whether the chapter explains and builds nothing (``EXPLAINERS``)."""
+        return self.slug in EXPLAINERS
 
     @property
     def shape(self) -> tuple[str, ...]:
-        """The chapter's headings, in order: CHAPTER_SHAPE, less *Building it* for an introduction."""
-        return tuple(h for h in CHAPTER_SHAPE if not (self.introduction and h == "Building it"))
+        """The chapter's headings, in order: CHAPTER_SHAPE, less *Building it* for an explainer."""
+        return tuple(h for h in CHAPTER_SHAPE if not (self.explainer and h == "Building it"))
 
     @property
     def label(self) -> str:
@@ -240,13 +243,19 @@ _CHAPTERS = (
         ),
     ),
     (
-        "a_tiny_query_engine",
-        "A tiny query engine",
+        "what_a_query_engine_does",
+        "What a query engine does",
         "writing_and_querying",
-        "What does it take to answer SQL from Parquet bytes?",
-        "A minimal query engine: scan, filter, project, aggregate and group, each stage saying what it did.",
+        "What does a query engine do with a Parquet file, and what does each kind of query cost?",
+        "The reader's engine run on one file, and what each kind of query makes its scan read.",
         (),
-        ("writing-baseline.parquet", "statistics.parquet"),
+        (
+            "writing-baseline.parquet",
+            "writing-shuffled.parquet",
+            "table/country=UK/part-1.parquet",
+            "table/country=DE/part-0.parquet",
+            "changes/appends/append-00.parquet",
+        ),
     ),
     (
         "modular_encryption",

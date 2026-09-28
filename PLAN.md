@@ -55,7 +55,7 @@ needs it, and each is finished, tested and quoted before the chapters that use i
 | 2 | PLAIN, dictionary, RLE/bit-packing hybrid, delta encodings, BYTE_STREAM_SPLIT; levels | ch04, ch05 | done |
 | 3 | page walking with values, data page v1 and v2, decompression | ch06, ch07 | done; ZSTD and Brotli sizes only |
 | 4 | statistics decoding with sort orders, pruning, page indexes, Bloom filters | ch08, ch09 | done |
-| 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine | ch10, ch11, ch12 | done; caching not modelled |
+| 5 | projection, request coalescing, concurrency, prefetching, caching; a query engine, run but not taught | ch10, ch11, ch12 | done; caching not modelled |
 | 6 | encrypted modules, multi-file datasets, manifests | ch13, ch14 | done; decryption not implemented; one log file, no checkpoints |
 | 7 | snapshots, position delete files, lookups, compaction planning | ch15 | done; position deletes only, one snapshots file |
 
@@ -87,13 +87,15 @@ from an opened footer.
 ch02 is the unit of cost for ch08 to ch12. ch10 is where it becomes the subject.
 
 **The query engine comes last in Part IV** because it is a consumer of everything before it:
-projection, pruning, decoding. **Encryption is late** so its complexity cannot distort the earlier
+projection, pruning, decoding. ch12 describes its role and what each operation costs against
+Parquet, not how to build one. **Encryption is late** so its complexity cannot distort the earlier
 architecture: the reader recognises `PARE` from ch02 and does nothing else with it until ch13.
 
 The chapter progression follows the source tutorial the book was planned from, *The Apache Parquet
 File Format: A Detailed Tutorial*, with one change: that tutorial's hands-on inspection chapter
-(PyArrow, DuckDB and the CLI) is replaced by a query engine, because inspection is what every
-chapter here already does, and a query engine is what shows the pieces working together.
+(PyArrow, DuckDB and the CLI) is replaced by what a query engine does with a file, because
+inspection is what every chapter here already does, and a query engine is what puts the pieces to
+work.
 
 ## 4. Settled decisions
 
@@ -181,10 +183,13 @@ Every chapter has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
 6. **Problems**: stubs with tests, and one problem about the reader's own files.
 7. **Where to go next**: primary sources, and the next chapter.
 
-ch01 is an *introduction* (`tools/outline.INTRODUCTIONS`): it asks why columns at all, before
-there is a Parquet file to open, so it has no *Building it*, and its problems are questions to
-reason about rather than tests. It ends on the same table as a Parquet file pyarrow wrote, and
-hands over to ch02, where the method starts.
+Two chapters explain and build nothing (`tools/outline.EXPLAINERS`), so they have no *Building
+it*, quote no reader code, and set problems that are questions to reason about rather than
+tests. ch01 asks why columns at all, before there is a Parquet file to open. It ends on the same
+table as a Parquet file pyarrow wrote, and hands over to ch02, where the method starts. ch12 asks
+what a query engine does with a Parquet file and what each kind of query costs against one. It
+runs the reader's engine and measures its scan, but does not teach the engine's inside, which
+would take a book of its own.
 
 ch02 and ch15 are the models for the method; ch03 to ch14 predate it and have been revised to it
 (NEXT_STEPS.md).

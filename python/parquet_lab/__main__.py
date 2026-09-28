@@ -85,7 +85,7 @@ def main() -> None:
     scan.add_argument("--gap", type=int)
     scan.add_argument("--chunks", action="store_true", help="read whole column chunks")
     scan.add_argument("--use", default="statistics,bloom,page-index")
-    q = sub.add_parser("query", help="SQL answered by the tiny engine (ch12)")
+    q = sub.add_parser("query", help="SQL answered by the reader's engine (ch12, ch14)")
     q.add_argument("file", type=Path)
     q.add_argument("sql")
     sub.add_parser("encryption", help="what a reader without keys can see (ch13)").add_argument(

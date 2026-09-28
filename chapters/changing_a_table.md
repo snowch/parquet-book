@@ -263,8 +263,8 @@ file still holds are its rows less the rows its delete files name:
 
 ### Reading a delete file
 
-A position delete file is read with the query engine from [ch12](#a-tiny-query-engine), since it
-is a Parquet file like any other:
+A position delete file is read with the reader's query engine
+([ch12](#what-a-query-engine-does)), since it is a Parquet file like any other:
 
 ::::{tab-set}
 :::{tab-item} Python

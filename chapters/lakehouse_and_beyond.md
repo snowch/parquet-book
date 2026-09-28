@@ -219,8 +219,8 @@ Parquet file exactly as the earlier chapters read it.
 
 The steps read the paths and the log by hand, and then asked the reader for a plan. The reader's
 `table` module writes the same reading once: partition values from a path, the files a log adds
-and removes, a rule for each condition, and the engine from [ch12](#a-tiny-query-engine) over the
-files that survive.
+and removes, a rule for each condition, and the reader's query engine, which
+[ch12](#what-a-query-engine-does) ran on one file, over the files that survive.
 
 ### Partition values from a path
 
@@ -325,9 +325,9 @@ rules nothing out.
 
 ### Querying the files together
 
-The query engine from [ch12](#a-tiny-query-engine) reads the files that survive as one table. A
-column named in a partition, rather than in the files' schema, takes its value from the path,
-the same value for every row of the file:
+The reader's query engine, from [ch12](#what-a-query-engine-does), reads the files that survive
+as one table. A column named in a partition, rather than in the files' schema, takes its value
+from the path, the same value for every row of the file:
 
 ::::{tab-set}
 :::{tab-item} Python

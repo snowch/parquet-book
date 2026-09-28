@@ -261,7 +261,9 @@ def page_html(
         h1 = f"<h1>{html.escape(p['title'])}</h1>"
     builds = ""
     if chapter is not None:
-        builds = f'<p class="builds"><strong>What you build:</strong> {html.escape(chapter.builds)}</p>'
+        # A chapter that explains and builds nothing says what it shows instead.
+        what = "What you see" if chapter.explainer else "What you build"
+        builds = f'<p class="builds"><strong>{what}:</strong> {html.escape(chapter.builds)}</p>'
 
     def link(q, cls, word):
         if q is None:

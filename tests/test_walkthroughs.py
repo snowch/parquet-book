@@ -770,10 +770,9 @@ def writing_facts() -> dict:
 
 
 def query_facts() -> dict:
-    """What ch12's steps must print for country, count(*) WHERE order_id < 300: the row groups
-    whose order_id minimum pyarrow's statistics put at or above 300, skipped, and the rows the
-    others hold and pass; the engine's stages, from the same; and the counts, from pyarrow's
-    reading of the file."""
+    """What ch12's steps must print for country, count(*) WHERE order_id < 300: the engine's
+    stages, with the row groups whose order_id minimum pyarrow's statistics put below 300 read and
+    the others skipped, and the counts, from pyarrow's reading of the file."""
     import pyarrow.parquet as pq
 
     path = ROOT / "fixtures" / "writing-baseline.parquet"
@@ -782,19 +781,13 @@ def query_facts() -> dict:
     rows = list(zip(table["order_id"], table["country"], strict=True))
     passing = [country for order_id, country in rows if order_id < limit]
     counts = [f"{c} {passing.count(c)}\n" for c in sorted(set(passing))]
-    by_hand, kept, start, scanned, chunks = [], [], 0, 0, 0
+    kept, scanned, chunks = [], 0, 0
     for g in range(md.num_row_groups):
         group = md.row_group(g)
-        low, n = group.column(0).statistics.min, group.num_rows
-        if low >= limit:
-            by_hand.append(f"row group {g} skipped: min order_id {low}\n")
-        else:
-            held = sum(order_id < limit for order_id, _ in rows[start : start + n])
-            by_hand.append(f"row group {g} read: {n} rows, {held} pass\n")
+        if group.column(0).statistics.min < limit:
             kept.append(g)
-            scanned += n
+            scanned += group.num_rows
             chunks += group.column(0).total_compressed_size + group.column(3).total_compressed_size
-        start += n
     assert kept == [0, 1], "the prose follows two row groups read and two skipped"
     stages = [
         f"Scan: {md.num_rows} rows in, {scanned} out\n",
@@ -805,9 +798,8 @@ def query_facts() -> dict:
         "country count(*)\n",
     ]
     return {
-        ("a_tiny_query_engine", "a_query_by_hand"): by_hand + counts,
-        ("a_tiny_query_engine", "run_a_query"): stages + counts,
-        ("a_tiny_query_engine", "query_with_a_library"): {
+        ("what_a_query_engine_does", "run_a_query"): stages + counts,
+        ("what_a_query_engine_does", "query_with_a_library"): {
             "python": [f"row groups kept: {kept}\n", *counts],
             "rust": [f"row groups kept: {[f'Some({g})' for g in kept]}\n".replace("'", ""), *counts],
         },

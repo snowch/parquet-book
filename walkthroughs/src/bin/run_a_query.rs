@@ -5,7 +5,7 @@ use parquet_lab::engine::{run, Value};
 fn main() {
     let path = "fixtures/writing-baseline.parquet";
     let data = std::fs::read(path).expect("run this from the repository's root");
-    // Try AND status = 'refunded' after the condition, avg(amount_cents), or LIMIT 3.
+    // Try SELECT count(*) FROM orders, or any other query in the chapter's table.
     let sql = "SELECT country, count(*) FROM orders WHERE order_id < 300 \
                GROUP BY country ORDER BY country";
     let answer = run(&data, sql).expect("a query the engine understands");

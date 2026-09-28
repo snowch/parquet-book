@@ -136,7 +136,7 @@ if (shots) {
 }
 
 // The code tabs: Python first, one choice for every excerpt, remembered across pages. (ch01 is
-// an introduction and quotes no reader code, so this starts on ch03.)
+// an explainer and quotes no reader code, so this starts on ch03.)
 await page.goto(base + "the-type-system.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "python", "code is shown in Python by default");
 const visible = () => page.locator(".tab-panel").evaluateAll((els) =>
@@ -148,7 +148,7 @@ await page.goto(base + "anatomy-of-a-parquet-file.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "rust", "and the choice holds on the next page");
 await page.locator('.tab-bar button[data-code="python"]').first().click();
 
-// ch01 is an introduction, with code and no panels.
+// ch01 explains and builds nothing: code and no panels.
 await page.goto(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
 {
@@ -407,11 +407,12 @@ await page.goto(base + "writing-parquet-well.html");
     `pyarrow writes Snappy in the page, and rebuilds writing-baseline.parquet to the byte: ${size} bytes`);
 }
 
-// ch12: the query engine. The book's Python reader answers the chapter's query in the page, stage
-// by stage, as the native engine does; pyarrow's dataset module answers it too, in the page.
+// ch12 explains what a query engine does and builds nothing: no panels and no workbench. The book's
+// Python reader answers the chapter's query in the page, stage by stage, as the native engine
+// does; pyarrow's dataset module answers it too, in the page.
 {
-  await page.goto(base + "a-tiny-query-engine.html");
-  check(await page.locator(".lab").count() === 0, "ch12 has no panels: its steps print the stages");
+  await page.goto(base + "what-a-query-engine-does.html");
+  check(await page.locator(".lab, .workbench").count() === 0, "ch12 has no panels and no workbench: its problems are questions");
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
     await step.locator(".run-button:not(.edit-button)").click();

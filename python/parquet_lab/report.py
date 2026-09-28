@@ -1388,7 +1388,8 @@ def scan(file: bytes, query: ScanQuery, strategy: Strategy, model: NetworkModel)
 
 
 def query(file: bytes, sql: str) -> dict:
-    """Ch12's experiment: ``sql`` answered from ``file``, with every stage of the pipeline."""
+    """``sql`` answered from ``file`` by the engine, with every stage of the pipeline:
+    ``python -m parquet_lab query``, run by ch14's Run buttons and ch12's problems."""
     try:
         a = engine.run(file, sql)
     except (ValueError, StoreError) as e:
