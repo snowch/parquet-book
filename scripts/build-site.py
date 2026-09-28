@@ -675,10 +675,14 @@ FAVICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 """
 
 
-def icon_png(size: int) -> bytes:
+def icon_png(size: int, maskable: bool = False) -> bytes:
     """The favicon's picture as a PNG ``size`` pixels square: home screens want a bitmap. Drawn
     here, from the same shapes, so the build needs no image library and writes the same bytes
-    every time."""
+    every time.
+
+    ``maskable`` is Android's kind: the blue fills the whole square, since the launcher cuts its
+    own shape out of it, and the bars shrink into the middle four fifths, the part every shape
+    keeps."""
     import struct
     import zlib
 
@@ -699,7 +703,9 @@ def icon_png(size: int) -> bytes:
             rgb, alpha = [0.0, 0.0, 0.0], 0.0
             for sx, sy in samples:
                 x, y = (px + sx) * 32 / size, (py + sy) * 32 / size
-                if not inside(x, y, 0, 0, 32, 32, 6):
+                if maskable:
+                    x, y = (x - 16) / 0.8 + 16, (y - 16) / 0.8 + 16
+                elif not inside(x, y, 0, 0, 32, 32, 6):
                     continue
                 white = next((o for bx, by, bw, bh, br, o in bars if inside(x, y, bx, by, bw, bh, br)), 0.0)
                 for i in range(3):
@@ -736,7 +742,12 @@ def manifest() -> str:
             "icons": [
                 {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
                 {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"},
-                {"src": "favicon.svg", "sizes": "any", "type": "image/svg+xml"},
+                {
+                    "src": "icon-maskable-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "maskable",
+                },
             ],
         },
         indent=2,
@@ -829,6 +840,7 @@ def build(out: Path) -> None:
     (out / "favicon.svg").write_text(FAVICON)
     for size in (192, 512):
         (out / f"icon-{size}.png").write_bytes(icon_png(size))
+    (out / "icon-maskable-512.png").write_bytes(icon_png(512, maskable=True))
     (out / "manifest.webmanifest").write_text(manifest())
     for f in (ROOT / "web" / "lab").iterdir():
         if f.suffix in (".js", ".css"):
