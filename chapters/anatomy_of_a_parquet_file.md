@@ -516,7 +516,9 @@ against pyarrow's manifest. From here on a chapter that builds something ends by
 the same question, so that you know where each fact lives in the tools you already use.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, which lives in `walkthroughs/libraries`, a
+steps. The page's pyarrow is an older version than the desk's, for a reason
+[Appendix A](#two-pyarrows) gives; for this step the two print the same. In Rust the step needs
+the `parquet` crate, which lives in `walkthroughs/libraries`, a
 workspace of its own so that the book's reader keeps no dependencies. Run it in a Codespace, or at
 a desk:
 

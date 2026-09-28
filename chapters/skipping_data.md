@@ -403,7 +403,7 @@ first step did. For `customer_id = 424242` on the shuffled file it keeps all fou
 reader's Bloom filters ruled out every one. pyarrow skips by statistics only. It uses neither the
 Bloom filters nor the page index to skip, and its Python API cannot read either. It says whether a
 column chunk has a ColumnIndex and an OffsetIndex, and versions newer than the one the page loads
-also say where a chunk's Bloom filter is, but no more. Within a kept row group, it reads every
+([why the page's is older](#two-pyarrows)) also say where a chunk's Bloom filter is, but no more. Within a kept row group, it reads every
 page of the columns it needs.
 
 The crate does nothing unless you ask. Its row group predicate is a function you write, here one

@@ -267,7 +267,7 @@ The `parquet` crate reads the choices back from each file's footer:
 
 With the fixtures' settings, pyarrow writes `writing-baseline.parquet` again, to the byte: the
 same size and the same footer. The pyarrow the page loads is older than the one that wrote the
-fixtures, and has no `max_rows_per_page`, so the step cuts its pages another way, as its comment
+fixtures ([why](#two-pyarrows)), and has no `max_rows_per_page`, so the step cuts its pages another way, as its comment
 says. Each change shows in the footer as the steps found it: more row
 groups and a larger footer, no dictionary page, no ColumnIndex. The last change declares the
 sort. `sorting_columns` records in each row group that it is sorted by `order_id`, for a few

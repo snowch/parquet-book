@@ -324,7 +324,7 @@ With `pre_buffer=False`, pyarrow makes one read per column chunk, the whole chun
 it does not use the page index. With `pre_buffer=True`, its default, it merges the chunks, which
 touch, into one read. The gap it merges across is `hole_size_limit` in `pyarrow.CacheOptions`,
 which a dataset scan takes through `ParquetFragmentScanOptions(cache_options=...)`. The page runs
-a build of pyarrow for WebAssembly, which reads a chunk at a time either way; run the step at a
+an older build of pyarrow for WebAssembly ([why](#two-pyarrows)), which reads a chunk at a time either way; run the step at a
 desk to see the merged read.
 
 In place of `read_row_groups`, try `pq.read_table(file, filters=[("order_id", "==", 431)])`. The

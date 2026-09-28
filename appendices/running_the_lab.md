@@ -33,6 +33,23 @@ and then charges you. [GitHub's billing page](https://docs.github.com/en/billing
 has the current terms. Stop or delete a Codespace when you are done with it: a stopped one still
 counts against the storage allowance.
 
+(two-pyarrows)=
+## Two versions of pyarrow
+
+The *Ask a library* steps run pyarrow, and the pyarrow in the page is older than the one at a
+desk. That is not a choice the book makes twice. At a desk, `requirements.txt` pins the pyarrow
+that wrote every fixture, and the build refuses to run under any other, so the files and every
+number measured from them come out the same on every machine. In the page, pyarrow is whatever
+the book's pinned Pyodide release ships. pyarrow is compiled C++, not pure Python, so the page
+cannot install another version the way it installs a pure-Python package; it takes the build
+Pyodide made for WebAssembly, which trails the desk's.
+
+For almost every step the two give the same output, and the tests check the steps at a desk. Where
+they differ, the chapter says so beside the step: a field the older version does not report
+([ch09](#skipping-data)), reads the WebAssembly build does not merge ([ch10](#how-readers-read)),
+and a writer option it does not have ([ch11](#writing-parquet-well)). When a Pyodide release
+ships a newer pyarrow, the book moves to it and those notes go.
+
 ## What you need
 
 At a desk, to read and run the book's reader in Python, Python 3.11 or later is enough: the
