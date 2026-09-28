@@ -518,4 +518,5 @@ cargo test -p exercises --test changing_a_table -- --ignored
   changes aside and merging them later began; compaction is its merge.
 - pyarrow's [compute functions](https://arrow.apache.org/docs/python/compute.html) are what the
   library step used to take out deleted rows.
-- The [appendices](#glossary) collect the book's terms.
+- [ch16](#what-iceberg-adds) maps what Apache Iceberg adds above Parquet files to the chapters
+  that show it, and reads the field ids by which a table names its columns.

@@ -32,10 +32,11 @@ CHAPTER_SHAPE = (
 
 #: Chapters that explain and build nothing. ch01 sets up the question the book answers, before
 #: there is a Parquet file to open; ch12 describes what a query engine does with a file, and
-#: leaves how an engine works inside to other books. Such a chapter has every heading but *Building it*, quotes no
-#: reader code, and its problems are questions to reason about rather than tests. Every other
-#: chapter follows the book's method: by hand, then the reader, then a library.
-EXPLAINERS = frozenset({"why_parquet_exists", "what_a_query_engine_does"})
+#: leaves how an engine works inside to other books; ch16 maps what Apache Iceberg adds above
+#: Parquet files to the chapters that show it. Such a chapter has every heading but *Building
+#: it*, quotes no reader code, and its problems are questions to reason about rather than tests.
+#: Every other chapter follows the book's method: by hand, then the reader, then a library.
+EXPLAINERS = frozenset({"why_parquet_exists", "what_a_query_engine_does", "what_iceberg_adds"})
 
 #: What a page carries until it is written. Everything that reports progress keys off it.
 UNWRITTEN = "[To write"
@@ -283,6 +284,16 @@ _CHAPTERS = (
         "A table read through its snapshots: lookups, position delete files applied in a scan, and a compaction planner.",
         ("changes",),
         ("changes.json",),
+    ),
+    (
+        "what_iceberg_adds",
+        "What Iceberg adds to Parquet",
+        "beyond_one_file",
+        "What does Apache Iceberg add on top of Parquet, and which of it has this book already shown?",
+        "Each feature Apache Iceberg adds above Parquet files, mapped to the chapter that shows it, "
+        "and a table's columns resolved by the field ids in a footer.",
+        (),
+        ("changes/data/part-0.parquet",),
     ),
 )
 

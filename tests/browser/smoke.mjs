@@ -538,6 +538,37 @@ await page.goto(base + "writing-parquet-well.html");
     "pyarrow's compute functions run in the page and take out the rows the delete files name");
 }
 
+// ch16 explains what Iceberg adds and builds nothing: no panels and no workbench. The book's
+// Python reader reads a ch15 data file's field ids in the page, as the native reader decodes them,
+// and resolves the table's columns by id to the values the native engine reads; pyarrow reads the
+// same ids in the page.
+{
+  await page.goto(base + "what-iceberg-adds.html");
+  check(await page.locator(".lab, .workbench").count() === 0, "ch16 has no panels and no workbench: its problems are questions");
+  const runStep = async (name, until) => {
+    const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
+    await step.locator(".run-button:not(.edit-button)").click();
+    await step.locator(".run-output").filter({ hasText: until }).waitFor({ timeout: 300000 });
+    return (await step.locator(".run-output").innerText()).split("\n").map((l) => l.trim());
+  };
+  const file = "fixtures/changes/data/part-0.parquet";
+  const ids = native(["schema", file]).elements.filter((e) => e.field_id !== null);
+  const [first] = native(["query", file, "SELECT order_id, country, amount_cents FROM orders"]).rows;
+  const lines = await runStep("field_ids_by_hand", "by name, the file has no");
+  check(ids.length > 0 && ids.every((e) => lines.includes(`field id ${e.field_id}: ${e.name}`)),
+    `the Python reader in the page reads ${ids.length} field ids from the footer, as the native reader decodes them`);
+  check(lines.includes(`order_number (id 1) <- order_id: ${first[0]}`) &&
+    lines.includes(`country (id 4) <- country: ${first[1]}`) &&
+    lines.includes(`amount_cents (id 6) <- amount_cents: ${first[2]}`) &&
+    lines.includes("channel (id 7) <- no column: None") &&
+    lines.includes("by name, the file has no order_number, channel"),
+    "the renamed column reads the file's order_id by id, and the added one reads as missing");
+  const library = await runStep("field_ids_with_a_library", "id 1 <-");
+  check(ids.every((e) => library.includes(`field id ${e.field_id}: ${e.name}`)) &&
+    library.includes(`id 1 <- order_id: ${first[0]}`),
+    "pyarrow in the page reads the same field ids, and id 1 from order_id");
+}
+
 // Every panel is a picture drawn by the Rust reader in WebAssembly, on every page that has one:
 // it draws, and offers no choice of engine and no editor of the reader.
 {

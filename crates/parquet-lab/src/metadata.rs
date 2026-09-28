@@ -91,7 +91,7 @@ pub struct SchemaElement {
     pub logical_type: Option<LogicalType>,
     pub scale: Option<i64>,
     pub precision: Option<i64>,
-    /// An identifier that survives renames; table formats use it (ch14).
+    /// An identifier that survives renames; table formats name columns by it (ch16).
     pub field_id: Option<i64>,
     pub span: Span,
 }

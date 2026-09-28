@@ -556,6 +556,7 @@ def schema(file: bytes) -> dict:
             "type_length": e.type_length,
             "logical_type": str(e.logical_type) if e.logical_type else None,
             "converted_type": e.converted_type,
+            "field_id": e.field_id,
         }
         for i, e in enumerate(md.schema)
     ]

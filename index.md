@@ -45,8 +45,11 @@ Every chapter has the same seven sections, so you always know where you are:
    question about your own tables.
 7. **Where to go next**: primary sources.
 
-[ch01](#why-parquet-exists) is the exception. It sets up the question the book answers, before
-there is a file to open, so it builds nothing and has no code for you to write.
+Three chapters explain and build nothing, so they have no *Building it* and their problems are
+questions to reason about. [ch01](#why-parquet-exists) sets up the question the book answers,
+before there is a file to open. [ch12](#what-a-query-engine-does) describes what a query engine
+does with a file. [ch16](#what-iceberg-adds), the last, maps what Apache Iceberg adds above
+Parquet files to the chapters that show it.
 
 ## Two rules the book keeps
 

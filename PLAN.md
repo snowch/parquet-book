@@ -183,13 +183,16 @@ Every chapter has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
 6. **Problems**: stubs with tests, and one problem about the reader's own files.
 7. **Where to go next**: primary sources, and the next chapter.
 
-Two chapters explain and build nothing (`tools/outline.EXPLAINERS`), so they have no *Building
+Three chapters explain and build nothing (`tools/outline.EXPLAINERS`), so they have no *Building
 it*, quote no reader code, and set problems that are questions to reason about rather than
 tests. ch01 asks why columns at all, before there is a Parquet file to open. It ends on the same
 table as a Parquet file pyarrow wrote, and hands over to ch02, where the method starts. ch12 asks
 what a query engine does with a Parquet file and what each kind of query costs against one. It
 runs the reader's engine and measures its scan, but does not teach the engine's inside, which
-would take a book of its own.
+would take a book of its own. ch16, the last, asks what Apache Iceberg adds above Parquet files.
+It maps each feature to the chapter that shows it, reads the field ids by which a table names
+its columns out of a footer, and compares Delta Lake and Apache Hudi, without teaching any of
+the three in depth.
 
 ch02 and ch15 are the models for the method; ch03 to ch14 predate it and have been revised to it
 (NEXT_STEPS.md).

@@ -75,7 +75,7 @@ class SchemaElement:
     scale: int | None
     precision: int | None
     field_id: int | None
-    """An identifier that survives renames; table formats use it (ch14)."""
+    """An identifier that survives renames; table formats name columns by it (ch16)."""
     span: Span
 
 

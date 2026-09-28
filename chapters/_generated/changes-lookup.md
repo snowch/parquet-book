@@ -2,11 +2,11 @@
 
 | Lookup | Round trips (requests) | Bytes fetched | Time |
 |---|--:|--:|--:|
-| order 300 in `written` | 5 (12) | 19,541 | 120 ms |
-| order 300 in `written`, 64 KiB of the tail first | 2 (2) | 24,979 | 40 ms |
-| order 300 in `after-a-day` | 5 (16) | 23,613 | 140 ms |
-| order 250 in `after-a-day`, then deleted by `deletes/delete-00.parquet` | 5 (21) | 23,599 | 160 ms |
-| order 300 in `compacted` | 5 (12) | 19,540 | 120 ms |
-| order 300 in a key-value store | 1 (1) | 52 | 20 ms |
+| order 300 in `written` | 5 (12) | 20,021 | 120 ms |
+| order 300 in `written`, 64 KiB of the tail first | 2 (2) | 25,459 | 40 ms |
+| order 300 in `after-a-day` | 5 (16) | 24,093 | 140 ms |
+| order 250 in `after-a-day`, then deleted by `deletes/delete-00.parquet` | 5 (21) | 24,079 | 160 ms |
+| order 300 in `compacted` | 5 (12) | 20,020 | 120 ms |
+| order 300 in a key-value store | 1 (1) | 55 | 20 ms |
 
 *Computed by the reader over `fixtures/changes/`, through the simulated store with four connections, 20 ms before each request's first byte and 100 MB/s after it. Unless the row says otherwise, a lookup reads a data file's trailer first. The key-value store's row is the share of `data/part-1.parquet` one row takes up: its size divided by its rows.*

@@ -2,8 +2,8 @@
 
 | Compacting `after-a-day` | |
 |---|--:|
-| Bytes read | 64,242 |
-| Bytes written, in 3 files | 29,228 |
+| Bytes read | 72,882 |
+| Bytes written, in 3 files | 30,668 |
 | Time, one file at a time | 581 ms |
 | Time saved by each later scan | 100 ms |
 | Scans until it has paid for itself | 6 |

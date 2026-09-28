@@ -186,7 +186,8 @@ type when both are present.
 
 A schema element can also carry a `field_id`: a number that identifies a column across renames.
 Table formats use it to match columns between files written years apart
-([ch14](#lakehouse-and-beyond)). The fixtures do not set one.
+([ch16](#what-iceberg-adds)). This chapter's fixture sets none; ch15's table sets one on every
+column.
 
 ## Building it
 
@@ -414,7 +415,7 @@ The two part over the statistics. pyarrow reads each minimum through its logical
 you a `datetime.date` and a `Decimal`. The crate, without its Arrow feature, hands you the bytes
 the third step read, and the logical reading is yours to do. The two also name the logical types
 differently: pyarrow's `Int(bitWidth=8, isSigned=true)` is the crate's `INTEGER(8,true)`. pyarrow
-prints `field_id=-1` for a field with no field id, which is every field of the fixtures.
+prints `field_id=-1` for a field with no field id, which is every field of this fixture.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
 steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a

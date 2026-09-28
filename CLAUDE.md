@@ -8,9 +8,10 @@ Project instructions for anyone, human or AI, working on this book. They are bin
 in which the reader builds a working Parquet reader while reading. Code is the interface. Each
 chapter asks a question, reads the answer out of a real Parquet file by hand, builds that into
 the reader, and then asks a library (pyarrow, the `parquet` crate) the same question. Labs draw
-pictures only where a picture beats printed output. Two chapters explain and build nothing
-(`tools/outline.EXPLAINERS`): ch01, why columns at all, and ch12, what a query engine does with a
-file and what each kind of query costs. The reader exists twice, in Python and in Rust, held to
+pictures only where a picture beats printed output. Three chapters explain and build nothing
+(`tools/outline.EXPLAINERS`): ch01, why columns at all; ch12, what a query engine does with a
+file and what each kind of query costs; and ch16, what Apache Iceberg adds above Parquet files.
+The reader exists twice, in Python and in Rust, held to
 identical answers by tests; the page shows both and runs both: the Python reader under Pyodide in
 the walkthrough steps, the Run buttons and the problems workbench, and the Rust reader through
 WebAssembly behind the panels, which are pictures and nothing else.

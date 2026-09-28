@@ -2,12 +2,12 @@
 
 | Snapshot | Requests | Bytes fetched | Time |
 |---|--:|--:|--:|
-| `written` | 5 | 55,992 | 40 ms |
-| `merge-on-read-1` | 6 | 57,010 | 60 ms |
-| `merge-on-read-2` | 7 | 58,028 | 60 ms |
-| `merge-on-read-4` | 9 | 60,064 | 60 ms |
-| `merge-on-read-8` | 13 | 64,136 | 80 ms |
-| `after-a-day` | 29 | 99,567 | 160 ms |
-| `compacted` | 6 | 64,553 | 60 ms |
+| `written` | 5 | 57,912 | 40 ms |
+| `merge-on-read-1` | 6 | 58,930 | 60 ms |
+| `merge-on-read-2` | 7 | 59,948 | 60 ms |
+| `merge-on-read-4` | 9 | 61,984 | 60 ms |
+| `merge-on-read-8` | 13 | 66,056 | 80 ms |
+| `after-a-day` | 29 | 109,167 | 160 ms |
+| `compacted` | 6 | 66,953 | 60 ms |
 
 *Computed by the reader over `fixtures/changes/`, through the simulated store with four connections, 20 ms before each request's first byte and 100 MB/s after it. A scan decodes every row of its data files, deleted ones included: `merge-on-read-8` decodes 800 rows to return 792.*

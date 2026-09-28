@@ -99,6 +99,7 @@ def facts(chapter: str, step: str, language: str) -> list[str]:
     known.update(query_facts())
     known.update(encryption_facts())
     known.update(lakehouse_facts())
+    known.update(iceberg_facts())
     assert (chapter, step) in known, f"add what {chapter}/{step} must print to tests/test_walkthroughs.py"
     found = known[(chapter, step)]
     return found[language] if isinstance(found, dict) else found
@@ -1118,6 +1119,38 @@ def changes_facts() -> dict:
             f"{part['path']} holds {len(amounts)} rows; {len(gone)} are deleted; {len(live)} are live",
             f"their amounts sum to {sum(live)}",
         ],
+    }
+
+
+def iceberg_facts() -> dict:
+    """What ch16's steps must print: the field ids pyarrow reads from a ch15 data file, and the
+    first row's values, resolved through the step's table schema, which renames id 1 and adds id 7.
+    """
+    import pyarrow.parquet as pq
+
+    path = ROOT / "fixtures" / "changes" / "data" / "part-0.parquet"
+    schema = pq.read_schema(path)
+    by_id = {int(f.metadata[b"PARQUET:field_id"]): f.name for f in schema}
+    first = pq.read_table(path).to_pylist()[0]
+    ids = [f"field id {i}: {name}\n" for i, name in by_id.items()]
+    renamed = f"order_number (id 1) <- {by_id[1]}: {first[by_id[1]]}\n"
+
+    def resolved(quote: str, null: str) -> list[str]:
+        return [
+            *ids,
+            renamed,
+            f"country (id 4) <- {by_id[4]}: {quote}{first[by_id[4]]}{quote}\n",
+            f"amount_cents (id 6) <- {by_id[6]}: {first[by_id[6]]}\n",
+            f"channel (id 7) <- no column: {null}\n",
+            "by name, the file has no order_number, channel",
+        ]
+
+    return {
+        ("what_iceberg_adds", "field_ids_by_hand"): {
+            "python": resolved("", "None"),
+            "rust": resolved('"', "null"),
+        },
+        ("what_iceberg_adds", "field_ids_with_a_library"): [*ids, f"id 1 <- {by_id[1]}: {first[by_id[1]]}\n"],
     }
 
 

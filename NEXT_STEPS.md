@@ -318,6 +318,15 @@ and `engine-join` (three build sides' key ranges pushed into a sorted and a shuf
 `a_query_by_hand`, the engine's quoted code and problems 12.1 and 12.2 are gone; its four
 problems are questions. The engine stays in the reader for ch14, ch15, the figures and the tests.
 
+## Done: ch16, what Iceberg adds to Parquet
+
+A last chapter, *What Iceberg adds to Parquet* (`what_iceberg_adds`), explains and builds
+nothing. It maps Iceberg's features to the chapters that show them, describes the metadata tree,
+hidden partitioning, sort orders and commits, and compares Delta Lake and Apache Hudi. Its step
+`field_ids_by_hand` reads the field ids ch15's data files now carry (the generator sets
+`PARQUET:field_id`) and resolves a renamed and an added column by id; `field_ids_with_a_library`
+reads the ids with pyarrow and the `parquet` crate. The schema report gained `field_id`.
+
 ## Done: ch13 in code
 
 ch13 opens on `footer_modes` (`PAR1` or `PARE` at both ends), `keys_by_name` (the key metadata's

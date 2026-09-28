@@ -7,7 +7,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -16,7 +16,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -25,7 +25,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -34,7 +34,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -50,7 +50,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -59,7 +59,7 @@
         {
           "path": "data/part-1-rewritten.parquet",
           "record_count": 199,
-          "file_size": 10311,
+          "file_size": 10791,
           "order_id": [
             201,
             400
@@ -68,7 +68,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -77,7 +77,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -93,7 +93,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -102,7 +102,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -111,7 +111,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -120,7 +120,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -143,7 +143,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -152,7 +152,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -161,7 +161,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -170,7 +170,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -199,7 +199,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -208,7 +208,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -217,7 +217,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -226,7 +226,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -267,7 +267,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -276,7 +276,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -285,7 +285,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -294,7 +294,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -359,7 +359,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -368,7 +368,7 @@
         {
           "path": "data/part-1.parquet",
           "record_count": 200,
-          "file_size": 10330,
+          "file_size": 10810,
           "order_id": [
             201,
             400
@@ -377,7 +377,7 @@
         {
           "path": "data/part-2.parquet",
           "record_count": 200,
-          "file_size": 10337,
+          "file_size": 10817,
           "order_id": [
             401,
             600
@@ -386,7 +386,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -395,7 +395,7 @@
         {
           "path": "appends/append-00.parquet",
           "record_count": 10,
-          "file_size": 2205,
+          "file_size": 2685,
           "order_id": [
             801,
             810
@@ -404,7 +404,7 @@
         {
           "path": "appends/append-01.parquet",
           "record_count": 10,
-          "file_size": 2192,
+          "file_size": 2672,
           "order_id": [
             811,
             820
@@ -413,7 +413,7 @@
         {
           "path": "appends/append-02.parquet",
           "record_count": 10,
-          "file_size": 2217,
+          "file_size": 2697,
           "order_id": [
             821,
             830
@@ -422,7 +422,7 @@
         {
           "path": "appends/append-03.parquet",
           "record_count": 10,
-          "file_size": 2190,
+          "file_size": 2670,
           "order_id": [
             831,
             840
@@ -431,7 +431,7 @@
         {
           "path": "appends/append-04.parquet",
           "record_count": 10,
-          "file_size": 2254,
+          "file_size": 2734,
           "order_id": [
             841,
             850
@@ -440,7 +440,7 @@
         {
           "path": "appends/append-05.parquet",
           "record_count": 10,
-          "file_size": 2222,
+          "file_size": 2702,
           "order_id": [
             851,
             860
@@ -449,7 +449,7 @@
         {
           "path": "appends/append-06.parquet",
           "record_count": 10,
-          "file_size": 2200,
+          "file_size": 2680,
           "order_id": [
             861,
             870
@@ -458,7 +458,7 @@
         {
           "path": "appends/append-07.parquet",
           "record_count": 10,
-          "file_size": 2246,
+          "file_size": 2726,
           "order_id": [
             871,
             880
@@ -467,7 +467,7 @@
         {
           "path": "appends/append-08.parquet",
           "record_count": 10,
-          "file_size": 2203,
+          "file_size": 2683,
           "order_id": [
             881,
             890
@@ -476,7 +476,7 @@
         {
           "path": "appends/append-09.parquet",
           "record_count": 10,
-          "file_size": 2224,
+          "file_size": 2704,
           "order_id": [
             891,
             900
@@ -485,7 +485,7 @@
         {
           "path": "appends/append-10.parquet",
           "record_count": 10,
-          "file_size": 2223,
+          "file_size": 2703,
           "order_id": [
             901,
             910
@@ -494,7 +494,7 @@
         {
           "path": "appends/append-11.parquet",
           "record_count": 10,
-          "file_size": 2217,
+          "file_size": 2697,
           "order_id": [
             911,
             920
@@ -503,7 +503,7 @@
         {
           "path": "appends/append-12.parquet",
           "record_count": 10,
-          "file_size": 2224,
+          "file_size": 2704,
           "order_id": [
             921,
             930
@@ -512,7 +512,7 @@
         {
           "path": "appends/append-13.parquet",
           "record_count": 10,
-          "file_size": 2204,
+          "file_size": 2684,
           "order_id": [
             931,
             940
@@ -521,7 +521,7 @@
         {
           "path": "appends/append-14.parquet",
           "record_count": 10,
-          "file_size": 2188,
+          "file_size": 2668,
           "order_id": [
             941,
             950
@@ -530,7 +530,7 @@
         {
           "path": "appends/append-15.parquet",
           "record_count": 10,
-          "file_size": 2222,
+          "file_size": 2702,
           "order_id": [
             951,
             960
@@ -595,7 +595,7 @@
         {
           "path": "data/part-0.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             1,
             200
@@ -604,7 +604,7 @@
         {
           "path": "compacted/part-1.parquet",
           "record_count": 196,
-          "file_size": 10216,
+          "file_size": 10696,
           "order_id": [
             201,
             400
@@ -613,7 +613,7 @@
         {
           "path": "compacted/part-2.parquet",
           "record_count": 196,
-          "file_size": 10226,
+          "file_size": 10706,
           "order_id": [
             401,
             600
@@ -622,7 +622,7 @@
         {
           "path": "data/part-3.parquet",
           "record_count": 200,
-          "file_size": 10338,
+          "file_size": 10818,
           "order_id": [
             601,
             800
@@ -631,7 +631,7 @@
         {
           "path": "compacted/part-4.parquet",
           "record_count": 160,
-          "file_size": 8786,
+          "file_size": 9266,
           "order_id": [
             801,
             960

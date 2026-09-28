@@ -47,11 +47,19 @@ or DELTA_BINARY_PACKED. It happens before compression. [ch05](#encodings)
 **Entropy coding.** Giving frequent symbols shorter codes than rare ones, as DEFLATE's Huffman codes
 do. [ch07](#compression)
 
+**Field id.** A number a schema element may carry, which a table format assigns to a column
+and never changes or reuses, so that files written before a rename still match the column.
+[ch16](#what-iceberg-adds)
+
 **Footer.** The `FileMetaData` structure near the end of a file: schema, row counts, and the
 position and description of every column chunk. [ch02](#anatomy-of-a-parquet-file)
 
 **Footer length.** The four-byte little-endian integer immediately before the closing magic.
 [ch02](#anatomy-of-a-parquet-file)
+
+**Hidden partitioning.** Partitioning by a value a table format derives from a column, such as
+its day, and records in its metadata, rather than one a query must name and a path must hold.
+[ch16](#what-iceberg-adds)
 
 **Hive-style partition.** A directory named `name=value` holding a table's files whose rows all
 share that value. The files omit the column; a reader takes it from the path.
@@ -74,6 +82,9 @@ many. Every codec in [ch07](#compression) is built on it.
 
 **Magic.** The four ASCII bytes `PAR1` at the start and end of every unencrypted Parquet file.
 [ch02](#anatomy-of-a-parquet-file)
+
+**Manifest.** In Apache Iceberg, a file that lists a table's data files or delete files, with
+each file's partition values, row count and column statistics. [ch16](#what-iceberg-adds)
 
 **Merge-on-read.** Changing a row by writing a small file that describes the change, such as a
 position delete file, which every reader applies until compaction. [ch15](#changing-a-table)

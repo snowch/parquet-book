@@ -414,7 +414,8 @@ cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin table_with_
 version, and a checkpoint, a Parquet file of its own, that summarises many versions so a reader
 need not replay them all. Apache Iceberg keeps the same information differently: a metadata file
 points to manifest lists, which point to manifests, which list the data files with their
-statistics. Both answer the same question this chapter asked.
+statistics. Both answer the same question this chapter asked, and [ch16](#what-iceberg-adds)
+describes Iceberg's tree.
 
 **Typed partitions.** Partition values in a path are text. This reader compares them as text,
 which is right for `country` and wrong for a numeric partition such as `year` compared with a

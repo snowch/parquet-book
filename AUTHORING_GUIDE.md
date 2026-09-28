@@ -46,9 +46,11 @@ Writing the prose first produces a chapter that explains what you meant to build
 `tools/outline.CHAPTER_SHAPE`, and not negotiable; `tests/test_book.py` fails a chapter that adds or
 loses one. A section the chapter needs and the shape lacks is a `###` inside one of them.
 
-A chapter that explains and builds nothing (`tools/outline.EXPLAINERS`: ch01 and ch12) drops
-*Building it*. ch01 comes before there is a file to open; ch12 describes what a query engine does
-with a file, and how an engine works inside would take a book of its own. Such a chapter quotes
+A chapter that explains and builds nothing (`tools/outline.EXPLAINERS`: ch01, ch12 and ch16)
+drops *Building it*. ch01 comes before there is a file to open; ch12 describes what a query engine
+does with a file, and how an engine works inside would take a book of its own; ch16 maps what
+Apache Iceberg adds above Parquet files to the chapters that show it, and Iceberg in depth would
+take another. Such a chapter quotes
 no reader code: its code is walkthrough steps, which may call the reader. Its problems are
 questions with no tests, each saying what a good answer contains, and it has no workbench. Keep
 it light. Do not make a chapter an explainer to dodge building something.

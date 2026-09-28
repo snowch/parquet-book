@@ -1,5 +1,5 @@
 {
-  "why": "ch15's table: the ch11 orders in four files, then changed by copy-on-write, by position delete files and by small appends, and compacted.",
+  "why": "ch15's table: the ch11 orders in four files, with Iceberg field ids, then changed by copy-on-write, by position delete files and by small appends, and compacted.",
   "deleted": [
     250,
     450,
@@ -13,23 +13,23 @@
   "objects": [
     {
       "key": "changes/data/part-0.parquet",
-      "size": 10338
+      "size": 10818
     },
     {
       "key": "changes/data/part-1.parquet",
-      "size": 10330
+      "size": 10810
     },
     {
       "key": "changes/data/part-2.parquet",
-      "size": 10337
+      "size": 10817
     },
     {
       "key": "changes/data/part-3.parquet",
-      "size": 10338
+      "size": 10818
     },
     {
       "key": "changes/data/part-1-rewritten.parquet",
-      "size": 10311
+      "size": 10791
     },
     {
       "key": "changes/deletes/delete-00.parquet",
@@ -65,79 +65,79 @@
     },
     {
       "key": "changes/appends/append-00.parquet",
-      "size": 2205
+      "size": 2685
     },
     {
       "key": "changes/appends/append-01.parquet",
-      "size": 2192
+      "size": 2672
     },
     {
       "key": "changes/appends/append-02.parquet",
-      "size": 2217
+      "size": 2697
     },
     {
       "key": "changes/appends/append-03.parquet",
-      "size": 2190
+      "size": 2670
     },
     {
       "key": "changes/appends/append-04.parquet",
-      "size": 2254
+      "size": 2734
     },
     {
       "key": "changes/appends/append-05.parquet",
-      "size": 2222
+      "size": 2702
     },
     {
       "key": "changes/appends/append-06.parquet",
-      "size": 2200
+      "size": 2680
     },
     {
       "key": "changes/appends/append-07.parquet",
-      "size": 2246
+      "size": 2726
     },
     {
       "key": "changes/appends/append-08.parquet",
-      "size": 2203
+      "size": 2683
     },
     {
       "key": "changes/appends/append-09.parquet",
-      "size": 2224
+      "size": 2704
     },
     {
       "key": "changes/appends/append-10.parquet",
-      "size": 2223
+      "size": 2703
     },
     {
       "key": "changes/appends/append-11.parquet",
-      "size": 2217
+      "size": 2697
     },
     {
       "key": "changes/appends/append-12.parquet",
-      "size": 2224
+      "size": 2704
     },
     {
       "key": "changes/appends/append-13.parquet",
-      "size": 2204
+      "size": 2684
     },
     {
       "key": "changes/appends/append-14.parquet",
-      "size": 2188
+      "size": 2668
     },
     {
       "key": "changes/appends/append-15.parquet",
-      "size": 2222
+      "size": 2702
     },
     {
       "key": "changes/compacted/part-1.parquet",
-      "size": 10216
+      "size": 10696
     },
     {
       "key": "changes/compacted/part-2.parquet",
-      "size": 10226
+      "size": 10706
     },
     {
       "key": "changes/compacted/part-4.parquet",
-      "size": 8786
+      "size": 9266
     },
     {
       "key": "changes/_snapshots.json",

@@ -1235,6 +1235,13 @@ DELETE_SCHEMA = pa.schema(
     ]
 )
 
+#: The schema of the table's data files: the orders, each column with the field id an Apache
+#: Iceberg table's schema gives it. A table format names a column by its id, not its name, so a
+#: rename leaves every file already written readable (ch16 reads these ids from a footer).
+CHANGES_SCHEMA = pa.schema(
+    [f.with_metadata({"PARQUET:field_id": str(i)}) for i, f in enumerate(WRITING_SCHEMA, start=1)]
+)
+
 
 def _write(table: pa.Table, **options) -> bytes:
     sink = io.BytesIO()
@@ -1249,7 +1256,7 @@ def changes_files() -> tuple[dict[str, bytes], list[dict]]:
     info: dict[str, dict] = {}
 
     def data(key: str, part: list[dict]) -> dict:
-        files[key] = _write(pa.Table.from_pylist(part, schema=WRITING_SCHEMA), **CHANGES_OPTIONS)
+        files[key] = _write(pa.Table.from_pylist(part, schema=CHANGES_SCHEMA), **CHANGES_OPTIONS)
         ids = [r["order_id"] for r in part]
         info[key] = {
             "path": key,
@@ -1372,8 +1379,8 @@ def changes_outputs() -> dict[Path, bytes]:
         answers[snap["id"]] = {"live_rows": live, "sum_amount_cents": total}
     listing = {
         "why": (
-            "ch15's table: the ch11 orders in four files, then changed by copy-on-write, by "
-            "position delete files and by small appends, and compacted."
+            "ch15's table: the ch11 orders in four files, with Iceberg field ids, then changed by "
+            "copy-on-write, by position delete files and by small appends, and compacted."
         ),
         "deleted": CHANGES_DELETED,
         "objects": objects,

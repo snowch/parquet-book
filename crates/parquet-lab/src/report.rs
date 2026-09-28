@@ -823,6 +823,7 @@ pub fn schema(file: &[u8]) -> Json {
                         e.logical_type.as_ref().map(|l| l.to_string()).into(),
                     ),
                     ("converted_type", e.converted_type.clone().into()),
+                    ("field_id", e.field_id.into()),
                 ])
             })
             .collect(),
