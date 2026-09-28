@@ -141,7 +141,9 @@ pyarrow falls back from a dictionary on its size, not on what it saves. It caps 
 size, and when a column chunk's dictionary outgrows the cap it writes the remaining pages with
 another encoding. `order_id`'s dictionary is far below the default cap, so pyarrow kept it, and
 the loss stands. A column of distinct values escapes its dictionary only once there are enough of
-them to fill the cap. Some other writers also drop a dictionary that saves nothing.
+them to fill the cap. parquet-java also checks what the dictionary saves: after the first
+page, it drops the dictionary if the dictionary and its indices are not smaller than the
+plain values would be.
 
 ### Dictionary encoding
 
