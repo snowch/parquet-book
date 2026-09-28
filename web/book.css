@@ -125,7 +125,10 @@ a.xref:hover { text-decoration: underline; }
              height: calc(100vh - var(--top)); overflow-y: auto; overscroll-behavior: contain;
              font: 14px/1.45 var(--chrome); padding: 1.4rem 1rem 3rem; }
 @media (max-width: 57.99rem) {
-  .nav { position: fixed; inset: var(--top) 0 0 0; z-index: 15; height: auto; background: var(--bg); }
+  /* The whole screen, under the top bar, with the list starting below the bar. Placed from the
+     bar's bottom instead, the list lost its first entry behind the bar in Chromium. */
+  .nav { position: fixed; inset: 0; z-index: 15; height: auto; background: var(--bg);
+         padding-top: calc(var(--top) + 1.4rem); }
   body.nav-open .nav { display: block; }
 }
 /* The middle column is the widest thing a chapter holds, and the group of columns is what

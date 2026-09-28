@@ -778,6 +778,13 @@ await page.goto(base + "writing-parquet-well.html");
   await page.locator("#menu").click();
   check(await page.locator(".nav").isVisible() && (await page.locator("#menu").getAttribute("aria-expanded")) === "true",
     "on a phone the Chapters button opens the list");
+  const first = await page.evaluate(() => {
+    const a = document.querySelector("#nav a");
+    return { text: a.textContent, top: a.getBoundingClientRect().top,
+             bar: document.querySelector(".top").getBoundingClientRect().bottom };
+  });
+  check(first.text === "Cover" && first.top >= first.bar,
+    `and its first entry, ${first.text}, shows below the top bar (${Math.round(first.top)}px, bar ends at ${Math.round(first.bar)}px)`);
   await page.locator("#menu").click();
   check(await page.locator(".nav").isHidden(), "and closes it");
   await page.setViewportSize({ width: 1440, height: 1000 });
