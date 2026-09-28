@@ -355,8 +355,9 @@ RAILS = r"""<script>
 #: because only the page knows the fonts it got. Each is measured once, as a copy with nothing
 #: squeezing it, so a table that would wrap its cells to fit counts as cut off too, and a tab set
 #: is sized by the wider of its two languages, so switching language never moves the column. A
-#: widened block also gets `fits` and its own width, so it starts at the prose's left edge and is
-#: no wider than its longest line (book.css).
+#: widened block also gets `fits` and its own width, so it starts at the prose's left edge: a table
+#: as wide as its content, and every block of code one width, the code column of a hundred
+#: characters, so the code on a page lines up (book.css).
 #:
 #: Anything still cut off at the width it was given gets an Expand button, which gives it the
 #: window: the same element, so an edit in progress and the reader's place both survive. On a
@@ -486,6 +487,23 @@ document.addEventListener("DOMContentLoaded", () => {
     meter.remove();
     return out;
   };
+  // The code column: a hundred characters of the code's own font, where the Rust reader's lines
+  // stop, with the block's padding and border. Measured, because only the page knows the font
+  // it got. A longer line is cut off at it and gets the Expand button.
+  let column = 0;
+  const codeColumn = (pre) => {
+    if (column || !pre) return column;
+    const cs = getComputedStyle(pre);
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;"
+      + `font-family:${cs.fontFamily};font-size:${cs.fontSize}`;
+    probe.textContent = "0".repeat(100);
+    document.body.append(probe);
+    column = probe.getBoundingClientRect().width + parseFloat(cs.paddingLeft)
+      + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) * 2;
+    probe.remove();
+    return column;
+  };
   const topOf = (el) => {
     while (el && el.parentElement !== article) el = el.parentElement;
     return el;
@@ -499,6 +517,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .filter((el) => !el.closest(OWN) && !el.matches(".table-wrap pre"));
     const boxes = blocks.map(boxOf);
     const need = needs(blocks);
+    const code = codeColumn(blocks.find((el) => el.matches("pre") && el.offsetParent !== null));
     const prose = Math.min(article.clientWidth, px("--measure"));
     width = article.clientWidth;
     // Each top-level block takes the wide column if anything in it would be cut off at the
@@ -508,7 +527,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const unit = topOf(el);
       if (!unit || !unit.matches(PROMOTE)) return;
       const u = units.get(unit) || { need: 0, tables: true };
-      u.need = Math.max(u.need, need[i]);
+      // Every block of code is one width, the code column, so their edges line up down the page;
+      // a table is as wide as its content.
+      u.need = Math.max(u.need, el.matches(".table-wrap") ? need[i] : code);
       u.tables = u.tables && el.matches(".table-wrap");
       units.set(unit, u);
     });
@@ -538,7 +559,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!pending) { pending = true; requestAnimationFrame(layout); }
   };
   layout();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { column = 0; schedule(); });
   // The column changes width with the window and when a rail opens or closes.
   new ResizeObserver(() => { if (article.clientWidth !== width) schedule(); }).observe(article);
   document.addEventListener("click", (event) => { if (event.target.closest(".tab-bar")) schedule(); });
