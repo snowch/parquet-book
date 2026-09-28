@@ -16,9 +16,9 @@ of a great many rows, and a layout built for whole rows makes them read everythi
 
 This chapter measures that on two files you could have written yourself: the same table of
 orders as a CSV file and as a Parquet file. Then it shows why the numbers come out as they do. It
-is the one chapter with no code for you to write. From the next chapter on, each one reads the
-bytes of a real file by hand, builds what it read into a reader, and checks the result against a
-library you already use.
+has no code for you to write. From the next chapter on, most chapters read the bytes of a real
+file by hand, build what they read into a reader, and check the result against a library you
+already use.
 
 ## The experiment
 

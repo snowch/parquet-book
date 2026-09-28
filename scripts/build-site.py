@@ -355,7 +355,8 @@ RAILS = r"""<script>
 #: because only the page knows the fonts it got. Each is measured once, as a copy with nothing
 #: squeezing it, so a table that would wrap its cells to fit counts as cut off too, and a tab set
 #: is sized by the wider of its two languages, so switching language never moves the column. A
-#: table also gets `fits` and its own width, so it starts at the prose's left edge (book.css).
+#: widened block also gets `fits` and its own width, so it starts at the prose's left edge and is
+#: no wider than its longest line (book.css).
 #:
 #: Anything still cut off at the width it was given gets an Expand button, which gives it the
 #: window: the same element, so an edit in progress and the reader's place both survive. On a
@@ -517,8 +518,10 @@ document.addEventListener("DOMContentLoaded", () => {
     for (const [unit, u] of units) {
       const wide = u.need > prose + 1;
       unit.classList.toggle("wide", wide);
-      unit.classList.toggle("fits", wide && u.tables);
-      if (wide && u.tables) unit.style.setProperty("--need", `${Math.ceil(u.need)}px`);
+      // Only as wide as it needs: a block of code one line too long for the measure grows by that
+      // much, not to the whole wide column with empty space on its right.
+      unit.classList.toggle("fits", wide);
+      if (wide) unit.style.setProperty("--need", `${Math.ceil(u.need) + 2}px`);
     }
     // Then, at the width each was given, which are still cut off. A block in the other language's
     // tab is not laid out; it is asked again when the reader switches.

@@ -291,7 +291,7 @@
 .runnable[data-codespace] .run-button:hover { border-color: var(--accent); }
 .run-note { margin: .3rem 0 1rem; color: var(--muted); font: 12.5px/1.45 var(--chrome); }
 /* A walkthrough step: Run and Edit side by side on the code. */
-.runnable .run-button.edit-button { right: 4.6rem; color: var(--accent); background: var(--bg); border-color: var(--rule); }
+.runnable .run-button.edit-button { right: calc(var(--u, 16px) * 4.6); color: var(--accent); background: var(--bg); border-color: var(--rule); }
 .walkthrough .runnable .code-area { border: 1px solid var(--edge); border-radius: 0 0 6px 6px; }
 /* The buttons sit above a walkthrough's code, and above a command on a narrow screen, not over it. */
 .walkthrough .runnable > pre, .walkthrough .runnable > .code-area { padding-top: 2.5rem; }

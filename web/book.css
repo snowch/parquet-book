@@ -85,7 +85,11 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: calc(var(--top) + 1rem); }
+/* The root is never smaller than 16px. The reading text is set in px and ignores a browser's
+   text-size setting, so a smaller root (a reader who set 10px text, or Safari's text zoom) shrank
+   only what is sized in rem: headings came out smaller than the paragraphs under them, and the
+   gap that keeps Edit clear of Run closed. A larger root still grows them. */
+html { font-size: max(100%, 16px); scroll-behavior: smooth; scroll-padding-top: calc(var(--top) + 1rem); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 body { margin: 0; background: var(--bg); color: var(--ink);
        font: 18px/1.62 var(--text); text-rendering: optimizeLegibility;
@@ -176,9 +180,9 @@ main { min-width: 0; padding: 1rem var(--pad) 5rem; }
    their own horizontal margins and at equal specificity the later rule would win. */
 #main > .page > * { max-width: var(--measure); margin-inline: auto; }
 #main > .page > :is(.lab, .workbench, .wide) { max-width: var(--wide); }
-/* A table is as wide as its content, and starts at the prose's left edge; one wider than the
-   prose runs on to the right, and moves left only as far as the wide column needs it to. The
-   script sets `--need`, the table's width with nothing squeezing it. */
+/* A widened table or block of code is as wide as its content, and starts at the prose's left
+   edge; it runs on to the right, and moves left only as far as the wide column needs it to. The
+   script sets `--need`, its width with nothing squeezing it. */
 #main > .page > .wide.fits {
   width: min(100%, var(--need), var(--wide)); max-width: none; margin-right: auto;
   margin-left: max((100% - min(100%, var(--wide))) / 2,
