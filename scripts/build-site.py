@@ -747,7 +747,8 @@ def service_worker(files: list[str], version: str) -> str:
     """Keep every file of the site on first visit, so the book reads with no network after it.
 
     The list is every file the build wrote, and the cache name carries a hash of their contents,
-    so a new deploy replaces the old copy instead of mixing with it.
+    so a new deploy replaces the old copy instead of mixing with it. Online, every file comes
+    from the network, so a reader sees a new deploy on the next page they open.
     """
     return f"""// Written by scripts/build-site.py. Keeps the whole book for offline reading.
 const CACHE = "parquet-book-{version}";
@@ -763,7 +764,17 @@ self.addEventListener("fetch", (e) => {{
   // Only the book's own files: Pyodide, fetched from a CDN for the Python the page runs, is
   // cached by the browser as any other download.
   if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(caches.match(e.request, {{ ignoreSearch: true }}).then((hit) => hit || fetch(e.request)));
+  // The network first, and the kept copy only when there is none. Served from the copy first,
+  // a reader saw the book as it was when the copy was taken until a new service worker had
+  // installed and the page had been loaded again: on a phone's home screen, often not for days.
+  // Each answer from the network refreshes the copy, so offline reading gets the latest pages.
+  e.respondWith(fetch(e.request).then((response) => {{
+    if (response.ok) {{
+      const copy = response.clone();
+      caches.open(CACHE).then((c) => c.put(e.request, copy));
+    }}
+    return response;
+  }}).catch(() => caches.match(e.request, {{ ignoreSearch: true }}).then((hit) => hit || Response.error())));
 }});
 """
 
