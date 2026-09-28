@@ -2,5 +2,5 @@ The text of this book (cover.md, index.md, parts/, chapters/, appendices/) is li
 Creative Commons Attribution-NonCommercial 4.0 International licence (CC BY-NC 4.0):
 https://creativecommons.org/licenses/by-nc/4.0/
 
-The code (crates/, exercises/, tools/, scripts/, tests/, web/, fixtures/generate.py) is licensed
-under the Apache License, Version 2.0. See LICENSE-CODE.
+The code (crates/, python/, walkthroughs/, exercises/, tools/, scripts/, tests/, web/,
+fixtures/generate.py) is licensed under the Apache License, Version 2.0. See LICENSE-CODE.
