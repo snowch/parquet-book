@@ -17,9 +17,52 @@
   --text: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, "DejaVu Sans Mono", monospace;
   --top: 3.1rem;
-  --nav: 17rem;
-  --toc: 14rem;
+  /* The unit the page's widths are laid out in: the reader's text size, but never less than
+     16px. `rem` alone follows a browser's font setting down as well as up, while the prose is
+     set in px and does not, so a reader with 10px text would get both rails, the column and
+     the page's own cap at ten sixteenths of their size around a chapter that had not moved.
+     Larger text still widens the layout, which is what the rails' px caps are for. */
+  --u: max(1rem, 16px);
+  /* Two widths, each what its content needs, centred on the same middle. The prose keeps its
+     measure at every width. Anything that cannot fit in it (a panel, the workbench, and a block
+     of code or a table only when it would be cut off at the measure, which the page measures)
+     takes one wider column. One, not two: a chapter with three left edges reads as three
+     columns stacked. 72 of them because the book's Rust is formatted to 100 columns and its
+     Python to 110, which at the code's 13.5px is 850 and 930 pixels with the block's padding,
+     and the byte map puts its tree beside a sixteen-byte hex dump. Whatever is still wider says
+     so, and takes the window on a button. */
+  --measure: calc(var(--u) * 46);
+  --wide: calc(var(--u) * 72);
+  --pad: clamp(1rem, 4vw, 2.6rem);
+  /* The middle column is sized by the book, not by the window: the wide column and its padding,
+     and never more. Past that, a wider window gives the rails its spare width before the
+     margins get any. Two ramps rather than one step: the first starts where the middle column
+     stops needing every pixel, about 1440px, which is where it still clears a hundred columns
+     of code beside both rails (a rem later than the arithmetic says, because `100vw` counts a
+     classic scrollbar the layout does not have). The chapter list takes four fifths of it,
+     because its titles are the ones that wrap. Past that the column is at the wide width and
+     has no use for another pixel until the window is wider still, so a second ramp gives the
+     rails the rest before the margins get any, most of it to the outline, whose section titles
+     are the longest entries on the page. */
+  --rails: clamp(0px, (100vw - var(--u) * 91) * 0.8, var(--u) * 5);
+  --spare: clamp(0px, 100vw - var(--u) * 97.25, var(--u) * 7.5);
+  /* Capped in px, and the cap is what each rail reaches at default text on the widest window,
+     so nothing moves for a reader on browser defaults. It bites when the reader's text is
+     larger, and it has to: in a `@media` rule `rem` is 16px whatever the reader has set, so at
+     24px text the layout would decide there was room for both rails at 72rem and then draw
+     them half as wide again, over the chapter. */
+  --nav: min(calc(var(--u) * 17 + var(--rails) * 0.8 + var(--spare) * 0.2), 360px);
+  --toc: min(calc(var(--u) * 14 + var(--rails) * 0.2 + var(--spare) * 0.8), 336px);
 }
+/* Registered, so each is computed once, here, as pixels: the script that decides whether the
+   outline has room reads them, and an unregistered property would hand it back its own text. */
+@property --measure { syntax: "<length>"; inherits: true; initial-value: 736px; }
+@property --wide { syntax: "<length>"; inherits: true; initial-value: 1152px; }
+@property --pad { syntax: "<length>"; inherits: true; initial-value: 16px; }
+@property --rails { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --spare { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --nav { syntax: "<length>"; inherits: true; initial-value: 272px; }
+@property --toc { syntax: "<length>"; inherits: true; initial-value: 224px; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --ink: #dde4e8; --muted: #a7b8c1; --faint: #83949d;
@@ -63,12 +106,46 @@ a.xref:hover { text-decoration: underline; }
               border: 1px solid var(--edge); border-radius: 6px; padding: .45rem .7rem;
               cursor: pointer; }
 .top button:hover { border-color: var(--accent); color: var(--accent); }
-#menu { display: none; }
+/* Written `hidden` and shown by the script that makes it work: `display` on a class would beat
+   the browser's own rule for the attribute. */
+.top [hidden] { display: none; }
 
-/* Three columns: chapters, the page, and the page's own outline. */
-.layout { display: grid; grid-template-columns: var(--nav) minmax(0, 1fr) var(--toc); }
-.nav, .toc { position: sticky; top: var(--top); align-self: start; height: calc(100vh - var(--top));
-             overflow-y: auto; font: 14px/1.45 var(--chrome); padding: 1.4rem 1rem 3rem; }
+/* Three columns: chapters, the page, and the page's own outline. Each rail is hidden until
+   there is room for it, and declared hidden before the rules that show it, so those win by order.
+   Two steps, not one: the prose needs 58rem beside the chapter list and 72rem beside both, and
+   one breakpoint at the larger would leave a 1024px tablet with no chapter list and a third of
+   its width empty. Below the first, the Chapters button opens the list over the page. */
+.layout { display: grid; grid-template-columns: minmax(0, calc(var(--wide) + 2 * var(--pad)));
+          justify-content: center; }
+.nav, .toc { display: none; position: sticky; top: var(--top); align-self: start;
+             height: calc(100vh - var(--top)); overflow-y: auto; overscroll-behavior: contain;
+             font: 14px/1.45 var(--chrome); padding: 1.4rem 1rem 3rem; }
+@media (max-width: 57.99rem) {
+  .nav { position: fixed; inset: var(--top) 0 0 0; z-index: 15; height: auto; background: var(--bg); }
+  body.nav-open .nav { display: block; }
+}
+/* The middle column is the widest thing a chapter holds, and the group of columns is what
+   centres: `1fr` would make it whatever the window has left, a column sized by the screen
+   rather than by the book. Each rail has a button of its own in the top bar, so a reader can
+   give the chapter back 272px, 224px or both. The outline also goes by itself when showing it
+   would leave the chapter narrower than its content needs (`toc-cramped`, set by the script,
+   because a media query cannot see the reader's text size), and on a page with no sections. */
+@media (min-width: 58rem) {
+  .layout { grid-template-columns: var(--nav) minmax(0, calc(var(--wide) + 2 * var(--pad))); }
+  .nav { display: block; }
+  html.nav-closed .layout { grid-template-columns: minmax(0, calc(var(--wide) + 2 * var(--pad))); }
+  html.nav-closed .nav { display: none; }
+}
+@media (min-width: 72rem) {
+  .layout { grid-template-columns: var(--nav) minmax(0, calc(var(--wide) + 2 * var(--pad))) var(--toc); }
+  html.nav-closed .layout { grid-template-columns: minmax(0, calc(var(--wide) + 2 * var(--pad))) var(--toc); }
+  html:is(.toc-closed, .toc-cramped, .toc-none) .layout {
+    grid-template-columns: var(--nav) minmax(0, calc(var(--wide) + 2 * var(--pad))); }
+  html.nav-closed:is(.toc-closed, .toc-cramped, .toc-none) .layout {
+    grid-template-columns: minmax(0, calc(var(--wide) + 2 * var(--pad))); }
+  .toc { display: block; }
+  html:is(.toc-closed, .toc-cramped, .toc-none) .toc { display: none; }
+}
 .nav { border-right: 1px solid var(--edge); }
 .nav ol { list-style: none; margin: 0; padding: 0; }
 .nav .part { margin: 1.1rem 0 .3rem; font-size: 11.5px; font-weight: 600; letter-spacing: .06em;
@@ -84,7 +161,7 @@ a.xref:hover { text-decoration: underline; }
                           text-transform: uppercase; color: var(--faint); border: 1px solid var(--edge);
                           border-radius: 3px; padding: 0 .25rem; }
 .nav .num { font-variant-numeric: tabular-nums; color: var(--faint); margin-right: .35rem; }
-.toc { color: var(--muted); }
+.toc { color: var(--muted); border-left: 1px solid var(--edge); }
 .toc p { margin: 0 0 .5rem; font-size: 11.5px; font-weight: 600; letter-spacing: .06em;
          text-transform: uppercase; color: var(--faint); }
 .toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--edge); }
@@ -92,19 +169,21 @@ a.xref:hover { text-decoration: underline; }
 .toc a:hover { color: var(--accent); }
 .toc .d3 a { padding-left: 1.4rem; font-size: 13px; }
 
-main { min-width: 0; padding: 1rem 2.2rem 5rem; }
-.page { max-width: 46rem; margin: 0 auto; }
-.page > .wide, .page :is(.lab, .workbench) { max-width: none; }
-/* An experiment takes the whole middle column, not the prose measure: a hex dump is sixteen
-   columns wide and sits beside a tree. The margin is the difference between the column and the
-   prose, so the panel never reaches under the outline beside it. Code a reader edits (a chapter's
-   problems) gets the same width, for its long lines. */
-@media (min-width: 75rem) {
-  .page :is(.lab, .workbench) { margin-inline: min(0px, calc((100% - min(100vw - var(--nav) - var(--toc) - 5.4rem, 72rem)) / 2)); }
-}
-@media (min-width: 52rem) and (max-width: 75rem) {
-  .page :is(.lab, .workbench) { margin-inline: min(0px, calc((100% - (100vw - var(--nav) - 5.4rem)) / 2)); }
-}
+main { min-width: 0; padding: 1rem var(--pad) 5rem; }
+/* The measure belongs to each thing in the chapter rather than to the column holding them, so
+   prose, headings and notes keep one line length and stay centred while what needs more room
+   spreads into the wide column around them. Addressed through the id, because most children set
+   their own horizontal margins and at equal specificity the later rule would win. */
+#main > .page > * { max-width: var(--measure); margin-inline: auto; }
+#main > .page > :is(.lab, .workbench, .wide) { max-width: var(--wide); }
+/* A table is as wide as its content, and starts at the prose's left edge; one wider than the
+   prose runs on to the right, and moves left only as far as the wide column needs it to. The
+   script sets `--need`, the table's width with nothing squeezing it. */
+#main > .page > .wide.fits {
+  width: min(100%, var(--need), var(--wide)); max-width: none; margin-right: auto;
+  margin-left: max((100% - min(100%, var(--wide))) / 2,
+                   min((100% - min(100%, var(--measure))) / 2,
+                       (100% + min(100%, var(--wide))) / 2 - min(100%, var(--need), var(--wide)))); }
 
 main :is(h1, h2, h3, h4) { font-family: var(--chrome); letter-spacing: -.012em; }
 h1 { font-size: clamp(1.6rem, 5.4vw, 2.1rem); font-weight: 700; line-height: 1.18;
@@ -142,12 +221,13 @@ pre code { background: none; padding: 0; font-size: inherit; }
 .tok-attr, .tok-macro { color: var(--tok-attr); }
 figure.quoted { margin: 1.3rem 0; }
 figure.quoted pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
-.source-bar { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
+.source-bar { display: flex; gap: 1rem; align-items: baseline;
               font: 12px/1.4 var(--chrome); color: var(--faint); background: var(--panel);
               border: 1px solid var(--edge); border-bottom: 0; border-radius: 6px 6px 0 0;
               padding: .35rem 1rem; }
+.source-bar .source-label { flex: none; }
 .source-bar code { background: none; padding: 0; font-size: 12px; overflow-wrap: anywhere; }
-.source-bar a { color: var(--muted); text-decoration: none; min-width: 0; }
+.source-bar a { color: var(--muted); text-decoration: none; min-width: 0; margin-left: auto; }
 .source-bar a:hover { color: var(--accent); }
 /* The same step in Python and in Rust. The head script sets <html data-code>; without it both
    panels show, one after the other, and the tab bar is hidden. */
@@ -166,6 +246,44 @@ html[data-code] .tab-panel .source-bar { border-top-left-radius: 0; }
 html[data-code="python"] .tab-panel[data-code="rust"],
 html[data-code="rust"] .tab-panel[data-code="python"] { display: none; }
 html:not([data-code]) .tab-panel + .tab-panel { margin-top: 1rem; }
+/* The button that gives the window to something the column cannot hold: a line of code longer
+   than the wide column, or a table wider than it. The script puts one on every block of code
+   and every table and shows it only where the block is cut off, which only the page can know,
+   having the fonts. A quoted file keeps it in its bar; anything else is wrapped in a
+   `wide-block` with the button above it, right-aligned, where it covers nothing: over the
+   corner it would sit on a table's last heading or a command's Run button. Opened, the same
+   element is moved nowhere and reloaded never, so an edit in progress survives the trip. */
+.expand { display: inline-flex; align-items: center; gap: .35rem; font: 12px/1 var(--chrome);
+          color: var(--muted); background: var(--bg); border: 1px solid var(--edge);
+          border-radius: 5px; padding: .3rem .5rem; cursor: pointer; }
+.expand:hover { border-color: var(--accent); color: var(--accent); }
+.expand[hidden] { display: none; }
+.source-bar .expand { align-self: center; flex: none; margin: -.15rem 0; }
+.wide-block { margin: 1.3rem 0; }
+.wide-block > :is(pre, .table-wrap, .runnable) { margin-top: 0; }
+.wide-block > pre:last-child, .wide-block > .table-wrap:last-child { margin-bottom: 0; }
+.wide-block > .expand { display: flex; width: fit-content; margin: 0 0 .4rem auto; }
+.wide-block > .expand[hidden] { display: none; }
+/* Open, it fills the window, above the top bar, and scrolls in itself, because the page behind
+   it cannot: `expand-open` stops the document scrolling, so anything that left the box would
+   be out of reach rather than off screen. The button stays pinned to the window's corner. */
+html.expand-open { overflow: hidden; }
+html.expand-open #main .page .expanded {
+  position: fixed; inset: 0; z-index: 40; margin: 0; width: auto; max-width: none;
+  background: var(--bg); display: flex; flex-direction: column; padding: .6rem;
+  overflow: auto; overscroll-behavior: contain; }
+html.expand-open #main .expanded > .expand { position: fixed; top: .6rem; right: .6rem; z-index: 41;
+                                             margin: 0; }
+html.expand-open #main .expanded.wide-block { padding-top: 2.8rem; }
+html.expand-open #main .expanded > :is(pre, .runnable) { flex: 1 1 auto; min-height: 0; margin: 0; }
+html.expand-open #main .expanded > .runnable { display: flex; flex-direction: column; }
+html.expand-open #main .expanded > .runnable > :is(pre, .code-area) { flex: 1 1 auto; min-height: 0;
+                                                                       margin: 0; resize: none; }
+/* A table is as wide as its content and the box scrolls: left a scroll box of its own, the
+   table would keep a swipe that started on it, and on a phone its last columns could not be
+   reached. */
+html.expand-open #main .expanded .table-wrap { overflow: visible; margin: 0; }
+html.expand-open #main .expanded table { width: max-content; }
 kbd { font-size: .8em; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px;
       padding: .05em .35em; background: var(--panel); }
 
@@ -189,8 +307,10 @@ td code { font-size: 12.5px; }
   table.cards, table.cards tbody, table.cards tr, table.cards td { display: block; width: 100%; }
   table.cards thead { display: none; }
   table.cards tr { border-bottom: 1px solid var(--rule); padding: .45rem 0; }
-  table.cards td { display: grid; grid-template-columns: minmax(6.5rem, 38%) 1fr; gap: .7rem;
-                   border: 0; padding: .12rem 0; text-align: left; }
+  /* A value may be one long token (a logical type, a column's dotted path), so it breaks
+     anywhere rather than pushing the card wider than the screen. */
+  table.cards td { display: grid; grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr); gap: .7rem;
+                   border: 0; padding: .12rem 0; text-align: left; overflow-wrap: anywhere; }
   table.cards td::before { content: attr(data-label); font-size: 11px; font-weight: 600;
                            letter-spacing: .05em; text-transform: uppercase; color: var(--faint);
                            padding-top: .15em; }
@@ -218,17 +338,8 @@ td code { font-size: 12.5px; }
 .footnotes { margin-top: 3rem; font-size: .9em; color: var(--muted); border-top: 1px solid var(--edge); }
 .stamp { margin-top: 2rem; font: 12.5px/1.4 var(--chrome); color: var(--faint); }
 
-@media (max-width: 75rem) {
-  .layout { grid-template-columns: var(--nav) minmax(0, 1fr); }
-  .toc { display: none; }
-}
 @media (max-width: 52rem) {
-  .layout { grid-template-columns: minmax(0, 1fr); }
-  #menu { display: inline-block; }
   .brand span { display: none; }
-  .nav { display: none; position: fixed; inset: var(--top) 0 0 0; z-index: 15; height: auto;
-         background: var(--bg); }
-  body.nav-open .nav { display: block; }
-  main { padding: 1rem 1rem 4rem; }
+  main { padding-bottom: 4rem; }
   body { font-size: 17px; }
 }

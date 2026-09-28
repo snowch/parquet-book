@@ -369,6 +369,14 @@ The lookup and scan tables are four columns; the compaction figure keeps only it
   `tests/test_python.py` still compares every report and every command through both readers, and
   fails if one is added without a comparison.
 
+## Done: a layout sized by the book
+
+- Ported from the reference book: code or a table that would be cut off at the prose's measure
+  takes a 72rem wide column (measured in the page), and what that still cuts off gets an Expand
+  button (Back and Escape close it). The outline hides itself when it would crowd the chapter,
+  both rails close from the top bar and stay closed, the rails show from 58rem and 72rem, and on
+  wide windows they grow into the spare width instead of leaving margins.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,

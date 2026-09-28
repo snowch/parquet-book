@@ -116,9 +116,10 @@ def toc_html(mdast: dict) -> str:
                 f"{html.escape(renderer.text_of(node))}</a></li>"
             )
     if not items:
-        return '<aside class="toc"></aside>'
+        return '<aside class="toc" id="toc"></aside>'
     return (
-        f'<aside class="toc" aria-label="On this page"><p>On this page</p><ol>{"".join(items)}</ol></aside>'
+        f'<aside class="toc" id="toc" aria-label="On this page"><p>On this page</p>'
+        f"<ol>{''.join(items)}</ol></aside>"
     )
 
 
@@ -189,7 +190,6 @@ HEAD_SCRIPT = r"""<script>
       try { if (theme === "system") localStorage.removeItem("theme"); else localStorage.setItem("theme", theme); } catch (e) {}
       apply(); show();
     });
-    document.getElementById("menu").addEventListener("click", () => document.body.classList.toggle("nav-open"));
   });
   // Where the reader is: the page and how far down it, kept as they read. Opened from a home
   // screen, the book starts at index.html?resume (manifest.webmanifest) and goes back there; the
@@ -251,6 +251,305 @@ HEAD_SCRIPT = r"""<script>
 </script>"""
 
 
+#: The two rails, and whether the reader wants them. Below 58rem the chapter list is closed and
+#: the Chapters button opens it over the page; where there is room it is open, and the same
+#: button closes it. The outline exists only from 72rem, so its button is there and nowhere
+#: else. Either choice is remembered, per browser rather than per page, and read before the page
+#: paints, so a reader who closed a rail does not watch it close again on every chapter.
+#:
+#: The outline also hides itself when showing it would leave the chapter narrower than what it
+#: holds: the prose's measure, or, on a page with code, a hundred columns of it, which is where
+#: the book's Rust stops. A media query cannot decide that, because `rem` inside one is 16px
+#: whatever the reader's text size, so it is decided here, from the rails' own computed widths
+#: (neither depends on whether the outline is shown, so this cannot chase itself) and a block of
+#: a hundred zeros measured in whatever monospace font this device has. Closing the chapter list
+#: gives the outline its room back.
+RAILS = r"""<script>
+(() => {
+  const root = document.documentElement;
+  try {
+    if (localStorage.getItem("nav") === "closed") root.classList.add("nav-closed");
+    if (localStorage.getItem("toc") === "closed") root.classList.add("toc-closed");
+  } catch (e) {}
+  const wide = matchMedia("(min-width: 58rem)"), roomy = matchMedia("(min-width: 72rem)");
+  const px = (name) => parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0;
+  let columns = null;
+  const columnsNeed = () => {
+    if (!root.classList.contains("has-code")) return 0;
+    if (columns === null) {
+      // Before the body exists the probe goes in the root element; the stylesheet has loaded,
+      // since a script waits for the stylesheets above it, so it is styled as a block of code.
+      const probe = document.createElement("pre");
+      probe.textContent = "0".repeat(100);
+      probe.style.cssText = "position:absolute;visibility:hidden;width:max-content;margin:0";
+      (document.body || root).appendChild(probe);
+      columns = probe.getBoundingClientRect().width;
+      probe.remove();
+    }
+    return columns;
+  };
+  // The window less a classic scrollbar, measured rather than read from the page: before the
+  // page has a body it does not scroll yet, and every page of the book does once it has.
+  let bar = null;
+  const room = () => {
+    if (bar === null) {
+      const probe = document.createElement("div");
+      probe.style.cssText = "position:absolute;visibility:hidden;overflow:scroll;width:100px;height:50px";
+      (document.body || root).appendChild(probe);
+      bar = probe.offsetWidth - probe.clientWidth;
+      probe.remove();
+    }
+    return innerWidth - bar;
+  };
+  const cramped = () => {
+    if (!roomy.matches) return false;
+    const rails = (root.classList.contains("nav-closed") ? 0 : px("--nav")) + px("--toc");
+    return room() - rails - 2 * px("--pad") < Math.max(px("--measure"), columnsNeed());
+  };
+  const reflect = () => {
+    root.classList.toggle("toc-cramped", cramped());
+    const menu = document.getElementById("menu"), outline = document.getElementById("outline");
+    if (menu) {
+      const shown = wide.matches ? !root.classList.contains("nav-closed")
+                                 : document.body.classList.contains("nav-open");
+      menu.setAttribute("aria-expanded", String(shown));
+      menu.title = `${shown ? "Hide" : "Show"} the list of chapters`;
+    }
+    if (outline) {
+      // Where the rail cannot be laid out, neither is its button: a control for something the
+      // reader cannot see is worse than none.
+      outline.hidden = !roomy.matches || root.classList.contains("toc-cramped")
+        || root.classList.contains("toc-none");
+      const shown = !root.classList.contains("toc-closed");
+      outline.setAttribute("aria-expanded", String(shown));
+      outline.title = `${shown ? "Hide" : "Show"} this page's outline`;
+    }
+  };
+  const remember = (key, closed) => {
+    try { if (closed) localStorage.setItem(key, "closed"); else localStorage.removeItem(key); } catch (e) {}
+  };
+  reflect();
+  addEventListener("resize", reflect);
+  wide.addEventListener("change", () => { document.body.classList.remove("nav-open"); reflect(); });
+  roomy.addEventListener("change", reflect);
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("menu").addEventListener("click", () => {
+      if (wide.matches) remember("nav", root.classList.toggle("nav-closed"));
+      else document.body.classList.toggle("nav-open");
+      reflect();
+    });
+    document.getElementById("outline").addEventListener("click", () => {
+      remember("toc", root.classList.toggle("toc-closed"));
+      reflect();
+    });
+    columns = null;
+    reflect();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { columns = null; reflect(); });
+  });
+})();
+</script>"""
+
+
+#: What the column cannot hold. A block of code or a table sits at the prose's measure, and takes
+#: the wide column only when it would be cut off at the measure: the `wide` class, decided here,
+#: because only the page knows the fonts it got. Each is measured once, as a copy with nothing
+#: squeezing it, so a table that would wrap its cells to fit counts as cut off too, and a tab set
+#: is sized by the wider of its two languages, so switching language never moves the column. A
+#: table also gets `fits` and its own width, so it starts at the prose's left edge (book.css).
+#:
+#: Anything still cut off at the width it was given gets an Expand button, which gives it the
+#: window: the same element, so an edit in progress and the reader's place both survive. On a
+#: phone an expanded block reads as a page of its own, so Back closes it rather than leaving the
+#: chapter: opening adds a history entry, and every way of closing goes back through it.
+EXPAND = r"""<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const root = document.documentElement;
+  const article = document.querySelector("#main > .page");
+  if (!article) return;
+  const px = (name) => parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0;
+  const phone = matchMedia("(max-width: 40rem)");
+  // Panels, the workbench and a run's output look after their own widths.
+  const OWN = ".lab, .workbench, .run-result, .results";
+  const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted";
+
+  let scrolled = 0;
+  const label = (button, open) => {
+    button.querySelector("span").textContent = open ? "Close" : "Expand";
+    button.setAttribute("aria-expanded", String(open));
+  };
+  const shut = () => {
+    const box = article.querySelector(".expanded");
+    if (!box) return;
+    box.classList.remove("expanded");
+    root.classList.remove("expand-open");
+    const button = box.querySelector(".expand");
+    label(button, false);
+    // It left the flow while it was open, so the page under it moved. Put the reader back where
+    // they were rather than wherever the shorter page ended up.
+    scrollTo({ top: scrolled, behavior: "instant" });
+    button.focus({ preventScroll: true });
+    schedule();
+  };
+  const close = () => {
+    if (!article.querySelector(".expanded")) return;
+    if (history.state && history.state.expanded) history.back();
+    else shut();
+  };
+  addEventListener("popstate", shut);
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
+
+  const control = (box) => {
+    const button = document.createElement("button");
+    button.className = "expand";
+    button.type = "button";
+    button.hidden = true;
+    button.setAttribute("aria-expanded", "false");
+    button.title = "Show all of it, in the whole window";
+    button.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">'
+      + '<path d="M6 2H2v4M10 14h4v-4M2 10v4h4M14 6V2h-4" fill="none" stroke="currentColor"'
+      + ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Expand</span>';
+    button.addEventListener("click", () => {
+      if (box.classList.contains("expanded")) { close(); return; }
+      scrolled = scrollY;
+      history.pushState({ expanded: true }, "");
+      box.classList.add("expanded");
+      root.classList.add("expand-open");
+      label(button, true);
+    });
+    return button;
+  };
+  // The box a block opens in: a quoted file is its own, with the button in its bar; anything
+  // else is wrapped, with a command's Run button and its output inside the wrapper.
+  const boxOf = (el) => {
+    const quoted = el.closest("figure.quoted");
+    if (quoted) {
+      if (!quoted.querySelector(":scope > .source-bar > .expand")) {
+        quoted.querySelector(":scope > .source-bar").append(control(quoted));
+      }
+      return quoted;
+    }
+    const wrapped = el.closest(".wide-block");
+    if (wrapped) return wrapped;
+    const target = el.parentElement.classList.contains("runnable") ? el.parentElement : el;
+    const box = document.createElement("div");
+    box.className = "wide-block";
+    target.before(box);
+    box.append(control(box), target);
+    while (box.nextElementSibling && box.nextElementSibling.matches(".run-result, .run-note")) {
+      box.append(box.nextElementSibling);
+    }
+    return box;
+  };
+
+  // What each block needs with nothing squeezing it: a copy, laid out out of sight at its
+  // content's width. A block of code never changes, so its answer is kept; an edited step's
+  // text area is measured each time, as a block of its text in its own font.
+  const kept = new WeakMap();
+  const needs = (els) => {
+    const meter = document.createElement("div");
+    meter.style.cssText = "position:fixed;left:0;top:0;visibility:hidden;pointer-events:none;"
+      + "width:max-content;height:0;overflow:hidden";
+    const copies = els.map((el) => {
+      if (kept.has(el)) return null;
+      let copy;
+      if (el.matches("textarea")) {
+        const cs = getComputedStyle(el);
+        copy = document.createElement("pre");
+        copy.textContent = el.value;
+        copy.style.cssText = `font:${cs.font};padding:0 ${cs.paddingRight} 0 ${cs.paddingLeft};`
+          + `border:0 solid;border-width:0 ${cs.borderRightWidth} 0 ${cs.borderLeftWidth};`
+          + `tab-size:${cs.tabSize}`;
+      } else if (el.matches(".table-wrap")) {
+        const table = el.querySelector("table");
+        // On a phone a table of many columns is a card per row, which is never cut off.
+        if (!table || (table.matches(".cards") && phone.matches)) return null;
+        copy = table.cloneNode(true);
+        copy.style.display = "table";
+      } else {
+        copy = el.cloneNode(true);
+      }
+      copy.style.width = "max-content";
+      copy.style.maxWidth = "none";
+      copy.style.margin = "0";
+      copy.style.overflow = "visible";
+      meter.append(copy);
+      return copy;
+    });
+    document.body.append(meter);
+    const out = els.map((el, i) => {
+      if (!copies[i]) return kept.get(el) || 0;
+      const width = copies[i].getBoundingClientRect().width;
+      if (!el.matches("textarea")) kept.set(el, width);
+      return width;
+    });
+    meter.remove();
+    return out;
+  };
+  const topOf = (el) => {
+    while (el && el.parentElement !== article) el = el.parentElement;
+    return el;
+  };
+
+  let width = -1;
+  const layout = () => {
+    pending = false;
+    if (root.classList.contains("expand-open")) return;
+    const blocks = [...article.querySelectorAll("pre, textarea.code-area, .table-wrap")]
+      .filter((el) => !el.closest(OWN) && !el.matches(".table-wrap pre"));
+    const boxes = blocks.map(boxOf);
+    const need = needs(blocks);
+    const prose = Math.min(article.clientWidth, px("--measure"));
+    width = article.clientWidth;
+    // Each top-level block takes the wide column if anything in it would be cut off at the
+    // measure. A block inside a list or a note keeps its place, and gets the button if it needs it.
+    const units = new Map();
+    blocks.forEach((el, i) => {
+      const unit = topOf(el);
+      if (!unit || !unit.matches(PROMOTE)) return;
+      const u = units.get(unit) || { need: 0, tables: true };
+      u.need = Math.max(u.need, need[i]);
+      u.tables = u.tables && el.matches(".table-wrap");
+      units.set(unit, u);
+    });
+    for (const el of article.querySelectorAll(":scope > .wide")) {
+      if (!units.has(el)) el.classList.remove("wide", "fits");
+    }
+    for (const [unit, u] of units) {
+      const wide = u.need > prose + 1;
+      unit.classList.toggle("wide", wide);
+      unit.classList.toggle("fits", wide && u.tables);
+      if (wide && u.tables) unit.style.setProperty("--need", `${Math.ceil(u.need)}px`);
+    }
+    // Then, at the width each was given, which are still cut off. A block in the other language's
+    // tab is not laid out; it is asked again when the reader switches.
+    const cut = blocks.map((el, i) => el.offsetParent !== null
+      && need[i] > (el.matches(".table-wrap") ? el.clientWidth : el.offsetWidth) + 1);
+    blocks.forEach((el, i) => {
+      if (el.offsetParent === null) return;
+      const button = boxes[i].querySelector(":scope > .expand, :scope > .source-bar > .expand");
+      button.hidden = !cut[i];
+    });
+  };
+  let pending = false;
+  const schedule = () => {
+    if (!pending) { pending = true; requestAnimationFrame(layout); }
+  };
+  layout();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+  // The column changes width with the window and when a rail opens or closes.
+  new ResizeObserver(() => { if (article.clientWidth !== width) schedule(); }).observe(article);
+  document.addEventListener("click", (event) => { if (event.target.closest(".tab-bar")) schedule(); });
+  // A walkthrough step swaps its code for a text area and back, and the reader types into it.
+  new MutationObserver((records) => {
+    if (records.some((r) => [...r.addedNodes].some((n) => n.nodeName === "PRE" || n.nodeName === "TEXTAREA"))) {
+      schedule();
+    }
+  }).observe(article, { childList: true, subtree: true });
+  article.addEventListener("input", (event) => { if (event.target.matches("textarea.code-area")) schedule(); });
+});
+</script>"""
+
+
 def page_html(
     p: dict, body: str, nav: str, toc: str, prev: dict | None, nxt: dict | None, stamp: str, has_lab: bool
 ) -> str:
@@ -279,8 +578,12 @@ def page_html(
         else ""
     )
     title = f"{p['label']} · {p['title']}" if p["label"] else p["title"]
+    # What the rails' script needs to know before the page has a body: whether this page has
+    # sections for an outline to list, and whether it shows code, which asks more of the column.
+    classes = [c for c, on in (("toc-none", "<ol>" not in toc), ("has-code", "<pre" in body)) if on]
+    attrs = f' class="{" ".join(classes)}"' if classes else ""
     return f"""<!doctype html>
-<html lang="en-GB">
+<html lang="en-GB"{attrs}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -292,11 +595,14 @@ def page_html(
 <link rel="stylesheet" href="book.css">
 {lab}
 {HEAD_SCRIPT}
+{RAILS}
+{EXPAND}
 </head>
 <body>
 <header class="top">
-<button id="menu" type="button" aria-controls="nav">Chapters</button>
+<button id="menu" type="button" aria-controls="nav" aria-expanded="false">Chapters</button>
 <a class="brand" href="index.html">{TITLE} <span>· {SUBTITLE}</span></a>
+<button id="outline" type="button" aria-controls="toc" aria-expanded="true" hidden>On this page</button>
 <button id="theme" type="button" hidden>System</button>
 </header>
 <div class="layout">

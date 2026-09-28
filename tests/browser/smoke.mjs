@@ -685,6 +685,104 @@ await page.goto(base + "writing-parquet-well.html");
     "every Rust walkthrough step offers a Codespace");
 }
 
+// The layout. Code or a table that would be cut off at the prose's measure takes the wide column,
+// and whatever that still cuts off has an Expand button, which gives it the window and gives it
+// back; the outline makes way when it would crowd the chapter; each rail closes from the top bar
+// and stays closed; and a phone never scrolls sideways.
+{
+  const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const blocks = () => page.evaluate(() => [...document.querySelectorAll("#main pre, #main textarea.code-area")]
+    .filter((e) => e.offsetParent !== null && !e.closest(".lab, .workbench, .run-result, .results"))
+    .map((e) => {
+      const box = e.closest("figure.quoted, .wide-block");
+      const button = box && box.querySelector(".expand");
+      return { cut: e.scrollWidth > e.clientWidth + 1, expand: !!button && !button.hidden,
+        width: e.getBoundingClientRect().width };
+    }));
+  const shown = (selector) => page.locator(selector).evaluate((e) => getComputedStyle(e).display !== "none");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(base + "skipping-data.html");
+  await settle();
+  const prose = await page.locator("#main .page > p:not(.builds)").first().evaluate((e) => e.getBoundingClientRect().width);
+  let seen = await blocks();
+  check(seen.length > 0 && seen.some((b) => b.width > prose + 40) && seen.every((b) => !b.cut || b.expand),
+    `at 1440px code wider than the ${Math.round(prose)}px prose takes the wide column (up to ${Math.round(Math.max(...seen.map((b) => b.width)))}px), and none is cut off without Expand`);
+  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await settle();
+  seen = await blocks();
+  check(seen.every((b) => !b.cut || b.expand), `ch02: ${seen.filter((b) => b.cut).length} of ${seen.length} blocks still cut off at 1440px, each with an Expand button`);
+  {
+    const button = page.locator("#main .expand:visible").first();
+    await button.scrollIntoViewIfNeeded();
+    const y = await page.evaluate(() => scrollY);
+    await button.click();
+    const full = await page.locator("#main .expanded").evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return r.left === 0 && r.top === 0 && r.width === innerWidth && r.height === innerHeight;
+    });
+    check(full && (await button.getAttribute("aria-expanded")) === "true", "Expand gives the block the whole window");
+    await page.keyboard.press("Escape");
+    await settle();
+    check(await page.locator("#main .expanded").count() === 0 && Math.abs(await page.evaluate(() => scrollY) - y) < 2,
+      "Escape closes it, back where the reader was");
+    await button.click();
+    await page.goBack();
+    await page.waitForFunction(() => !document.querySelector("#main .expanded"));
+    check(page.url().endsWith("anatomy-of-a-parquet-file.html") && Math.abs(await page.evaluate(() => scrollY) - y) < 2,
+      "and Back closes it without leaving the chapter");
+  }
+
+  // At 1280px the outline beside the chapter list would leave the chapter narrower than its prose.
+  await page.goto(base + "skipping-data.html");
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await settle();
+  check(!(await shown(".toc")) && await page.locator("#outline").isHidden(),
+    "at 1280px the outline makes way for the chapter, and so does its button");
+  await page.locator("#menu").click();
+  await settle();
+  check(!(await shown(".nav")) && await shown(".toc") && (await page.locator("#menu").getAttribute("aria-expanded")) === "false",
+    "closing the chapter list gives the chapter its room, and the outline comes back");
+  await page.reload();
+  await settle();
+  check(!(await shown(".nav")) && await shown(".toc"), "the closed chapter list stays closed when the page loads again");
+  await page.locator("#menu").focus();
+  await page.keyboard.press("Enter");
+  await settle();
+  check(await shown(".nav") && !(await shown(".toc")) && (await page.locator("#menu").getAttribute("aria-expanded")) === "true",
+    "and the keyboard opens it again");
+
+  // Where there is room for both rails, the outline has a button of its own, remembered too.
+  await page.setViewportSize({ width: 1920, height: 1000 });
+  await settle();
+  const outline = page.locator("#outline");
+  check(await shown(".toc") && await outline.isVisible() && (await outline.getAttribute("aria-expanded")) === "true",
+    "at 1920px both rails show, and the outline's button says it is open");
+  await outline.click();
+  await settle();
+  check(!(await shown(".toc")) && (await outline.getAttribute("aria-expanded")) === "false", "the outline's button closes it");
+  await page.goto(base + "encodings.html");
+  await settle();
+  check(!(await shown(".toc")), "and it stays closed on the next page");
+  await outline.click();
+  await settle();
+  check(await shown(".toc") && await page.evaluate(() => localStorage.getItem("toc")) === null, "and opens again");
+
+  // A phone: nothing wider than the screen, and the Chapters button opens the list over the page.
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const name of ["skipping-data.html", "what-a-query-engine-does.html", "anatomy-of-a-parquet-file.html", "nested-data.html"]) {
+    await page.goto(base + name);
+    await settle();
+    const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    check(over <= 0, `at 390px ${name} does not scroll sideways`);
+  }
+  await page.locator("#menu").click();
+  check(await page.locator(".nav").isVisible() && (await page.locator("#menu").getAttribute("aria-expanded")) === "true",
+    "on a phone the Chapters button opens the list");
+  await page.locator("#menu").click();
+  check(await page.locator(".nav").isHidden(), "and closes it");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+}
+
 // Opened from a home screen, the book starts at index.html?resume and goes back to the page the
 // reader was on, as far down as they were; the preface offers the same way back.
 {
