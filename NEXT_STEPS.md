@@ -377,6 +377,13 @@ The lookup and scan tables are four columns; the compaction figure keeps only it
   both rails close from the top bar and stay closed, the rails show from 58rem and 72rem, and on
   wide windows they grow into the spare width instead of leaving margins.
 
+## Done: a cover
+
+- `cover.md` is published as index.html (title, tagline, what the book is, a picture of a file's
+  bytes in `web/cover-hero.svg`, byline and licences, held to myst.yml by a test); the preface
+  moves to preface.html. Resuming from the home screen and the Continue reading link start at the
+  cover, and the preface is now remembered like any other page.
+
 ## Now: every chapter in the new shape
 
 Where a panel is mainly controls (ch09's mechanisms, ch10's strategies, ch11's writer settings,

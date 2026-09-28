@@ -18,7 +18,7 @@ from tools.render import LabBlockError, parse_lab_block
 
 ROOT = Path(__file__).resolve().parent.parent
 BOOK_PAGES = sorted(
-    [ROOT / "index.md"]
+    [ROOT / "cover.md", ROOT / "index.md"]
     + list((ROOT / "parts").glob("*.md"))
     + list((ROOT / "chapters").glob("*.md"))
     + list((ROOT / "appendices").glob("*.md"))
@@ -56,7 +56,7 @@ def test_the_table_of_contents_is_the_outline():
         if "file" in entry:
             files.append(entry["file"])
         files += [c["file"] for c in entry.get("children", [])]
-    expected = ["index.md"]
+    expected = ["cover.md", "index.md"]
     for part in PARTS:
         expected.append(part.path)
         expected += [c.path for c in CHAPTERS if c.part == part.title]
@@ -210,8 +210,28 @@ def test_the_renderer_and_the_outline_know_the_same_pages():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     sources = [p["source"] for p in module.page_list()]
-    assert sources[0] == "index.md"
+    assert sources[:2] == ["cover.md", "index.md"], "the cover, then the preface"
     assert sorted(sources) == sorted(str(p.relative_to(ROOT)) for p in BOOK_PAGES)
+
+
+#: What each licence ``myst.yml`` may declare is called, and the file in the repository that
+#: holds its text.
+LICENCES = {"CC-BY-NC-4.0": ("CC BY-NC 4.0", "LICENSE"), "Apache-2.0": ("Apache 2.0", "LICENSE-CODE")}
+
+
+def test_the_cover_names_the_author_and_the_licences_myst_declares():
+    """The cover says who wrote the book and the terms it is under, in words; ``myst.yml`` is
+    where they are declared, so the two are held to each other here."""
+    config = yaml.safe_load((ROOT / "myst.yml").read_text())["project"]
+    cover = (ROOT / "cover.md").read_text()
+    assert f"By {config['authors'][0]['name']}, in collaboration with Claude (Anthropic)" in cover
+    repo = config["github"].rstrip("/")
+    for part in ("content", "code"):
+        name, file = LICENCES[config["license"][part]]
+        assert f"[{name}]({repo}/blob/main/{file})" in cover, part
+        assert (ROOT / file).is_file()
+    assert "cover-hero.svg" in cover and (ROOT / "web" / "cover-hero.svg").is_file()
+    assert "](#preface)" in cover, "the cover starts the reader at the preface"
 
 
 def test_the_number_check_catches_a_typed_number(tmp_path):

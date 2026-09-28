@@ -58,6 +58,10 @@ LANGUAGES = {"python": "Python", "rust": "Rust"}
 #: MyST page slug -> the file this build publishes it as. Filled in by the site build.
 PAGES: dict[str, str] = {}
 
+#: An image a page shows -> the file in this repository it is copied from. Filled in as pages
+#: render, for the site build to copy each one beside the pages.
+IMAGES: dict[str, Path] = {}
+
 #: A reference whose text opens with a chapter label, which the renderer re-derives.
 LABELLED = re.compile(r"^(ch\d+|Appendix [A-Z])\b")
 
@@ -216,6 +220,36 @@ def _xref(node: dict, inner: str) -> str:
     return f'<a class="xref" href="{html.escape(href)}">{inner}</a>'
 
 
+def _image(node: dict) -> str:
+    """An image from this repository, published beside the pages under its own file name.
+
+    MyST copies an image it parses to a root-relative, hashed name (``/cover-hero-1a2b….svg``),
+    which breaks under a base path; the file it came from is in ``urlSource``. An SVG's width and
+    height come from its ``viewBox``, so the page keeps the picture's room before it loads.
+    """
+    url = str(node.get("url", ""))
+    alt = html.escape(str(node.get("alt", "")))
+    source = str(node.get("urlSource") or "")
+    if url.startswith("/"):
+        path = ROOT / source
+        if not source or not path.is_file():
+            raise UnknownNodeError(f"image {url!r} is not a file in this repository")
+        name = path.name
+        if IMAGES.get(name, path) != path:
+            raise UnknownNodeError(f"two images are published as {name!r}: {IMAGES[name]} and {path}")
+        IMAGES[name] = path
+        url = name
+        box = (
+            re.search(r'viewBox="[-\d.]+ [-\d.]+ ([\d.]+) ([\d.]+)"', path.read_text())
+            if name.endswith(".svg")
+            else None
+        )
+        size = f' width="{box.group(1)}" height="{box.group(2)}"' if box else ""
+    else:
+        size = ""
+    return f'<img src="{html.escape(url)}" alt="{alt}"{size}>'
+
+
 def _plain(node: dict) -> str:
     """A node's text, without markup: a table heading as a label."""
     if "value" in node and node.get("type") in ("text", "inlineCode"):
@@ -349,9 +383,7 @@ def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
             footnotes.append(node)
         return ""
     if kind == "image":
-        src = html.escape(str(node.get("url", "")))
-        alt = html.escape(str(node.get("alt", "")))
-        return f'<img src="{src}" alt="{alt}" loading="lazy">'
+        return _image(node)
     if kind == "container":
         return f"<figure>{children()}</figure>"
     if kind == "caption":

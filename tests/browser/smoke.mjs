@@ -783,8 +783,26 @@ await page.goto(base + "writing-parquet-well.html");
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
 
-// Opened from a home screen, the book starts at index.html?resume and goes back to the page the
-// reader was on, as far down as they were; the preface offers the same way back.
+// The site opens on the cover: the book's title, its picture of a file, and the way in, which is
+// the preface, published as preface.html.
+{
+  await page.goto(base);
+  check((await page.locator("article.page h1").textContent()) === "Parquet, byte by byte", "the site opens on the cover");
+  const hero = page.locator("article.cover > img");
+  const drawn = await hero.evaluate(async (img) => { await img.decode().catch(() => {}); return img.complete && img.naturalWidth > 0; });
+  check(drawn && (await hero.getAttribute("src")) === "cover-hero.svg" && ((await hero.getAttribute("alt")) || "").includes("PAR1"),
+    "the cover shows its picture of a file, with alt text");
+  check((await page.locator(".nav a").first().textContent()) === "Cover"
+    && (await page.locator(".nav a").nth(1).getAttribute("href")) === "preface.html", "the chapter list starts at the cover, then the preface");
+  await page.getByRole("link", { name: "Start with the Preface" }).click();
+  const opened = await page.waitForURL(/preface\.html$/, { timeout: 10000 }).then(() => true, () => false);
+  check(opened && (await page.locator("article.page h1").textContent()) === "Preface", "the cover's link opens the preface");
+  check((await page.locator(".prevnext .prev").getAttribute("href")) === "index.html", "and the preface's previous page is the cover");
+}
+
+// Opened from a home screen, the book starts at the cover, index.html?resume, and goes back to the
+// page the reader was on, as far down as they were; the cover offers the same way back. The
+// preface is a page like any other, so it is remembered too; the cover never is.
 {
   await page.goto(base + "encodings.html");
   await page.mouse.wheel(0, 2000);
@@ -795,7 +813,14 @@ await page.goto(base + "writing-parquet-well.html");
   const back = await page.waitForFunction((want) => Math.abs(scrollY - want) < 5, y, { timeout: 10000 }).then(() => true, () => false);
   check(back, `the home-screen start goes back to the last page, scrolled to ${y}`);
   await page.goto(base + "index.html");
-  check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the preface links back to the last page");
+  check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the cover links back to the last page");
+  await page.goto(base + "preface.html");
+  await page.waitForTimeout(500);
+  await page.goto(base + "index.html?resume");
+  const toPreface = await page.waitForURL(/preface\.html$/, { timeout: 10000 }).then(() => true, () => false);
+  check(toPreface, "the home-screen start goes back to the preface when that was the last page");
+  await page.goto(base);
+  check((await page.locator(".resume a").getAttribute("href")) === "preface.html", "and the cover links back to it");
 }
 
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);

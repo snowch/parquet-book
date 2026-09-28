@@ -8,10 +8,11 @@ project:
   id: parquet-book
   title: Parquet, byte by byte
   description: >-
-    An executable investigation of Apache Parquet. The reader builds a small Parquet reader in
-    Rust while reading, and every experiment in the book runs that reader in the browser,
-    compiled to WebAssembly.
-  keywords: [parquet, columnar storage, file formats, object storage, rust, webassembly]
+    Apache Parquet for data engineers, read from the bytes of real files. You build a working
+    Parquet reader in Python and in Rust while you read, and ask pyarrow and the Rust parquet
+    crate the same questions. The Python steps and problems run in the page under Pyodide, and
+    the pictures are drawn by the Rust reader compiled to WebAssembly.
+  keywords: [parquet, columnar storage, file formats, object storage, python, rust, webassembly]
   authors:
     - name: Chris Snow
       url: https://snowch.github.io
@@ -34,7 +35,9 @@ project:
     - target/**
     - _build/**
   toc:
+    - file: cover.md
     - file: index.md
+      title: Preface
     - file: parts/the_file.md
       children:
         - file: chapters/why_parquet_exists.md

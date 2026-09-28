@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PAGES = ["index.md", "parts/*.md", "chapters/*.md", "appendices/*.md"]
+PAGES = ["cover.md", "index.md", "parts/*.md", "chapters/*.md", "appendices/*.md"]
 
 UNIT = (
     r"(?:bytes?|B|KB|KiB|MB|MiB|GB|GiB|ms|µs|us|seconds?|requests?|rows?|row groups?|pages?"

@@ -43,8 +43,24 @@ SUBTITLE = "Build a Parquet reader while you read about one"
 
 
 def page_list() -> list[dict]:
-    """Every page, in reading order, with what the chrome needs to know about it."""
-    pages = [{"source": "index.md", "href": "index.html", "title": "Preface", "label": None}]
+    """Every page, in reading order, with what the chrome needs to know about it.
+
+    The cover is published as index.html, where a reader arriving at the site lands, and the
+    preface as preface.html. MyST names its pages by their place in the table of contents (the
+    cover is its ``index``, the preface ``index-1``), so a link is resolved through MyST's slug,
+    never through the name a page is published under (``build``).
+    """
+    pages = [
+        {
+            "source": "cover.md",
+            "href": "index.html",
+            "title": TITLE,
+            "nav": "Cover",
+            "label": None,
+            "cover": True,
+        },
+        {"source": "index.md", "href": "preface.html", "title": "Preface", "label": None},
+    ]
     for part in PARTS:
         pages.append(
             {
@@ -101,7 +117,8 @@ def nav_html(pages: list[dict], here: str) -> str:
                 f"{html.escape(p['title'])}</a></li>"
             )
         else:
-            out.append(f'<li><a href="{p["href"]}"{c}{aria}>{html.escape(p["title"])}</a></li>')
+            name = p.get("nav", p["title"])
+            out.append(f'<li><a href="{p["href"]}"{c}{aria}>{html.escape(name)}</a></li>')
     out.append("</ol></nav>")
     return "".join(out)
 
@@ -192,8 +209,9 @@ HEAD_SCRIPT = r"""<script>
     });
   });
   // Where the reader is: the page and how far down it, kept as they read. Opened from a home
-  // screen, the book starts at index.html?resume (manifest.webmanifest) and goes back there; the
-  // preface also offers a link back, however it was reached.
+  // screen, the book starts at the cover, index.html?resume (manifest.webmanifest), and goes
+  // back there; the cover also offers a link back, however it was reached, since it is where a
+  // returning reader lands.
   const page = location.pathname.split("/").pop() || "index.html";
   let last = null;
   try { last = JSON.parse(localStorage.getItem("last-read")); } catch (e) {}
@@ -204,7 +222,8 @@ HEAD_SCRIPT = r"""<script>
     location.replace(last.page);
     return;
   }
-  // The preface is where the book starts anyway, so it is never the place to go back to.
+  // The cover is where the book starts anyway, so it is never the place to go back to. The
+  // preface is read like any other page, so it is.
   const remember = () => {
     if (page === "index.html") return;
     try {
@@ -592,9 +611,8 @@ def page_html(
         if q is None:
             return ""
         label = f"{q['label']} · " if q["label"] else ""
-        return (
-            f'<a class="{cls}" href="{q["href"]}"><small>{word}</small>{html.escape(label + q["title"])}</a>'
-        )
+        name = q.get("nav", q["title"])
+        return f'<a class="{cls}" href="{q["href"]}"><small>{word}</small>{html.escape(label + name)}</a>'
 
     lab = (
         '<link rel="stylesheet" href="lab/lab.css"><script type="module" src="lab/lab.js"></script>'
@@ -602,6 +620,8 @@ def page_html(
         else ""
     )
     title = f"{p['label']} · {p['title']}" if p["label"] else p["title"]
+    # The cover's title is the book's, said once.
+    title = TITLE if p.get("cover") else f"{title} · {TITLE}"
     # What the rails' script needs to know before the page has a body: whether this page has
     # sections for an outline to list, and whether it shows code, which asks more of the column.
     classes = [c for c, on in (("toc-none", "<ol>" not in toc), ("has-code", "<pre" in body)) if on]
@@ -611,7 +631,7 @@ def page_html(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{html.escape(title)} · {TITLE}</title>
+<title>{html.escape(title)}</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -631,7 +651,7 @@ def page_html(
 </header>
 <div class="layout">
 {nav}
-<main id="main"><article class="page">
+<main id="main"><article class="{"page cover" if p.get("cover") else "page"}">
 {h1}
 {builds}
 {body}
@@ -755,6 +775,7 @@ def build(out: Path) -> None:
     if missing:
         sys.exit(f"MyST produced no parse for: {', '.join(missing)}. Is each page in myst.yml's toc?")
     renderer.PAGES.clear()
+    renderer.IMAGES.clear()
     for p in pages:
         renderer.PAGES[parse[p["source"]]["slug"]] = p["href"]
 
@@ -785,6 +806,9 @@ def build(out: Path) -> None:
         (out / p["href"]).write_text(text)
 
     shutil.copy(ROOT / "web" / "book.css", out / "book.css")
+    # The pictures the pages show, such as the cover's, under the names the pages use.
+    for name, source in sorted(renderer.IMAGES.items()):
+        shutil.copy(source, out / name)
     (out / "favicon.svg").write_text(FAVICON)
     for size in (192, 512):
         (out / f"icon-{size}.png").write_bytes(icon_png(size))

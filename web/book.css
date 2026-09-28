@@ -293,7 +293,16 @@ kbd { font-size: .8em; border: 1px solid var(--rule); border-bottom-width: 2px; 
 
 /* Tables are data, not prose: the furniture face and lining figures. */
 .table-wrap { overflow-x: auto; margin: 1.3rem 0; }
-/* The way back to the page the reader was on, at the top of the preface. */
+/* The cover: the title larger, its tagline under it, the picture of a file across the column,
+   then the byline and the terms. The picture draws its own panel, so it reads the same on light
+   and dark pages. */
+.cover > h1 { font-size: clamp(2rem, 7.5vw, 2.9rem); margin-top: 2.2rem; }
+.cover > p:has(> em:only-child) { margin: 0 0 1.4rem; font-size: 1.2rem; line-height: 1.45;
+                                  color: var(--muted); }
+.cover > img { display: block; width: 100%; height: auto; margin: 2rem 0 1.6rem; }
+.cover > img + p { margin-bottom: .4rem; font: 600 15px/1.5 var(--chrome); }
+.cover > img + p + p { margin-top: 0; font: 13.5px/1.5 var(--chrome); color: var(--muted); }
+/* The way back to the page the reader was on, at the top of the cover. */
 .resume { margin: .2rem 0 1.4rem; font: 600 14.5px/1.4 var(--chrome); }
 .resume a { display: inline-block; padding: .5rem .8rem; border-radius: 6px; background: var(--wash);
             color: var(--accent); text-decoration: none; }

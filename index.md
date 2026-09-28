@@ -19,8 +19,8 @@ format and answers it on the bytes of a real Parquet file, in three steps:
 3. **With a library.** The same question asked of pyarrow and of the Rust `parquet` crate, the
    tools you use at work, with the answer checked against what you found by hand.
 
-[ch02](#anatomy-of-a-parquet-file) takes all three steps. The chapters after it build the reader
-and are gaining the first and third steps as the book is revised.
+Every chapter that builds a piece of the reader takes all three steps. Three chapters explain
+instead, and build nothing; *How a chapter works* says which.
 
 The reader exists twice, in Python and in Rust, held to identical answers by tests. Every excerpt
 of the reader has a tab for each; pick one and the whole book follows. The same code runs in the
