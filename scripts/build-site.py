@@ -754,7 +754,11 @@ def service_worker(files: list[str], version: str) -> str:
 const CACHE = "parquet-book-{version}";
 const FILES = {json.dumps(files)};
 self.addEventListener("install", (e) => {{
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+  // Straight from the server, not the browser's HTTP cache, which may hold a page from before
+  // this deploy for as long as the host allows (ten minutes on GitHub Pages).
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(FILES.map((f) => new Request(f, {{ cache: "reload" }}))))
+    .then(() => self.skipWaiting()));
 }});
 self.addEventListener("activate", (e) => {{
   e.waitUntil(caches.keys().then((keys) => Promise.all(
@@ -768,7 +772,9 @@ self.addEventListener("fetch", (e) => {{
   // a reader saw the book as it was when the copy was taken until a new service worker had
   // installed and the page had been loaded again: on a phone's home screen, often not for days.
   // Each answer from the network refreshes the copy, so offline reading gets the latest pages.
-  e.respondWith(fetch(e.request).then((response) => {{
+  // `no-cache` asks the server every time, so the browser's HTTP cache cannot hand back a page
+  // from before a deploy; an unchanged file costs a "not modified" reply and no body.
+  e.respondWith(fetch(e.request, {{ cache: "no-cache" }}).then((response) => {{
     if (response.ok) {{
       const copy = response.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy));
