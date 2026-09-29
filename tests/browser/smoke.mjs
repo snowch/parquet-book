@@ -842,6 +842,33 @@ await page.goto(base + "writing-parquet-well.html");
   check((await page.locator(".resume a").getAttribute("href")) === "preface.html", "and the cover links back to it");
 }
 
+// Installed on a phone, the book runs as an app whose links within the book carry no referrer
+// (Android). The cover's link must open the cover, not be taken for a launch and sent back to the
+// last page read.
+{
+  const app = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await app.addInitScript(() => {
+    const real = window.matchMedia.bind(window);
+    window.matchMedia = (q) => (q.includes("display-mode: standalone")
+      ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q));
+    Object.defineProperty(document, "referrer", { get: () => "" });
+  });
+  const tab = await app.newPage();
+  await tab.goto(base + "index.html?resume");
+  await tab.goto(base + "preface.html");
+  await tab.waitForTimeout(500);
+  await tab.locator(".prevnext .prev").click();
+  await tab.waitForURL(/index\.html$/);
+  await tab.waitForTimeout(500);
+  check(tab.url().endsWith("index.html") && (await tab.locator("article.page h1").textContent()) === "Parquet, byte by byte",
+    "in an installed book with no referrer, the cover's link opens the cover");
+  const launch = await app.newPage();
+  await launch.goto(base + "index.html");
+  const resumed = await launch.waitForURL(/preface\.html$/, { timeout: 10000 }).then(() => true, () => false);
+  check(resumed, "and a new launch of it still goes back to the last page read");
+  await app.close();
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

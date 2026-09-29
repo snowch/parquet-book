@@ -220,8 +220,15 @@ HEAD_SCRIPT = r"""<script>
   const page = location.pathname.split("/").pop() || "index.html";
   let last = null;
   try { last = JSON.parse(localStorage.getItem("last-read")); } catch (e) {}
+  // A launch is the start URL (?resume), which only a home screen opens, or, since some home
+  // screens open the page that was added rather than the manifest's start_url, the first page of
+  // a session in an installed book. Not "no referrer": an installed app on Android sends none for
+  // a link within the book, so the cover's own link was taken for a launch and went back to the
+  // last page read.
+  let first = true;
+  try { first = !sessionStorage.getItem("in-book"); sessionStorage.setItem("in-book", "1"); } catch (e) {}
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  const launched = new URLSearchParams(location.search).has("resume") || (standalone && !document.referrer);
+  const launched = new URLSearchParams(location.search).has("resume") || (standalone && first);
   if (page === "index.html" && launched && last && last.page && last.page !== "index.html") {
     try { sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {}
     location.replace(last.page);
