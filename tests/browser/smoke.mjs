@@ -785,6 +785,13 @@ await page.goto(base + "writing-parquet-well.html");
   });
   check(first.text === "Cover" && first.top >= first.bar,
     `and its first entry, ${first.text}, shows below the top bar (${Math.round(first.top)}px, bar ends at ${Math.round(first.bar)}px)`);
+  const end = await page.evaluate(() => {
+    const nav = document.querySelector("#nav"), links = nav.querySelectorAll("a");
+    nav.scrollTop = nav.scrollHeight;
+    return { fits: nav.getBoundingClientRect().bottom <= innerHeight + 1,
+             last: links[links.length - 1].getBoundingClientRect().bottom <= innerHeight + 1 };
+  });
+  check(end.fits && end.last, "and the list fits the screen and scrolls to its last entry");
   await page.locator("#menu").click();
   check(await page.locator(".nav").isHidden(), "and closes it");
   await page.setViewportSize({ width: 1440, height: 1000 });
