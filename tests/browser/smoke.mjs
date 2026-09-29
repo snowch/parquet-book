@@ -792,8 +792,13 @@ await page.goto(base + "writing-parquet-well.html");
              last: links[links.length - 1].getBoundingClientRect().bottom <= innerHeight + 1 };
   });
   check(end.fits && end.last, "and the list fits the screen and scrolls to its last entry");
+  const here = page.url();
+  await page.goBack();
+  await page.waitForTimeout(300);
+  check(await page.locator(".nav").isHidden() && page.url() === here, "Back closes the list and stays on the page");
   await page.locator("#menu").click();
-  check(await page.locator(".nav").isHidden(), "and closes it");
+  await page.locator("#menu").click();
+  check(await page.locator(".nav").isHidden(), "and the button closes it too");
   await page.setViewportSize({ width: 1440, height: 1000 });
 }
 

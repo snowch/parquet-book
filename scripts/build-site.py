@@ -357,10 +357,28 @@ RAILS = r"""<script>
   wide.addEventListener("change", () => { document.body.classList.remove("nav-open"); reflect(); });
   roomy.addEventListener("change", reflect);
   document.addEventListener("DOMContentLoaded", () => {
+    // On a phone the list covers the page and reads as a screen of its own, so Back closes it
+    // rather than leaving the chapter: opening adds a history entry, and closing goes back
+    // through it. A chapter chosen from the list replaces that entry, so Back from the chapter
+    // returns to the page the list was opened on, not to the list.
+    const body = document.body, listed = () => !!(history.state && history.state.list);
+    const shut = () => { body.classList.remove("nav-open"); reflect(); };
     document.getElementById("menu").addEventListener("click", () => {
-      if (wide.matches) remember("nav", root.classList.toggle("nav-closed"));
-      else document.body.classList.toggle("nav-open");
-      reflect();
+      if (wide.matches) { remember("nav", root.classList.toggle("nav-closed")); reflect(); return; }
+      if (!body.classList.contains("nav-open")) {
+        body.classList.add("nav-open");
+        history.pushState({ list: true }, "");
+        reflect();
+      } else if (listed()) history.back();
+      else shut();
+    });
+    addEventListener("popstate", () => { if (!listed() && body.classList.contains("nav-open")) shut(); });
+    addEventListener("pageshow", () => { if (!listed() && body.classList.contains("nav-open")) shut(); });
+    document.getElementById("nav").addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link || wide.matches || !listed()) return;
+      event.preventDefault();
+      location.replace(link.href);
     });
     document.getElementById("outline").addEventListener("click", () => {
       remember("toc", root.classList.toggle("toc-closed"));
