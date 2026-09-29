@@ -382,7 +382,10 @@ RAILS = r"""<script>
       else shut();
     });
     addEventListener("popstate", () => { if (!listed() && body.classList.contains("nav-open")) shut(); });
-    addEventListener("pageshow", () => { if (!listed() && body.classList.contains("nav-open")) shut(); });
+    // A page Back brings from the browser's memory comes back as it was left: close the list.
+    addEventListener("pageshow", (event) => {
+      if ((event.persisted || !listed()) && body.classList.contains("nav-open")) shut();
+    });
     document.getElementById("nav").addEventListener("click", (event) => {
       const link = event.target.closest("a[href]");
       if (!link || wide.matches || !listed()) return;
@@ -449,6 +452,8 @@ document.addEventListener("DOMContentLoaded", () => {
     else shut();
   };
   addEventListener("popstate", shut);
+  // Likewise a block left expanded, which would come back filling the window.
+  addEventListener("pageshow", (event) => { if (event.persisted) shut(); });
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
 
   const control = (box) => {
@@ -844,7 +849,13 @@ self.addEventListener("fetch", (e) => {{
   // Each answer from the network refreshes the copy, so offline reading gets the latest pages.
   // `no-cache` asks the server every time, so the browser's HTTP cache cannot hand back a page
   // from before a deploy; an unchanged file costs a "not modified" reply and no body.
-  e.respondWith(fetch(e.request, {{ cache: "no-cache" }}).then((response) => {{
+  // A page load is asked for afresh, by its URL: copying the browser's own request with new
+  // options is refused for a page load by some browsers (Firefox), which left the book showing
+  // its kept copy, or nothing, on Back.
+  const fresh = e.request.mode === "navigate"
+    ? fetch(e.request.url, {{ cache: "no-cache", credentials: "same-origin" }})
+    : fetch(e.request, {{ cache: "no-cache" }});
+  e.respondWith(fresh.then((response) => {{
     if (response.ok) {{
       const copy = response.clone();
       caches.open(CACHE).then((c) => c.put(e.request, copy));
