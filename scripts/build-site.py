@@ -231,6 +231,12 @@ HEAD_SCRIPT = r"""<script>
   try { first = !sessionStorage.getItem("in-book"); sessionStorage.setItem("in-book", "1"); } catch (e) {}
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
   const launched = first && (new URLSearchParams(location.search).has("resume") || standalone);
+  // Sent here by the service worker at a launch (?resumed): go down to where the reader was, and
+  // take the marker out of the address.
+  if (new URLSearchParams(location.search).has("resumed")) {
+    try { if (last && last.page === page) sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {}
+    history.replaceState(history.state, "", location.pathname + location.hash);
+  }
   if (page === "index.html" && launched && last && last.page && last.page !== "index.html") {
     try { sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {}
     // Some browsers (Firefox on Android) keep the launch page in the history although it is
@@ -244,8 +250,12 @@ HEAD_SCRIPT = r"""<script>
   // preface is read like any other page, so it is.
   const remember = () => {
     if (page === "index.html") return;
+    const now = { page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: Math.round(scrollY) };
+    try { localStorage.setItem("last-read", JSON.stringify(now)); } catch (e) {}
+    // The service worker cannot read localStorage, so the place is also kept where it can, for a
+    // launch to go straight to it (service_worker, STATE).
     try {
-      localStorage.setItem("last-read", JSON.stringify({ page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: Math.round(scrollY) }));
+      if ("caches" in window) caches.open("parquet-book-state").then((c) => c.put("last-read", new Response(JSON.stringify(now)))).catch(() => {});
     } catch (e) {}
   };
   let pending = 0;
@@ -832,6 +842,8 @@ def service_worker(files: list[str], version: str) -> str:
     return f"""// Written by scripts/build-site.py. Keeps the whole book for offline reading.
 const CACHE = "parquet-book-{version}";
 const FILES = {json.dumps(files)};
+// Where the page keeps the last page read, for a launch to go straight to (HEAD_SCRIPT writes it).
+const STATE = "parquet-book-state";
 self.addEventListener("install", (e) => {{
   // Straight from the server, not the browser's HTTP cache, which may hold a page from before
   // this deploy for as long as the host allows (ten minutes on GitHub Pages).
@@ -841,12 +853,14 @@ self.addEventListener("install", (e) => {{
 }});
 self.addEventListener("activate", (e) => {{
   e.waitUntil(caches.keys().then((keys) => Promise.all(
-    keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+    keys.filter((k) => k !== CACHE && k !== STATE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 }});
 self.addEventListener("fetch", (e) => {{
   // Only the book's own files: Pyodide, fetched from a CDN for the Python the page runs, is
   // cached by the browser as any other download.
-  if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
+  const url = new URL(e.request.url);
+  if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  const navigate = e.request.mode === "navigate";
   // The network first, and the kept copy only when there is none. Served from the copy first,
   // a reader saw the book as it was when the copy was taken until a new service worker had
   // installed and the page had been loaded again: on a phone's home screen, often not for days.
@@ -856,16 +870,40 @@ self.addEventListener("fetch", (e) => {{
   // A page load is asked for afresh, by its URL: copying the browser's own request with new
   // options is refused for a page load by some browsers (Firefox), which left the book showing
   // its kept copy, or nothing, on Back.
-  const fresh = e.request.mode === "navigate"
-    ? fetch(e.request.url, {{ cache: "no-cache", credentials: "same-origin" }})
-    : fetch(e.request, {{ cache: "no-cache" }});
-  e.respondWith(fresh.then((response) => {{
-    if (response.ok) {{
-      const copy = response.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy));
-    }}
-    return response;
-  }}).catch(() => caches.match(e.request, {{ ignoreSearch: true }}).then((hit) => hit || Response.error())));
+  const network = () => (navigate
+    ? fetch(url.href, {{ cache: "no-cache", credentials: "same-origin" }})
+    : fetch(e.request, {{ cache: "no-cache" }})).then((response) => {{
+      if (response.ok) {{
+        const copy = response.clone();
+        const key = navigate ? url.origin + url.pathname : e.request;
+        caches.open(CACHE).then((c) => c.put(key, copy));
+      }}
+      return response;
+    }});
+  const kept = () => caches.match(e.request, {{ ignoreSearch: true }});
+  const offline = () => kept().then((hit) => hit || Response.error());
+  // A launch from the home screen (index.html?resume) goes straight to the last page read, told
+  // by a redirect, so no launch page is drawn or left in the history. Waiting on the network for
+  // the start page and then for the last page left a phone on a white screen for seconds.
+  if (navigate && url.searchParams.has("resume")) {{
+    e.respondWith(caches.open(STATE).then((c) => c.match("last-read"))
+      .then((r) => (r ? r.json() : null))
+      .then((last) => (last && last.page && last.page !== "index.html"
+        ? Response.redirect(new URL(last.page + "?resumed", url).href, 302)
+        : network().catch(offline)))
+      .catch(() => network().catch(offline)));
+    return;
+  }}
+  // The page a launch goes to is shown from the kept copy at once, and refreshed behind it: after
+  // a deploy it can be one version old until the next page is opened. Every other load asks the
+  // network first.
+  if (navigate && url.searchParams.has("resumed")) {{
+    const update = network().catch(() => null);
+    e.waitUntil(update);
+    e.respondWith(kept().then((hit) => hit || update.then((r) => r || offline())));
+    return;
+  }}
+  e.respondWith(network().catch(offline));
 }});
 """
 

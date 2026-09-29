@@ -831,16 +831,17 @@ await page.goto(base + "writing-parquet-well.html");
   await page.mouse.wheel(0, 2000);
   await page.waitForTimeout(1000);
   const y = await page.evaluate(() => scrollY);
-  // A launch is a new session: the book resumes once a session, not on every visit to the start.
+  // A launch is a new session. The cover is never remembered, so it can stand before the launch.
+  await page.goto(base + "index.html");
   await page.evaluate(() => sessionStorage.clear());
   const launched = page;
   await launched.goto(base + "index.html?resume");
   await launched.waitForURL(/encodings\.html$/);
   const back = await launched.waitForFunction((want) => Math.abs(scrollY - want) < 5, y, { timeout: 10000 }).then(() => true, () => false);
   check(back, `the home-screen start goes back to the last page, scrolled to ${y}`);
-  await launched.goto(base + "index.html?resume");
+  await launched.goBack();
   await launched.waitForTimeout(500);
-  check(launched.url().endsWith("index.html?resume"), "and within that session the start shows the cover, so Back does not bounce forward");
+  check(launched.url().endsWith("index.html"), `and the launch leaves no page of its own behind: Back goes to ${launched.url().split("/").pop()}`);
   await page.goto(base + "index.html");
   check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the cover links back to the last page");
   await page.goto(base + "preface.html");
