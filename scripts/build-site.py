@@ -102,7 +102,12 @@ def is_unwritten(source: str) -> bool:
 
 def nav_html(pages: list[dict], here: str) -> str:
     out = ['<nav class="nav" id="nav" aria-label="Chapters"><ol>']
+    appendices = False
     for p in pages:
+        # The appendices get a heading as the parts do, though they have no page of their own.
+        if p["source"].startswith("appendices/") and not appendices:
+            appendices = True
+            out.append('<li class="part">Appendices</li>')
         cls = ["here"] if p["href"] == here else []
         if p.get("chapter") is not None and is_unwritten(p["source"]):
             cls.append("unwritten")
