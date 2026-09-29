@@ -30,6 +30,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -623,6 +625,32 @@ document.addEventListener("DOMContentLoaded", () => {
 </script>"""
 
 
+#: How the book was written, said the same way on the cover and at the foot of every page.
+WRITTEN_WITH = "in collaboration with Claude (Anthropic)"
+
+#: What each licence ``myst.yml`` may declare is called, and the file that holds its text.
+LICENCES = {"CC-BY-NC-4.0": ("CC BY-NC 4.0", "LICENSE"), "Apache-2.0": ("Apache 2.0", "LICENSE-CODE")}
+
+
+def colophon() -> str:
+    """The foot of every page but the cover: who wrote the book, and the terms each part of it is
+    under. Read from ``myst.yml``, the one place the licences are declared, so a page cannot name
+    other terms than the repository's. Most readers arrive on a chapter rather than the cover, and
+    code copied from any page carries these terms with it. The cover says it in its own words."""
+    config = yaml.safe_load((ROOT / "myst.yml").read_text())["project"]
+    repo = config["github"].rstrip("/")
+    author = config["authors"][0]["name"]
+
+    def terms(spdx: str) -> str:
+        name, file = LICENCES[spdx]
+        return f'<a href="{repo}/blob/main/{file}">{html.escape(name)}</a>'
+
+    return (
+        f'<footer class="colophon">By {html.escape(author)}, {WRITTEN_WITH} · Prose and figures: '
+        f"{terms(config['license']['content'])} · Code: {terms(config['license']['code'])}</footer>"
+    )
+
+
 def page_html(
     p: dict, body: str, nav: str, toc: str, prev: dict | None, nxt: dict | None, stamp: str, has_lab: bool
 ) -> str:
@@ -686,6 +714,7 @@ def page_html(
 {builds}
 {body}
 <nav class="prevnext" aria-label="Previous and next">{link(prev, "prev", "Previous")}{link(nxt, "next", "Next")}</nav>
+{"" if p.get("cover") else colophon()}
 <p class="stamp">{html.escape(stamp)}</p>
 </article></main>
 {toc}

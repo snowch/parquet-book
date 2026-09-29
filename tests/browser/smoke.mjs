@@ -817,6 +817,10 @@ await page.goto(base + "writing-parquet-well.html");
   const opened = await page.waitForURL(/preface\.html$/, { timeout: 10000 }).then(() => true, () => false);
   check(opened && (await page.locator("article.page h1").textContent()) === "Preface", "the cover's link opens the preface");
   check((await page.locator(".prevnext .prev").getAttribute("href")) === "index.html", "and the preface's previous page is the cover");
+  const foot = page.locator("footer.colophon");
+  check((await foot.count()) === 1 && (await foot.textContent()).includes("Chris Snow")
+    && (await foot.locator("a").evaluateAll((a) => a.map((x) => x.textContent))).join(",") === "CC BY-NC 4.0,Apache 2.0",
+    "every page but the cover ends with its author and licences");
 }
 
 // Opened from a home screen, the book starts at the cover, index.html?resume, and goes back to the
