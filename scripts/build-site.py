@@ -230,9 +230,13 @@ HEAD_SCRIPT = r"""<script>
   let first = true;
   try { first = !sessionStorage.getItem("in-book"); sessionStorage.setItem("in-book", "1"); } catch (e) {}
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
-  const launched = new URLSearchParams(location.search).has("resume") || (standalone && first);
+  const launched = first && (new URLSearchParams(location.search).has("resume") || standalone);
   if (page === "index.html" && launched && last && last.page && last.page !== "index.html") {
     try { sessionStorage.setItem("resume-scroll", String(last.y || 0)); } catch (e) {}
+    // Some browsers (Firefox on Android) keep the launch page in the history although it is
+    // replaced, frozen before it drew: Back showed a white page. Coming back to it, it shows the
+    // cover instead, and it resumes only once a session, so Back does not bounce forward again.
+    addEventListener("pageshow", (event) => { if (event.persisted) location.reload(); });
     location.replace(last.page);
     return;
   }
