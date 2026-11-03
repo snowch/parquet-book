@@ -673,6 +673,7 @@ def colophon() -> str:
 def page_html(
     p: dict, body: str, nav: str, toc: str, prev: dict | None, nxt: dict | None, stamp: str, has_lab: bool
 ) -> str:
+    repo = yaml.safe_load((ROOT / "myst.yml").read_text())["project"]["github"].rstrip("/")
     chapter = p.get("chapter")
     if p["label"]:
         h1 = f'<h1><span class="label">{html.escape(p["label"])}</span>{html.escape(p["title"])}</h1>'
@@ -724,6 +725,13 @@ def page_html(
 <button id="menu" type="button" aria-controls="nav" aria-expanded="false">Chapters</button>
 <a class="brand" href="index.html">{TITLE} <span>· {SUBTITLE}</span></a>
 <button id="outline" type="button" aria-controls="toc" aria-expanded="true" hidden>On this page</button>
+<a class="github-star" href="{html.escape(repo, quote=True)}" target="_blank" rel="noopener noreferrer"
+   aria-label="Star {html.escape(TITLE, quote=True)} on GitHub (opens in a new tab)" title="Star on GitHub (opens in a new tab)">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+<path d="m12 3 2.78 5.63L21 9.54l-4.5 4.39 1.06 6.2L12 17.2l-5.56 2.93 1.06-6.2L3 9.54l6.22-.91Z"/>
+</svg><span>Star on GitHub</span>
+</a>
 <button id="theme" type="button" hidden>System</button>
 </header>
 <div class="layout">
