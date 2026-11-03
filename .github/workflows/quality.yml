@@ -7,7 +7,8 @@ on:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 supports Ubuntu 24.04; ubuntu-latest may select a newer release.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
