@@ -104,12 +104,15 @@ a.xref:hover { text-decoration: underline; }
        align-items: center; gap: .75rem; padding: 0 1rem; background: var(--bg);
        border-bottom: 1px solid var(--edge); font-family: var(--chrome); }
 .brand { font-weight: 600; font-size: 15px; letter-spacing: -.01em; color: var(--ink);
-         text-decoration: none; margin-right: auto; }
+         text-decoration: none; margin-right: auto; min-width: 0;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand span { color: var(--muted); font-weight: 400; }
-.top button { font: 13.5px/1 var(--chrome); color: var(--muted); background: var(--panel);
+.top button, .github-star { font: 13.5px/1 var(--chrome); color: var(--muted); background: var(--panel);
               border: 1px solid var(--edge); border-radius: 6px; padding: .45rem .7rem;
-              cursor: pointer; }
-.top button:hover { border-color: var(--accent); color: var(--accent); }
+              cursor: pointer; flex-shrink: 0; }
+.github-star { display: inline-flex; align-items: center; gap: .35rem; text-decoration: none;
+               white-space: nowrap; }
+.top button:hover, .github-star:hover { border-color: var(--accent); color: var(--accent); }
 /* Written `hidden` and shown by the script that makes it work: `display` on a class would beat
    the browser's own rule for the attribute. */
 .top [hidden] { display: none; }
@@ -361,7 +364,7 @@ td code { font-size: 12.5px; }
 .stamp { margin-top: 2rem; font: 12.5px/1.4 var(--chrome); color: var(--faint); }
 
 @media (max-width: 52rem) {
-  .brand span { display: none; }
+  .brand span, .github-star span { display: none; }
   main { padding-bottom: 4rem; }
   body { font-size: 17px; }
 }
