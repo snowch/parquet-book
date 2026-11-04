@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 580" role="img" aria-labelledby="title description">
+<title id="title">Only the scan reads the Parquet file</title><desc id="description">Planning chooses order_id and country and pushes the condition into the scan. The scan uses row-group bounds and decodes possible matches. Filter checks those rows, Aggregate counts countries, and Sort orders the results. Row counts come from the book's engine.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="580" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Only the scan reads the Parquet file</text>
+<rect x="24" y="64" width="630" height="68" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="36" y="91" class="strong">Plan: select order_id and country</text>
+<text x="36" y="115" class="small">Push order_id &lt; 300 into the scan</text>
+<path d="M190 137 L190 157" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="165" width="330" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="192" class="strong">Scan</text>
+<text x="36" y="216" class="small">800 rows → 400 rows</text>
+<text x="374" y="190" class="strong">Reads the file</text>
+<text x="374" y="217" class="small">Skips impossible row groups</text>
+<path d="M190 235 L190 249" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="255" width="330" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="282" class="strong">Filter</text>
+<text x="36" y="306" class="small">400 rows → 299 rows</text>
+<text x="374" y="280" class="strong">Checks decoded rows</text>
+<text x="374" y="307" class="small">Removes remaining non-matches</text>
+<path d="M190 325 L190 339" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="345" width="330" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="372" class="strong">Aggregate</text>
+<text x="36" y="396" class="small">299 rows → 6 rows</text>
+<text x="374" y="370" class="strong">Groups by country</text>
+<text x="374" y="397" class="small">Counts rows in each group</text>
+<path d="M190 415 L190 429" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="435" width="330" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="462" class="strong">Sort</text>
+<text x="36" y="486" class="small">6 rows → 6 rows</text>
+<text x="374" y="460" class="strong">Orders the result</text>
+<text x="374" y="487" class="small">Works on decoded values</text>
+<text x="24" y="555" class="small">Metadata pruning saves reads; row filtering still checks the condition.</text>
+</svg>

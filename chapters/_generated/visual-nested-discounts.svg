@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 569" role="img" aria-labelledby="title description">
+<title id="title">A repetition level names the list that continues</title><desc id="description">Orders contain items, and items contain discounts. Every discount slot is aligned with its containing order and item. Repetition zero starts an order, one starts another item, and two adds a discount. B2 has an empty discounts list but still has a level slot.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="569" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">A repetition level names the list that continues</text>
+<text x="24" y="76" class="strong">Order → item → discounts</text>
+<text x="420" y="76" class="strong">(r, d, value)</text>
+<text x="24" y="121" class="strong">Order 1</text>
+<rect x="145" y="94" width="245" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="157" y="121" class="strong">A1: [5,10]</text>
+<rect x="415" y="94" width="240" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="427" y="121" class="strong">(0, 6, 5)</text>
+<path d="M380 133 L405 181" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="415" y="158" width="240" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="427" y="185" class="strong">(2, 6, 10)</text>
+<rect x="145" y="222" width="245" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="157" y="249" class="strong">B2: []</text>
+<rect x="415" y="222" width="240" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="427" y="249" class="strong">(1, 4, ∅)</text>
+<text x="24" y="313" class="strong">Order 2</text>
+<rect x="145" y="286" width="245" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="157" y="313" class="strong">items = []</text>
+<rect x="415" y="286" width="240" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="427" y="313" class="strong">(0, 1, ∅)</text>
+<text x="24" y="377" class="strong">Order 3</text>
+<rect x="145" y="350" width="245" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="157" y="377" class="strong">C3: [7]</text>
+<rect x="415" y="350" width="240" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="427" y="377" class="strong">(0, 6, 7)</text>
+<text x="24" y="441" class="strong">Order 4</text>
+<rect x="145" y="414" width="245" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="157" y="441" class="strong">items = null</text>
+<rect x="415" y="414" width="240" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="427" y="441" class="strong">(0, 0, ∅)</text>
+<text x="24" y="499" class="small">r = 0: new order  ·  r = 1: new item  ·  r = 2: next discount</text>
+<text x="24" y="527" class="small">∅ means no stored value; d explains what is missing.</text>
+</svg>

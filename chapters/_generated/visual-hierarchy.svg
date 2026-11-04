@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 440" role="img" aria-labelledby="title description">
+<title id="title">From table rows to pages</title><desc id="description">A logical table is divided horizontally into row groups. Each row group has one chunk per leaf column. A column chunk is a sequence of page headers and bodies in the physical file.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="440" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">From table rows to pages</text>
+<text x="24" y="75" class="strong">Logical table</text>
+<text x="340" y="75" class="strong">Physical column chunks</text>
+<rect x="24" y="95" width="240" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="122" class="strong">Group 0: 2 rows</text>
+<path d="M274 117 L326 117" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="340" y="95" width="97" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="352" y="122" class="strong">col 0</text>
+<rect x="443" y="95" width="97" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="455" y="122" class="strong">col 1</text>
+<rect x="546" y="95" width="97" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="558" y="122" class="strong">col 2</text>
+<rect x="24" y="145" width="240" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="172" class="strong">Group 1: 2 rows</text>
+<path d="M274 167 L326 167" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="340" y="145" width="97" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="352" y="172" class="strong">col 0</text>
+<rect x="443" y="145" width="97" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="455" y="172" class="strong">col 1</text>
+<rect x="546" y="145" width="97" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="558" y="172" class="strong">col 2</text>
+<rect x="24" y="195" width="240" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="36" y="222" class="strong">Group 2: 2 rows</text>
+<path d="M274 217 L326 217" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="340" y="195" width="97" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="352" y="222" class="strong">col 0</text>
+<rect x="443" y="195" width="97" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="455" y="222" class="strong">col 1</text>
+<rect x="546" y="195" width="97" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="558" y="222" class="strong">col 2</text>
+<text x="24" y="265" class="strong">Expand group 0, order_id</text>
+<rect x="24" y="285" width="622" height="92" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="312" class="strong">Page 0</text>
+<text x="36" y="336" class="small">header → body</text>
+<text x="36" y="360" class="small">79 bytes</text>
+<text x="24" y="420" class="small">The footer records each chunk's location and size.</text>
+</svg>

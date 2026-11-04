@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 510" role="img" aria-labelledby="title description">
+<title id="title">Data pages: where the boundaries move</title><desc id="description">Version one stores level lengths in the body and compresses the whole body when a codec is used. Version two puts level lengths in the header, leaves levels uncompressed and may compress only values. A repetition or definition stream is omitted when its maximum level is zero.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="510" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Data pages: where the boundaries move</text>
+<text x="24" y="79" class="strong">Version 1</text>
+<rect x="24" y="96" width="300" height="68" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="36" y="123" class="strong">Page header</text>
+<text x="36" y="147" class="small">value count; body sizes</text>
+<path d="M174 169 L174 190" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="354" y="79" class="strong">Version 2</text>
+<rect x="354" y="96" width="300" height="68" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="366" y="123" class="strong">Page header</text>
+<text x="366" y="147" class="small">+ level lengths, rows, nulls</text>
+<path d="M504 169 L504 190" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="196" width="300" height="234" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="36" y="222" class="strong">Body: compressed together*</text>
+<rect x="36" y="240" width="276" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="48" y="267" class="strong">Length + repetition levels</text>
+<rect x="36" y="298" width="276" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="48" y="325" class="strong">Length + definition levels</text>
+<rect x="36" y="356" width="276" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="48" y="383" class="strong">Encoded values</text>
+<rect x="354" y="196" width="300" height="234" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<rect x="366" y="210" width="276" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="378" y="237" class="strong">Repetition levels</text>
+<text x="378" y="261" class="small">Uncompressed; no prefix</text>
+<rect x="366" y="287" width="276" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="378" y="314" class="strong">Definition levels</text>
+<text x="378" y="338" class="small">Uncompressed; no prefix</text>
+<rect x="366" y="364" width="276" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="378" y="391" class="strong">Values: may be compressed*</text>
+<text x="24" y="464" class="small">* With a codec. Headers themselves are not compressed.</text>
+<text x="24" y="490" class="small">A level stream is absent when its maximum level is zero.</text>
+</svg>

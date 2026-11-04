@@ -105,6 +105,11 @@ eight orders both ways, and mark the values the query needs, one character a val
 :::
 ::::
 
+The filled cells below are the values the query selected. Follow their positions in each layout.
+
+```{include} _generated/visual-layouts.md
+```
+
 By rows, each order's values sit together, as in the CSV file, so the two columns come in one
 short run per order and a reader must skip past everything between them. By columns, each
 column's values sit together, as in a Parquet file, so the two columns are one run: one read.
