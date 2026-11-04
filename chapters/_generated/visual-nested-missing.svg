@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 400" role="img" aria-labelledby="title description">
+<title id="title">How much of the list exists?</title><desc id="description">Four definition levels distinguish an absent tags list, an empty list, a null element inside a present list, and a present value. Each case is taken from the tags column's decoded slots.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="400" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">How much of the list exists?</text>
+<text x="24" y="87" class="mono">d = 0</text>
+<rect x="110" y="65" width="240" height="60" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="130" y="102" class="small">no list</text>
+<text x="365" y="87" class="mono">null</text>
+<text x="365" y="112" class="small">List absent</text>
+<text x="24" y="165" class="mono">d = 1</text>
+<rect x="110" y="143" width="240" height="60" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<rect x="120" y="151" width="220" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="130" y="180" class="small">empty list</text>
+<text x="365" y="165" class="mono">[]</text>
+<text x="365" y="190" class="small">List has no entries</text>
+<text x="24" y="243" class="mono">d = 2</text>
+<rect x="110" y="221" width="240" height="60" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<rect x="120" y="229" width="220" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<rect x="136" y="237" width="90" height="28" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="145" y="257" class="mono">null</text>
+<text x="365" y="243" class="mono">[&quot;sale&quot;,null]</text>
+<text x="365" y="268" class="small">Null element</text>
+<text x="24" y="321" class="mono">d = 3</text>
+<rect x="110" y="299" width="240" height="60" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<rect x="120" y="307" width="220" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<rect x="136" y="315" width="90" height="28" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="145" y="335" class="mono">gift</text>
+<text x="365" y="321" class="mono">[&quot;gift&quot;,&quot;express&quot;]</text>
+<text x="365" y="346" class="small">Value present</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 695" role="img" aria-labelledby="title description">
+<title id="title">One order, different amounts of reading</title><desc id="description">A shared linear bar chart compares bytes fetched after the footer for order_id 431 across every writer configuration. Labels also give request counts, so fewer bytes are not mistaken for lower latency.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="695" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">One order, different amounts of reading</text>
+<text x="24" y="76" class="mono">SELECT * WHERE order_id = 431</text>
+<text x="24" y="105" class="strong">the baseline</text>
+<rect x="24" y="117" width="88" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="137" class="small">4,764 B / 8 req</text>
+<text x="24" y="180" class="strong">one row group</text>
+<rect x="24" y="192" width="321" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="212" class="small">17,373 B / 14 req</text>
+<text x="24" y="255" class="strong">row groups of 40 rows</text>
+<rect x="24" y="267" width="26" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="287" class="small">1,388 B / 3 req</text>
+<text x="24" y="330" class="strong">sorted by country</text>
+<rect x="24" y="342" width="389" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="362" class="small">21,078 B / 41 req</text>
+<text x="24" y="405" class="strong">shuffled</text>
+<rect x="24" y="417" width="440" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="437" class="small">23,828 B / 6 req</text>
+<text x="24" y="480" class="strong">no dictionary</text>
+<rect x="24" y="492" width="29" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="512" class="small">1,584 B / 8 req</text>
+<text x="24" y="555" class="strong">no page index</text>
+<rect x="24" y="567" width="123" height="25" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="475" y="587" class="small">6,650 B / 1 req</text>
+<text x="24" y="665" class="small">Bars start at zero; longest bar = 23,828 bytes.</text>
+</svg>

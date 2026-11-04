@@ -232,6 +232,10 @@ def _image(node: dict) -> str:
     source = str(node.get("urlSource") or "")
     if url.startswith("/"):
         path = ROOT / source
+        # MyST keeps included figures' image paths relative to the containing chapter.
+        # Resolve that explicit namespace without guessing among same-named files.
+        if source.startswith("_generated/"):
+            path = ROOT / "chapters" / source
         if not source or not path.is_file():
             raise UnknownNodeError(f"image {url!r} is not a file in this repository")
         name = path.name
@@ -247,7 +251,18 @@ def _image(node: dict) -> str:
         size = f' width="{box.group(1)}" height="{box.group(2)}"' if box else ""
     else:
         size = ""
-    return f'<img src="{html.escape(url)}" alt="{alt}"{size}>'
+    image = f'<img src="{html.escape(url)}" alt="{alt}"{size}>'
+    if Path(url).name.startswith("visual-") and url.endswith(".svg"):
+        return (
+            '<div class="diagram-scroll" role="region" tabindex="0" '
+            'aria-label="Diagram; scroll horizontally to explore on a narrow screen">'
+            + image
+            + '</div><p class="diagram-link"><a href="'
+            + html.escape(url)
+            + '">Open full-size diagram</a><span class="diagram-hint">'
+            + " · Scroll the diagram sideways to see all of it.</span></p>"
+        )
+    return image
 
 
 def _plain(node: dict) -> str:

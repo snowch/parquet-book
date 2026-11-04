@@ -92,11 +92,18 @@ calls each row a *triple*. Only a triple whose `d` is the column's maximum has a
 The first two rows are the first order's two tags, and the `r` of 1 on the second says it
 continues the same list. The next two rows have no value, and each is still a whole record: an
 empty list and a null list. Without their slots, the reader would not know those records
-existed. The last row is a null inside a list, one level below the maximum. The records at the
+existed. The final record holds `sale` followed by a null element, whose definition level is one
+below the maximum. The records at the
 end are rebuilt from these rows alone.
 
 Change `name` to `"email"`, `"order_id"` or `"items"`, and watch the maximum levels set what a
 row can say. `items` has two columns, and each rebuilds its own view of the same records.
+
+Keep the records beside their slots as you read the output. Each new record starts a coloured band;
+the arrows continue its list.
+
+```{include} _generated/visual-nested-tags.md
+```
 
 ### What the levels say
 
@@ -123,6 +130,12 @@ whose definition level is `d + 1`. For `tags[]`, as the second step printed:
 - `d = 2`: an entry exists, but its `element` is absent. The element is null.
 - `d = 3`: the value is present.
 
+The containers below show how far each definition level reaches. The null element case comes from
+the final record's list, which also holds `sale`.
+
+```{include} _generated/visual-nested-missing.md
+```
+
 **The repetition level** `r` says where the slot sits in the nesting. Zero starts a new record.
 Any other value names the repeated field that gains a new element: here, `r = 1` adds an element
 to `tags`.
@@ -139,12 +152,12 @@ path and a maximum repetition level of 2. Now `r` has three meanings: 0 is a new
 new item, and 2 is another discount in the same item. These are the levels the first step
 unpacked, with what the reader makes of each:
 
-```{include} _generated/nested-levels-discounts.md
+```{include} _generated/visual-nested-discounts.md
 ```
 
-Read the third row. Its `r` of 1 says a new item has started. Its `d` of 4 says the item exists
-and has a `discounts` list, but that list has no entries. That is item `B2`, whose discounts are
-empty, and the reader can tell it from a record with no items at all, which is the next row.
+Follow item `B2` in the diagram. Its `r` of 1 starts a new item. Its `d` of 4 says the item
+and its `discounts` list exist, but the list has no entries. The next row belongs to an order
+with no items. Those cases need different definition levels.
 
 ### How the levels are stored
 

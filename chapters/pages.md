@@ -143,6 +143,12 @@ side by side:
 Writers adopted version 2 slowly, and many still write version 1 by default for compatibility.
 Every reader a file will meet must support version 2 before a writer should produce it.
 
+The compression boundary makes the difference visible. Level streams appear only where the schema
+needs them; the diagram includes both to show their order.
+
+```{include} _generated/visual-page-layouts.md
+```
+
 ### Checksums
 
 A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page

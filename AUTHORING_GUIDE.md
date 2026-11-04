@@ -102,6 +102,14 @@ digits, in prose. Format constants written as words ("the last eight bytes") pas
 by the specification. A definition that must be typed as digits takes
 `% number-ok: <reason>` on the line before its paragraph.
 
+Static explanatory diagrams live in `crates/pqlab/src/figures/diagrams.rs`. `make figures`
+generates an SVG and a Markdown figure fragment together; include the fragment beside the
+explanation it supports. Both files are covered by `pqlab figures --check`. Read measurements
+from the reader, label conceptual examples as schematics, and state what each chart counts.
+Give every diagram a descriptive alternative text and a caption that states its takeaway.
+Use labels as well as colour. The renderer keeps labels legible in a horizontally scrollable
+region on narrow screens and provides a link to the full-size SVG without requiring JavaScript.
+
 ### Never paste code into prose
 
 A chapter the Python reader covers quotes each step in both languages, Python first, in a tab set
