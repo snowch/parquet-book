@@ -100,8 +100,16 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 if (shots) await mkdir(shots, { recursive: true });
 
+// These existing checks exercise the optional code path. The reading-path checks below use
+// fresh contexts and leave the native disclosures in their default, closed state.
+async function explore(url) {
+  await page.goto(url);
+  await page.locator("details.code-disclosure").evaluateAll((els) => els.forEach((e) => { e.open = true; }));
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
 // ch02: the whole file, as the reader parsed it, with the bytes it never asked for dimmed.
-await page.goto(base + "anatomy-of-a-parquet-file.html");
+await explore(base + "anatomy-of-a-parquet-file.html");
 const expected = native(["footer", "fixtures/tiny.parquet", "--json"]);
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]')?.dataset.state === "ok");
 const whole = page.locator('.lab[data-experiment="anatomy"]');
@@ -137,19 +145,19 @@ if (shots) {
 
 // The code tabs: Python first, one choice for every excerpt, remembered across pages. (ch01 is
 // an explainer and quotes no reader code, so this starts on ch03.)
-await page.goto(base + "the-type-system.html");
+await explore(base + "the-type-system.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "python", "code is shown in Python by default");
 const visible = () => page.locator(".tab-panel").evaluateAll((els) =>
   els.filter((e) => e.offsetParent !== null).map((e) => e.dataset.code));
 check((await visible()).every((c) => c === "python") && (await visible()).length > 0, "only the Python excerpts are visible");
 await page.locator('.tab-bar button[data-code="rust"]').first().click();
 check((await visible()).every((c) => c === "rust"), "one click shows every excerpt in Rust");
-await page.goto(base + "anatomy-of-a-parquet-file.html");
+await explore(base + "anatomy-of-a-parquet-file.html");
 check(await page.evaluate(() => document.documentElement.dataset.code) === "rust", "and the choice holds on the next page");
 await page.locator('.tab-bar button[data-code="python"]').first().click();
 
 // ch01 explains and builds nothing: code and no panels.
-await page.goto(base + "why-parquet-exists.html");
+await explore(base + "why-parquet-exists.html");
 check(await page.locator(".lab").count() === 0, "ch01 has no panels: its pictures come from code");
 {
   // ch01 opens on code: the CSV file read a row at a time, in the page, reads every byte.
@@ -169,7 +177,7 @@ check(await page.locator(".lab").count() === 0, "ch01 has no panels: its picture
   check(/^by rows, 8 runs:\n[.#]+$/m.test(drawn) && /^by columns, 1 run:\n[.#]+$/m.test(drawn), "ch01's layouts step draws both layouts in the page");
 }
 if (shots) {
-  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await explore(base + "anatomy-of-a-parquet-file.html");
   await page.screenshot({ path: path.join(shots, "chapter.png") });
   await page.emulateMedia({ colorScheme: "dark" });
   await page.screenshot({ path: path.join(shots, "chapter-dark.png") });
@@ -178,7 +186,7 @@ if (shots) {
 // ch03: the schema, rebuilt by hand in the page. The walk's levels and the count of columns the
 // book's reader finds are the native reader's.
 {
-  await page.goto(base + "the-type-system.html");
+  await explore(base + "the-type-system.html");
   check(await page.locator(".lab").count() === 0, "ch03 has no panels: its steps print the schema");
   const nativeSchema = native(["schema", "fixtures/types.parquet"]);
   const step = page.locator('figure.walkthrough[data-file$="rebuild_the_tree.py"]');
@@ -194,7 +202,7 @@ if (shots) {
 // ch04: the levels of tags[], read by the book's Python reader in the page. The triples and the
 // records it prints are the native reader's.
 {
-  await page.goto(base + "nested-data.html");
+  await explore(base + "nested-data.html");
   check(await page.locator(".lab").count() === 0, "ch04 has no panels: its steps print the levels");
   const nativeLevels = native(["levels", "fixtures/nested.parquet", "2"]);
   const step = page.locator('figure.walkthrough[data-file$="levels_of_a_column.py"]');
@@ -211,7 +219,7 @@ if (shots) {
 // ch05: url's DELTA_BYTE_ARRAY page, decoded by the book's Python reader in the page. Every step
 // it prints, and the values, are the native reader's.
 {
-  await page.goto(base + "encodings.html");
+  await explore(base + "encodings.html");
   check(await page.locator(".lab").count() === 0, "ch05 has no panels: its steps print the decoding");
   const nativeUrl = native(["encodings", "fixtures/encodings.parquet", "3"]);
   const step = page.locator('figure.walkthrough[data-file$="decode_a_column.py"]');
@@ -228,7 +236,7 @@ if (shots) {
 // ch06: pages. The book's Python reader walks country's pages in the page, and after one bit of
 // the last page's body is flipped, only that page's checksum fails, as the native reader finds.
 {
-  await page.goto(base + "pages.html");
+  await explore(base + "pages.html");
   check(await page.locator(".lab").count() === 0, "ch06 has no panels: its steps walk the pages");
   const nativePages = native(["pages", "fixtures/pages-v2.parquet", "1"]);
   const step = page.locator('figure.walkthrough[data-file$="damage_a_page.py"]');
@@ -242,7 +250,7 @@ if (shots) {
 }
 
 // ch07: compression. The tokens and the rebuilt page are the Rust decompressor's.
-await page.goto(base + "compression.html");
+await explore(base + "compression.html");
 const compLab = page.locator('.lab[data-experiment="compression"]');
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="compression"]')?.dataset.state === "ok");
 const snappy = native(["compression", "fixtures/codec-snappy.parquet", "1"]);
@@ -289,7 +297,7 @@ if (shots) {
 // ch08: statistics. The book's Python reader decides in the page which bounds it may use for
 // every column chunk, and each range it prints, or refuses, is the native reader's.
 {
-  await page.goto(base + "metadata-and-statistics.html");
+  await explore(base + "metadata-and-statistics.html");
   check(await page.locator(".lab").count() === 0, "ch08 has no panels: its steps print the bounds");
   const nativeStats = native(["statistics", "fixtures/statistics.parquet", "0", "0"]);
   const step = page.locator('figure.walkthrough[data-file$="the_reader_decides.py"]');
@@ -310,7 +318,7 @@ if (shots) {
 // group's verdict, its kept rows and the bytes it reads are the native reader's. The library step
 // runs pyarrow's dataset module in the page, and keeps the row groups the statistics keep.
 {
-  await page.goto(base + "skipping-data.html");
+  await explore(base + "skipping-data.html");
   check(await page.locator(".lab").count() === 0, "ch09 has no panels: its steps print the plans");
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
@@ -335,7 +343,7 @@ if (shots) {
 
 // ch10: the read path. Requests and times are the reader's and the simulated store's, and the
 // panel's strategies are the rows of the chapter's table of them.
-await page.goto(base + "how-readers-read.html");
+await explore(base + "how-readers-read.html");
 const scanLab = page.locator('.lab[data-experiment="scan"]');
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="scan"]')?.dataset.state === "ok");
 const scan1 = native(["scan", "fixtures/pruning-sorted.parquet", "--where", "0", "=", "431", "--size", "head", "--prefetch", "8"]);
@@ -387,7 +395,7 @@ check(await scanLab.getAttribute("data-matching") === "1", "and returns one row"
 
 // ch11: writer settings. The page runs the reader's query on every file, and pyarrow writes the
 // baseline again, to the byte.
-await page.goto(base + "writing-parquet-well.html");
+await explore(base + "writing-parquet-well.html");
 {
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
@@ -411,7 +419,7 @@ await page.goto(base + "writing-parquet-well.html");
 // Python reader answers the chapter's query in the page, stage by stage, as the native engine
 // does; pyarrow's dataset module answers it too, in the page.
 {
-  await page.goto(base + "what-a-query-engine-does.html");
+  await explore(base + "what-a-query-engine-does.html");
   check(await page.locator(".lab, .workbench").count() === 0, "ch12 has no panels and no workbench: its problems are questions");
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
@@ -437,7 +445,7 @@ await page.goto(base + "writing-parquet-well.html");
 // reads the plain columns in the page and refuses the encrypted ones with an error, never by
 // stopping the worker; the next step still runs after it.
 {
-  await page.goto(base + "modular-encryption.html");
+  await explore(base + "modular-encryption.html");
   const cryptLab = page.locator('.lab[data-experiment="encryption"]');
   await page.waitForFunction(() => document.querySelector('.lab[data-experiment="encryption"]')?.dataset.state === "ok");
   const plain = native(["encryption", "fixtures/plaintext-footer.parquet"]);
@@ -476,7 +484,7 @@ await page.goto(base + "writing-parquet-well.html");
 // ch14: a table of files. The book's Python reader plans the chapter's query in the page, file by
 // file, as the native reader does; pyarrow's dataset module reads the partitioned directory too.
 {
-  await page.goto(base + "lakehouse-and-beyond.html");
+  await explore(base + "lakehouse-and-beyond.html");
   check(await page.locator(".lab").count() === 0, "ch14 has no panels: its steps print each file's fate");
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
@@ -500,7 +508,7 @@ await page.goto(base + "writing-parquet-well.html");
 // ch15: a changing table. The panel is a lookup, and its chain of requests is the native reader's;
 // the steps print the same chain in the page, and pyarrow applies the deletes there too.
 {
-  await page.goto(base + "changing-a-table.html");
+  await explore(base + "changing-a-table.html");
   const changesLab = page.locator('.lab[data-experiment="changes"]');
   await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]')?.dataset.state === "ok", null, { timeout: 60000 });
   const lookup = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"]);
@@ -543,7 +551,7 @@ await page.goto(base + "writing-parquet-well.html");
 // and resolves the table's columns by id to the values the native engine reads; pyarrow reads the
 // same ids in the page.
 {
-  await page.goto(base + "what-iceberg-adds.html");
+  await explore(base + "what-iceberg-adds.html");
   check(await page.locator(".lab, .workbench").count() === 0, "ch16 has no panels and no workbench: its problems are questions");
   const runStep = async (name, until) => {
     const step = page.locator(`figure.walkthrough[data-file$="${name}.py"]`);
@@ -577,7 +585,7 @@ await page.goto(base + "writing-parquet-well.html");
     if ((await readFile(path.join(root, f), "utf8")).includes("data-experiment=")) pages.push(f);
   }
   for (const f of pages) {
-    await page.goto(base + f);
+    await explore(base + f);
     await page.waitForFunction(() => [...document.querySelectorAll(".lab[data-experiment]")]
       .every((el) => el.dataset.ready === "true"), null, { timeout: 60000 });
     const labs = page.locator(".lab[data-experiment]");
@@ -596,7 +604,7 @@ await page.goto(base + "writing-parquet-well.html");
   const desk = spawnSync("python3", ["-m", "pytest", "exercises/python/tests/test_compression.py", "--problems",
     "-q", "-p", "no:cacheprovider"], { encoding: "utf8" }).stdout;
   const count = (word) => Number((desk.match(new RegExp(`(\\d+) ${word}`)) || [0, 0])[1]);
-  await page.goto(base + "compression.html");
+  await explore(base + "compression.html");
   const wb = page.locator('.workbench[data-chapter="compression"]');
   await wb.and(page.locator('[data-ready="true"]')).waitFor({ timeout: 30000 });
   await wb.locator('button[data-act="run"]').click();
@@ -615,7 +623,7 @@ await page.goto(base + "writing-parquet-well.html");
 // same tests.
 {
   const runBlock = async (file, text) => {
-    await page.goto(base + file);
+    await explore(base + file);
     const box = page.locator(".runnable", { hasText: text }).first();
     await box.locator(".run-button").click();
     await box.and(page.locator('[data-state="running"]')).waitFor({ timeout: 10000 }).catch(() => {});
@@ -653,7 +661,7 @@ await page.goto(base + "writing-parquet-well.html");
 // Python step runs in the page and prints the footer length the native reader decodes; an edited
 // step runs the edit; the library step runs pyarrow; a Rust step offers a Codespace.
 {
-  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await explore(base + "anatomy-of-a-parquet-file.html");
   const native = JSON.parse(execFileSync("target/debug/pqlab", ["footer", "fixtures/tiny.parquet", "--json"], { encoding: "utf8" }));
   const runStep = async (step) => {
     const box = step.locator(".runnable");
@@ -692,7 +700,7 @@ await page.goto(base + "writing-parquet-well.html");
 {
   const settle = () => page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const blocks = () => page.evaluate(() => [...document.querySelectorAll("#main pre, #main textarea.code-area")]
-    .filter((e) => e.offsetParent !== null && !e.closest(".lab, .workbench, .run-result, .results"))
+    .filter((e) => e.offsetParent !== null && !e.closest(".lab, .workbench, .run-result, .results, .example-result"))
     .map((e) => {
       const box = e.closest("figure.quoted, .wide-block");
       const button = box && box.querySelector(".expand");
@@ -701,13 +709,13 @@ await page.goto(base + "writing-parquet-well.html");
     }));
   const shown = (selector) => page.locator(selector).evaluate((e) => getComputedStyle(e).display !== "none");
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto(base + "skipping-data.html");
+  await explore(base + "skipping-data.html");
   await settle();
   const prose = await page.locator("#main .page > p:not(.builds)").first().evaluate((e) => e.getBoundingClientRect().width);
   let seen = await blocks();
   check(seen.length > 0 && seen.some((b) => b.width > prose + 40) && seen.every((b) => !b.cut || b.expand),
     `at 1440px code wider than the ${Math.round(prose)}px prose takes the wide column (up to ${Math.round(Math.max(...seen.map((b) => b.width)))}px), and none is cut off without Expand`);
-  await page.goto(base + "anatomy-of-a-parquet-file.html");
+  await explore(base + "anatomy-of-a-parquet-file.html");
   await settle();
   seen = await blocks();
   check(seen.every((b) => !b.cut || b.expand), `ch02: ${seen.filter((b) => b.cut).length} of ${seen.length} blocks still cut off at 1440px, each with an Expand button`);
@@ -733,7 +741,7 @@ await page.goto(base + "writing-parquet-well.html");
   }
 
   // At 1280px the outline beside the chapter list would leave the chapter narrower than its prose.
-  await page.goto(base + "skipping-data.html");
+  await explore(base + "skipping-data.html");
   await page.setViewportSize({ width: 1280, height: 1000 });
   await settle();
   check(!(await shown(".toc")) && await page.locator("#outline").isHidden(),
@@ -760,7 +768,7 @@ await page.goto(base + "writing-parquet-well.html");
   await outline.click();
   await settle();
   check(!(await shown(".toc")) && (await outline.getAttribute("aria-expanded")) === "false", "the outline's button closes it");
-  await page.goto(base + "encodings.html");
+  await explore(base + "encodings.html");
   await settle();
   check(!(await shown(".toc")), "and it stays closed on the next page");
   await outline.click();
@@ -770,7 +778,7 @@ await page.goto(base + "writing-parquet-well.html");
   // A phone: nothing wider than the screen, and the Chapters button opens the list over the page.
   await page.setViewportSize({ width: 390, height: 844 });
   for (const name of ["skipping-data.html", "what-a-query-engine-does.html", "anatomy-of-a-parquet-file.html", "nested-data.html"]) {
-    await page.goto(base + name);
+    await explore(base + name);
     await settle();
     const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check(over <= 0, `at 390px ${name} does not scroll sideways`);
@@ -805,7 +813,7 @@ await page.goto(base + "writing-parquet-well.html");
 // The site opens on the cover: the book's title, its picture of a file, and the way in, which is
 // the preface, published as preface.html.
 {
-  await page.goto(base);
+  await explore(base);
   check((await page.locator("article.page h1").textContent()) === "Parquet, byte by byte", "the site opens on the cover");
   const hero = page.locator("article.cover > img");
   const drawn = await hero.evaluate(async (img) => { await img.decode().catch(() => {}); return img.complete && img.naturalWidth > 0; });
@@ -827,12 +835,12 @@ await page.goto(base + "writing-parquet-well.html");
 // page the reader was on, as far down as they were; the cover offers the same way back. The
 // preface is a page like any other, so it is remembered too; the cover never is.
 {
-  await page.goto(base + "encodings.html");
+  await explore(base + "encodings.html");
   await page.mouse.wheel(0, 2000);
   await page.waitForTimeout(1000);
   const y = await page.evaluate(() => scrollY);
   // A launch is a new session. The cover is never remembered, so it can stand before the launch.
-  await page.goto(base + "index.html");
+  await explore(base + "index.html");
   await page.evaluate(() => sessionStorage.clear());
   const launched = page;
   await launched.goto(base + "index.html?resume");
@@ -842,15 +850,15 @@ await page.goto(base + "writing-parquet-well.html");
   await launched.goBack();
   await launched.waitForTimeout(500);
   check(launched.url().endsWith("index.html"), `and the launch leaves no page of its own behind: Back goes to ${launched.url().split("/").pop()}`);
-  await page.goto(base + "index.html");
+  await explore(base + "index.html");
   check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the cover links back to the last page");
-  await page.goto(base + "preface.html");
+  await explore(base + "preface.html");
   await page.waitForTimeout(500);
   await page.evaluate(() => sessionStorage.clear());
-  await page.goto(base + "index.html?resume");
+  await explore(base + "index.html?resume");
   const toPreface = await page.waitForURL(/preface\.html$/, { timeout: 10000 }).then(() => true, () => false);
   check(toPreface, "the home-screen start goes back to the preface when that was the last page");
-  await page.goto(base);
+  await explore(base);
   check((await page.locator(".resume a").getAttribute("href")) === "preface.html", "and the cover links back to it");
 }
 
@@ -887,7 +895,7 @@ await page.goto(base + "writing-parquet-well.html");
   const figures = (await readdir(root)).filter((name) => /^visual-.*\.svg$/.test(name));
   check(figures.length === 14, "all fourteen explanatory diagrams are published");
   for (const name of figures) {
-    await page.goto(base + name);
+    await explore(base + name);
     const clipped = await page.locator("svg").evaluate((svg) => {
       const box = svg.viewBox.baseVal;
       return [...svg.querySelectorAll("text")].filter((text) => {
@@ -926,6 +934,44 @@ await page.goto(base + "writing-parquet-well.html");
         await tab.waitForTimeout(200);
         check(await regions.first().evaluate((e) => e.scrollLeft > 0), `${slug}: keyboard scroll reaches the rest of the figure`);
       }
+    }
+    await context.close();
+  }
+}
+
+// Reading requires neither opening code nor loading the execution runtime. Check every chapter,
+// including answer reveals by keyboard, under both themes and with JavaScript disabled.
+{
+  const saved = JSON.parse(await readFile(new URL("../../walkthroughs/_generated/results.json", import.meta.url), "utf8"));
+  const chapters = [...new Set(Object.keys(saved).map((p) => p.split("/")[2]))];
+  for (const [width, colorScheme] of [[390, "light"], [1440, "dark"]]) {
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 }, colorScheme });
+    const tab = await context.newPage();
+    for (const chapter of chapters) {
+      await tab.goto(base + chapter.replaceAll("_", "-") + ".html");
+      const results = tab.locator(".example-result");
+      const expected = Object.entries(saved).filter(([p]) => p.split("/")[2] === chapter);
+      check(await results.count() === expected.length, `${chapter}: every walkthrough has a visible worked result`);
+      for (const [source, result] of expected) {
+        const figure = tab.locator(`.example-result[data-source="${source}"]`);
+        check(await figure.locator(":scope > pre").textContent() === result.stdout && await figure.isVisible(),
+          `${source}: the saved answer is visible without JavaScript`);
+      }
+      check(await tab.locator("details.code-disclosure[open]").count() === 0,
+        `${chapter}: code is optional and closed initially`);
+      const code = tab.locator("details.code-disclosure").first();
+      await code.locator(":scope > summary").focus();
+      await tab.keyboard.press("Enter");
+      check(await code.getAttribute("open") !== null && await code.locator("pre").first().isVisible(),
+        `${chapter}: keyboard reveals optional code without JavaScript`);
+      const checkpoint = tab.locator(".checkpoint");
+      check(await checkpoint.count() === 1 && await checkpoint.locator("details > p").isHidden(),
+        `${chapter}: a question comes before its explanation`);
+      await checkpoint.locator("summary").focus();
+      await tab.keyboard.press("Enter");
+      check(await checkpoint.locator("details > p").isVisible(), `${chapter}: keyboard reveals the explanation`);
+      check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `${chapter}: reading and open code fit at ${width}px in ${colorScheme} mode`);
     }
     await context.close();
   }

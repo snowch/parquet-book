@@ -5,7 +5,8 @@ Project instructions for anyone, human or AI, working on this book. They are bin
 ## What this is
 
 *Parquet, byte by byte*: an interactive technical book about Apache Parquet, for data engineers,
-in which the reader builds a working Parquet reader while reading. Code is the interface. Each
+which readers can follow through explanations and worked results, with optional code to explore
+or use to build a working Parquet reader. Each
 chapter asks a question, reads the answer out of a real Parquet file by hand, builds that into
 the reader, and then asks a library (pyarrow, the `parquet` crate) the same question. Labs draw
 pictures only where a picture beats printed output. Three chapters explain and build nothing

@@ -16,6 +16,14 @@ can make one request for each, one large request that covers them all, or someth
 it can make several at once. This chapter builds the reader's read path and measures those
 choices.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Explain the trade-off between bytes, requests and latency, and identify which reads can run in parallel.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### One query, request by request
@@ -168,6 +176,14 @@ The tests run every query under every strategy and compare the rows with a plain
 whole file, so a missed range cannot pass unnoticed.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#how-readers-read-limits),
+then the takeaways and the understanding check.
+:::
 
 The step called `scan`, which reads the footer with ch02's `read_footer`, plans with ch09's
 `prune.plan`, and fetches in phases. This section builds the fetching: how ranges merge, how one
@@ -348,6 +364,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin reads_with_a_library
 ```
 
+(how-readers-read-limits)=
 ## What this cannot tell you
 
 **How a real store behaves.** The model charges a fixed latency and a fixed bandwidth. Real
@@ -380,7 +397,15 @@ can take longer than fetching, and a reader that overlaps the two gains most.
   favours reading only what is needed.
 :::
 
+```checkpoint
+question: Why can fetching extra bytes make a query faster on object storage?
+answer: A larger tail read or a merged range can replace several requests with one. Each avoided request saves a round trip. The extra transfer can cost less than that latency, though a slow link or a large file can reverse the trade-off.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/how_readers_read.py`, or in Rust in
 `exercises/src/how_readers_read.rs`. The first two have tests. The third has none.

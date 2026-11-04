@@ -18,6 +18,14 @@ therefore a new file. This chapter measures what that costs, for the reads and t
 what the usual repair, compaction, costs in its turn. It starts with the operation Parquet was
 never built for: finding one row.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Compare copy-on-write, merge-on-read and compaction in terms of the work paid by readers and writers.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### A table and its history
@@ -243,6 +251,14 @@ commits must fail and retry.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#changing-a-table-limits),
+then the takeaways and the understanding check.
+:::
+
 The reader's `changes` module (`python/parquet_lab/changes.py`, or
 `crates/parquet-lab/src/changes.rs`) reads a table through its snapshots, which
 `read_snapshots` parses out of `_snapshots.json`. A snapshot is two lists, and the rows a data
@@ -423,6 +439,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin deletes_with_a_library
 ```
 
+(changing-a-table-limits)=
 ## What this cannot tell you
 
 **How deep real metadata is.** This table's metadata is one file. Iceberg's is a chain: a
@@ -467,7 +484,15 @@ cost is the real bill.
   enough scans, and has to be scheduled around the writers it competes with.
 :::
 
+```checkpoint
+question: An order is present in a data file but named by a position delete in the chosen snapshot. Should the query return it?
+answer: No. A snapshot's data and delete files must be interpreted together. The reader may have to read the data and relevant deletes to learn that no row remains. Merge-on-read saves rewriting data at delete time but adds work to later reads.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/changing_a_table.py`, or in Rust in
 `exercises/src/changing_a_table.rs`. The first two have tests. The third has none.

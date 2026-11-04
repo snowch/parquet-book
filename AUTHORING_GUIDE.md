@@ -60,14 +60,15 @@ leaves it open. The outline holds the question; the page expands it.
 
 **The experiment** opens with a walkthrough (below): the reader reads the chapter's structure out
 of a fixture by hand, in a few lines of code they run and change. The audience is data engineers,
-and code is their interface; lead with it. Then show the reader's view of the same bytes:
+and the worked result is their entry point. The renderer shows the saved Python output before
+the optional source code. Then show the reader's view of the same bytes:
 generated tables, and a `lab` block where a picture beats printed output (a byte map, a request
 timeline, row groups lit by a predicate), with a numbered list of things to try, each saying what
 to click and what to look for. Write it so a reader who does each step in order discovers the
 chapter's point before being told it. Finish with short sections that name what was seen.
 
-**Building it** quotes the code the experiment ran, in the order it ran. Each quote gets a
-paragraph before it saying what to look for and, where useful, one after it saying what follows.
+**Building it** quotes the code the experiment ran, in the order it ran. Mark the section as optional and link to the limitations for readers following the conceptual
+path. Each quote gets a paragraph before it saying what to look for and, where useful, one after it saying what follows.
 End with the command that tests the code against the fixtures, and then `### Ask a library`: a
 walkthrough step that gets the same facts from pyarrow and from the `parquet` crate, so the
 reader leaves knowing the call that does this at work. ch02 is the model.
@@ -166,7 +167,8 @@ footer starts, then breaks the length to show why a reader must check what it re
   this reason. Print facts in both languages' own idiom; do not bend them to print identical text.
 - Add what each step must print to `tests/test_walkthroughs.py`, derived from the fixture and its
   manifest. The prose that follows a step describes what it printed without typing a number.
-- End with an invitation to change something, and say what to try.
+- End with an invitation to change something, and say what to try. Explain the outcome without
+  requiring a run; show an important contrast in a generated table or saved comparison.
 
 **Ask a library** is a walkthrough step too, named `<what>_with_a_library` (`footer_with_a_library`,
 `deletes_with_a_library`), since each step's name is a binary and must be unique:
@@ -178,6 +180,25 @@ hand-written steps and the reader found, and add them to `tests/test_walkthrough
 manifest. Use the library's metadata API, not a whole-table read, unless the chapter is about
 values. In the page, the first Python run loads pyarrow under Pyodide, which is a large download;
 say so in the prose. The Rust step opens in a Codespace.
+
+## Reading without code
+
+Every chapter states a learning goal in a `reading-guide` div before *The experiment*. Its
+explanations, diagrams, worked results and limitations must teach that goal without opening code.
+The renderer places walkthroughs and implementation excerpts in native disclosures, closed by
+default. Do not put an essential explanation only inside one of those disclosures.
+
+`make figures` also runs `python -m tools.walkthrough_results`. It executes every Python
+walkthrough and the explicit variations in `tools/walkthrough_results.py`, and writes
+`walkthroughs/_generated/results.json`. Never edit the saved output. `make check` reruns the
+examples and fails on stale results. The renderer checks the source digest and shows the output
+outside the language tabs, labelled as Python output. Keep output concise and meaningful; explain
+what to notice in the surrounding prose. Simulated request times are not wall-clock timings.
+
+End *Key takeaways* with one `checkpoint` fence, with a `question:` and an `answer:` on separate
+lines. The question asks readers to apply the chapter's idea to a case or explain a consequence.
+The answer explains why, including the relevant limitation or misconception. It appears under
+an accessible native disclosure so readers can think first, without JavaScript or code execution.
 
 ## Problems
 

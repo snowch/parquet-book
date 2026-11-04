@@ -5,9 +5,13 @@ title: Running the lab
 (running-the-lab)=
 # Running the lab
 
+Reading the book does not require these tools. Worked results and diagrams are visible without
+running anything. Use this appendix when you want to explore code or build the reader.
+
 ## In your browser
 
-Nothing to install. Every chapter from ch02 on opens its problems with a workbench, where you edit the Python
+Nothing to install. Open **Read or run the code** to reach an example's controls. Chapters with
+coding problems also have **Try the coding exercises (optional)**, where you edit the Python
 problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
 runs. A Python command in these pages that runs the reader's tests, a problem's tests or the
 reader's command line has a **Run** button, which runs it in the page and shows what it printed;

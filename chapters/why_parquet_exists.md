@@ -20,6 +20,14 @@ has no code for you to write. From the next chapter on, most chapters read the b
 file by hand, build what they read into a reader, and check the result against a library you
 already use.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Explain why a column layout helps a query that reads only part of a table, and when a row layout is useful.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Two columns from a CSV file
@@ -187,6 +195,11 @@ does not: a column layout turns a scan into a few large reads.
 - **Parquet is built for analytical reads.** It trades cheap row access and in-place updates for
   cheap scans of a few columns.
 :::
+
+```checkpoint
+question: A query needs every field of one order. Would the column layout have the same advantage as it does for summing one column?
+answer: No. Reconstructing a complete order needs values from separate columns. A row layout keeps those fields together. Column storage gains most when a query reads a few columns across many rows.
+```
 
 ## Problems
 

@@ -14,20 +14,26 @@ left a problem. A column layout scatters each row across the file, so a reader c
 the start and pick values up as it goes. It needs a map: which bytes hold which column, for
 which rows. A Parquet file carries that map, and it carries it at the end.
 
-First you will read a file's bytes yourself, a few at a time. Then you will follow the book's
-reader, which knows one thing: the name of an object in object storage. You will watch every
-request it makes, see the bytes each request returns, and then build the code that made those
-requests.
+First follow a file's bytes, a few at a time. Then follow the book's reader, which starts with
+only the name of an object in storage. The worked results show every request and the bytes it
+returns. You can inspect or run the code behind them, and build it yourself if you wish.
+
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Locate the footer from the trailer and explain why a reader can discover the file without reading its values.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
 
 ## The experiment
 
 ### Read the bytes yourself
 
 `tiny.parquet` is a real Parquet file written by pyarrow: four orders from a sales table, and
-[Appendix B](#the-fixtures) says exactly how it was written. Before any reader opens it, open it
-yourself. Each step below is a few lines of code. In Python, run them in the page, change them
-with **Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name.
+[Appendix B](#the-fixtures) says exactly how it was written. The results below show what its
+first and last bytes reveal. Open **Read or run the code** to inspect or change an example;
+[Appendix A](#running-the-lab) explains how to run Python and Rust.
 
 **The first bytes.** A file format usually announces itself at the start.
 
@@ -297,6 +303,14 @@ none of it can be read.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#anatomy-of-a-parquet-file-limits),
+then the takeaways and the understanding check.
+:::
+
 The reader you called above is the book's reader, which exists in Python (`python/parquet_lab`)
 and in Rust (`crates/parquet-lab`), and the tests hold the two to the same answers. This section
 builds the part of it the experiment used, in the order it ran. Each piece is quoted from the source, so what you read here is what ran
@@ -541,6 +555,7 @@ a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin footer_with_a_library
 ```
 
+(anatomy-of-a-parquet-file-limits)=
 ## What this cannot tell you
 
 **How a real network behaves.** The simulated store charges a fixed latency and a fixed
@@ -579,7 +594,15 @@ goes further.
   the trailer and then the footer, and report the offsets you can find by hand.
 :::
 
+```checkpoint
+question: If a suffix request includes both the trailer and the entire footer, must the reader make another request to discover the schema?
+answer: No. The trailer locates the footer, and the returned bytes already contain it. The reader can decode the schema from that response. It must still validate the magic and bounds before trusting those bytes.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Four, in `exercises/python/anatomy_of_a_parquet_file.py`, or in Rust in
 `exercises/src/anatomy_of_a_parquet_file.rs`. The first three have tests that fail until you solve

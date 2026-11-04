@@ -19,6 +19,14 @@ nothing about types. It sees bytes, finds repetition in them, and writes it more
 column chunk's metadata names the codec, and a reader must undo it before it can decode anything
 the page holds.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Explain what a codec removes after encoding and why the same codec can behave differently on different columns.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### One table, six codecs
@@ -27,9 +35,9 @@ The `codec-*.parquet` files hold the same orders, encoded the same way: PLAIN, n
 Only the codec differs, so their pages are identical before compression, and any difference in
 size is the codec's. [Appendix B](#the-fixtures) lists how each was written.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, decodes it with the reader's `decode_file_metadata` from
 [ch03](#the-type-system), and finds a column chunk's page with `walk_pages` from [ch06](#pages).
 
@@ -205,6 +213,14 @@ to the other. *Ask a library*, at the end of *Building it*, shows both names. `L
 and rarely written.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#compression-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps undid Snappy by hand, then called the reader's `decompress` on three codecs. This
 section builds the Snappy decoder, says where the other two are, and shows where the column
@@ -420,6 +436,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin compression_with_a_library
 ```
 
+(compression-limits)=
 ## What this cannot tell you
 
 **How fast each codec is.** The book's numbers come from files, not clocks, so they are the same
@@ -455,7 +472,15 @@ better than these.
   nulls can be counted without decompressing.
 :::
 
+```checkpoint
+question: Why might the same codec shrink country codes much more than noisy distances?
+answer: Country codes leave repeated byte sequences that a codec can replace with references. Noisy floating-point values leave fewer useful repeats. The data pattern matters as well as the codec, and decompression must recover the exact encoded bytes.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/compression.py`, or in Rust in
 `exercises/src/compression.rs`. The first two have tests. The third has none.

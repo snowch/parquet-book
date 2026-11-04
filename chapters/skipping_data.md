@@ -19,6 +19,14 @@ matching row returns a wrong answer, silently. A reader that reads a page it cou
 only wastes bytes. So every mechanism here answers "skip" or "cannot rule it out", never "no
 match" on a guess.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Use statistics, page indexes and Bloom filters to rule data out without discarding a possible match.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### The same orders, sorted and shuffled
@@ -28,9 +36,9 @@ way: four row groups, pages of forty rows, a page index for every column, and a 
 `customer_id`. The first is in `order_id` order; the second is shuffled.
 [Appendix B](#the-fixtures) says how pyarrow wrote them.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
 `decode_file_metadata` from [ch03](#the-type-system).
 
@@ -233,6 +241,14 @@ many requests they add, which [ch10](#how-readers-read) measures.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#skipping-data-limits),
+then the takeaways and the understanding check.
+:::
+
 The steps read the statistics by hand, then asked the reader's `page_index` and `bloom` modules,
 then called `prune.plan`. This section builds the parts of the plan: the test of a condition
 against a range, the probe of a filter, and the step from kept rows to the pages of every column.
@@ -427,6 +443,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin skipping_with_a_library
 ```
 
+(skipping-data-limits)=
 ## What this cannot tell you
 
 **How conditions combine.** The reader's plan takes one condition. Each condition yields row
@@ -461,7 +478,15 @@ there before reading any data page. This reader does not.
   free.
 :::
 
+```checkpoint
+question: A Bloom filter says a value may be present. Can the engine return a matching row without decoding the data?
+answer: No. Other values may have set the same bits. A negative probe proves absence, but a positive probe only means the group remains a candidate. The engine must read and check the actual values.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/skipping_data.py`, or in Rust in
 `exercises/src/skipping_data.rs`. The first two have tests. The third has none.

@@ -41,7 +41,7 @@ from tools.outline import APPENDICES, CHAPTERS, PARTS, UNWRITTEN  # noqa: E402
 CONTENT = ROOT / "_build" / "site" / "content"
 WASM = ROOT / "target" / "wasm32-unknown-unknown" / "release" / "parquet_lab_wasm.wasm"
 TITLE = "Parquet, byte by byte"
-SUBTITLE = "Build a Parquet reader while you read about one"
+SUBTITLE = "Understand the format. Explore the code."
 
 
 def page_list() -> list[dict]:
@@ -439,8 +439,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const px = (name) => parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0;
   const phone = matchMedia("(max-width: 40rem)");
   // Panels, the workbench and a run's output look after their own widths.
-  const OWN = ".lab, .workbench, .run-result, .results";
-  const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted";
+  const OWN = ".lab, .workbench, .run-result, .results, .example-result";
+  const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted, .code-disclosure";
 
   let scrolled = 0;
   const label = (button, open) => {
@@ -596,6 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
     blocks.forEach((el, i) => {
       const unit = topOf(el);
       if (!unit || !unit.matches(PROMOTE)) return;
+      if (unit.matches("details:not([open])")) return;
       const u = units.get(unit) || { need: 0, tables: true };
       // Every block of code is one width, the code column, so their edges line up down the page;
       // a table is as wide as its content.
@@ -633,6 +634,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // The column changes width with the window and when a rail opens or closes.
   new ResizeObserver(() => { if (article.clientWidth !== width) schedule(); }).observe(article);
   document.addEventListener("click", (event) => { if (event.target.closest(".tab-bar")) schedule(); });
+  article.addEventListener("toggle", schedule, true);
   // A walkthrough step swaps its code for a text area and back, and the reader types into it.
   new MutationObserver((records) => {
     if (records.some((r) => [...r.addedNodes].some((n) => n.nodeName === "PRE" || n.nodeName === "TEXTAREA"))) {
@@ -682,7 +684,7 @@ def page_html(
     builds = ""
     if chapter is not None:
         # A chapter that explains and builds nothing says what it shows instead.
-        what = "What you see" if chapter.explainer else "What you build"
+        what = "Explore" if chapter.explainer else "Optional build"
         builds = f'<p class="builds"><strong>{what}:</strong> {html.escape(chapter.builds)}</p>'
 
     def link(q, cls, word):

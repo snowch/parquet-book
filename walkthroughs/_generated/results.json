@@ -1,0 +1,467 @@
+{
+  "walkthroughs/python/anatomy_of_a_parquet_file/damaged_length.py": {
+    "source_sha256": "dc3cc6e9a1a439e3732bbcf374e7eced75661b200c63804d4d2c721934282d7d",
+    "stdout": "the footer length now reads 65404\nso the footer would start at byte -64775\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/first_bytes.py": {
+    "source_sha256": "36d35e1f07299bce383fc97835f1ae3400bde165829f42b7359febbc38415037",
+    "stdout": "637 bytes in the file\nthe first four: b'PAR1'\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/footer_length.py": {
+    "source_sha256": "f0dfc6ab994eb96a64bd7f588c5756f13b8c2544691887b599f1553dda467355",
+    "stdout": "the four before them: 7c 01 00 00\nread little-endian: 380\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/footer_start.py": {
+    "source_sha256": "dc74c04b27a47de4c9eea50379379e975ae5c08d6d40ecaf0d1be8cfe7cf1f99",
+    "stdout": "the footer starts at byte 249 and is 380 bytes long\nits first eight bytes: 15 04 19 4c 35 00 18 06\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/footer_with_a_library.py": {
+    "source_sha256": "57851495d495806cd39eb95c3ffcf00b06b74c23fbf56e9309483255e870bf35",
+    "stdout": "footer length: 380\nrows: 4 in 1 row group\ncolumn chunk order_id: bytes 4 to 99\ncolumn chunk country: bytes 99 to 154\ncolumn chunk amount_cents: bytes 154 to 249\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/last_bytes.py": {
+    "source_sha256": "48cce75e9f8dbe4a25f708a74402b787ca1910970249f5f58d13646767ff84a8",
+    "stdout": "the last four: b'PAR1'\nthe same as the first four: True\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/open_with_the_reader.py": {
+    "source_sha256": "0565a86cebe16281492cbf790d44f18a4f7eeeb162142fb1fc15ab55d5256e1c",
+    "stdout": "HEAD · -> 0 bytes by 20 ms: learn the file size, to know where the end is\nGET bytes=629-636 -> 8 bytes by 40 ms: read the trailer\nGET bytes=249-628 -> 380 bytes by 60 ms: read the footer: the trailer says where it starts\nfooter length: 380 rows: 4\n",
+    "comparisons": [
+      {
+        "title": "Find the size with a suffix request",
+        "explanation": "The suffix response supplies the file size, so the HEAD request disappears.",
+        "changes": [
+          [
+            "size=Head(), prefetch=8",
+            "size=SuffixRange(), prefetch=8"
+          ]
+        ],
+        "stdout": "GET bytes=-8 -> 8 bytes by 20 ms: read the trailer; the response carries the file size\nGET bytes=249-628 -> 380 bytes by 40 ms: read the footer: the trailer says where it starts\nfooter length: 380 rows: 4\n"
+      },
+      {
+        "title": "Bring the footer with the trailer",
+        "explanation": "A larger suffix read includes the footer. Fewer requests now return more bytes.",
+        "changes": [
+          [
+            "size=Head(), prefetch=8",
+            "size=SuffixRange(), prefetch=512"
+          ]
+        ],
+        "stdout": "GET bytes=-512 -> 512 bytes by 20 ms: read the trailer; the response carries the file size\nfooter length: 380 rows: 4\n"
+      }
+    ]
+  },
+  "walkthroughs/python/anatomy_of_a_parquet_file/the_reader_refuses.py": {
+    "source_sha256": "72f48ba1a1882875e8004a29c6b2750a1cfab3eecb42fd61feaf91267eaccfa5",
+    "stdout": "the reader refuses: the trailer claims a 65404-byte footer, but only 625 bytes lie between the opening magic and the trailer\nafter 2 requests: learn the file size, to know where the end is, read the trailer\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/deletes_with_a_library.py": {
+    "source_sha256": "c11dbf9090a01b9791221d785fadae7364137fe470e7ba87c4ef9034dd786ae2",
+    "stdout": "data/part-1.parquet holds 200 rows; 4 are deleted; 196 are live\ntheir amounts sum to 879296\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/find_the_file.py": {
+    "source_sha256": "76e04072ea5e6dbed9b2ddd071905ac23239c932cf837892aabd233c67edaec4",
+    "stdout": "order 300 can only be in data/part-1.parquet\nand these delete files may remove it: deletes/delete-00.parquet, deletes/delete-02.parquet, deletes/delete-04.parquet, deletes/delete-06.parquet\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/look_up_an_order.py": {
+    "source_sha256": "425b2c4a59c883879d4826cb9346496877e9ee3537748b9dd77cf2f18a924e7a",
+    "stdout": "round trip 1:\n   20 ms: GET _snapshots.json · read the table's snapshots\nround trip 2:\n   40 ms: GET deletes/delete-00.parquet · read a delete file that names a file the key may be in\n   40 ms: GET deletes/delete-02.parquet · read a delete file that names a file the key may be in\n   40 ms: GET deletes/delete-04.parquet · read a delete file that names a file the key may be in\n   40 ms: GET deletes/delete-06.parquet · read a delete file that names a file the key may be in\n   60 ms: GET data/part-1.parquet bytes=10802-10809 read the trailer\nround trip 3:\n   80 ms: GET data/part-1.parquet bytes=8222-10801 read the footer: the trailer says where it starts\nround trip 4:\n  100 ms: GET data/part-1.parquet bytes=6473-6583 read the indexes the plan needs\n  100 ms: GET data/part-1.parquet bytes=7656-7938 read the indexes the plan needs\nround trip 5:\n  120 ms: GET data/part-1.parquet bytes=4-434 read the pages the plan kept\n  120 ms: GET data/part-1.parquet bytes=591-1259 read the pages the plan kept\n  120 ms: GET data/part-1.parquet bytes=1416-2003 read the pages the plan kept\n  120 ms: GET data/part-1.parquet bytes=2160-2250 read the pages the plan kept\n  140 ms: GET data/part-1.parquet bytes=2371-2449 read the pages the plan kept\n  140 ms: GET data/part-1.parquet bytes=2550-3039 read the pages the plan kept\n  140 ms: GET data/part-1.parquet bytes=3196-3237 read the pages the plan kept\norder 300 is row 99 of data/part-1.parquet\n  order_id: 300\n  ordered_at: 2026-01-01T08:03:49Z\n  customer_id: 752886\n  country: UK\n  status: paid\n  amount_cents: 4966\n16 requests, 24093 bytes, 140 ms\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/plan_a_compaction.py": {
+    "source_sha256": "44ee3ddd252cca232a4e12f15acd985ceb7b4587677730a90b68182571447c61",
+    "stdout": "group 1: 200 rows in, 196 out, 14882 bytes to read\n  data/part-1.parquet\n  deletes/delete-00.parquet\n  deletes/delete-02.parquet\n  deletes/delete-04.parquet\n  deletes/delete-06.parquet\ngroup 2: 200 rows in, 196 out, 14889 bytes to read\n  data/part-2.parquet\n  deletes/delete-01.parquet\n  deletes/delete-03.parquet\n  deletes/delete-05.parquet\n  deletes/delete-07.parquet\ngroup 3: 160 rows in, 160 out, 43111 bytes to read\n  appends/append-00.parquet\n  appends/append-01.parquet\n  appends/append-02.parquet\n  appends/append-03.parquet\n  appends/append-04.parquet\n  appends/append-05.parquet\n  appends/append-06.parquet\n  appends/append-07.parquet\n  appends/append-08.parquet\n  appends/append-09.parquet\n  appends/append-10.parquet\n  appends/append-11.parquet\n  appends/append-12.parquet\n  appends/append-13.parquet\n  appends/append-14.parquet\n  appends/append-15.parquet\n3 files to write, from 72882 bytes read\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/read_a_delete_file.py": {
+    "source_sha256": "a4522ac7134147c1ab150e36ba31e06bf5c8384b56659509a39db52999cd7eb6",
+    "stdout": "row 49 of data/part-1.parquet is deleted: order 250\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/changing_a_table/table_files.py": {
+    "source_sha256": "700ac56bd725ef4105e09d1d88c9d7ec2dc8b26f498d24a9dccb297d4ed5b227",
+    "stdout": "data/part-0.parquet: 200 rows in 10818 bytes, 54 bytes a row\ndata/part-1.parquet: 200 rows in 10810 bytes, 54 bytes a row\ndata/part-2.parquet: 200 rows in 10817 bytes, 54 bytes a row\ndata/part-3.parquet: 200 rows in 10818 bytes, 54 bytes a row\nappends/append-00.parquet: 10 rows in 2685 bytes, 268 bytes a row\nappends/append-01.parquet: 10 rows in 2672 bytes, 267 bytes a row\nappends/append-02.parquet: 10 rows in 2697 bytes, 269 bytes a row\nappends/append-03.parquet: 10 rows in 2670 bytes, 267 bytes a row\nappends/append-04.parquet: 10 rows in 2734 bytes, 273 bytes a row\nappends/append-05.parquet: 10 rows in 2702 bytes, 270 bytes a row\nappends/append-06.parquet: 10 rows in 2680 bytes, 268 bytes a row\nappends/append-07.parquet: 10 rows in 2726 bytes, 272 bytes a row\nappends/append-08.parquet: 10 rows in 2683 bytes, 268 bytes a row\nappends/append-09.parquet: 10 rows in 2704 bytes, 270 bytes a row\nappends/append-10.parquet: 10 rows in 2703 bytes, 270 bytes a row\nappends/append-11.parquet: 10 rows in 2697 bytes, 269 bytes a row\nappends/append-12.parquet: 10 rows in 2704 bytes, 270 bytes a row\nappends/append-13.parquet: 10 rows in 2684 bytes, 268 bytes a row\nappends/append-14.parquet: 10 rows in 2668 bytes, 266 bytes a row\nappends/append-15.parquet: 10 rows in 2702 bytes, 270 bytes a row\n20 data files and 8 delete files\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/compression/compression_with_a_library.py": {
+    "source_sha256": "08db0d90ecc57b424b056294f9c952c944046033288514c0a1a352011f43ebe6",
+    "stdout": "country: SNAPPY, 136 of 1570 bytes\ncountry: LZ4, 76 of 1569 bytes\ncountry: GZIP, 87 of 1569 bytes\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/compression/every_codec_one_page.py": {
+    "source_sha256": "9f15e5285bfbb1f68d2b0b300da0f6c400285fd057cd0262968da040cec23079",
+    "stdout": "SNAPPY: 102 bytes become 1536 in 35 tokens, the same: True\nLZ4_RAW: 43 bytes become 1536 in 13 tokens, the same: True\nGZIP: 54 bytes become 1536 in 18 tokens, the same: True\n",
+    "comparisons": [
+      {
+        "title": "Compress noisy distances instead of country codes",
+        "explanation": "The codecs still recover the same bytes, but noisy values leave less repetition to remove.",
+        "changes": [
+          [
+            "column = 1",
+            "column = 5"
+          ]
+        ],
+        "stdout": "SNAPPY: 1874 bytes become 2048 in 332 tokens, the same: True\nLZ4_RAW: 1802 bytes become 2048 in 465 tokens, the same: True\nGZIP: 1524 bytes become 2048 in 512 tokens, the same: True\n"
+      }
+    ]
+  },
+  "walkthroughs/python/compression/snappy_by_hand.py": {
+    "source_sha256": "8dc2ec723b0c79d28d488f9d8e7677d39f650898a3b9ca000af34ae2cccd3440",
+    "stdout": "102 bytes; the varint says 1536 will come out\nliteral 6 bytes\ncopy 4 from 6 back\nliteral 2 bytes\ncopy 4 from 6 back\nliteral 2 bytes\ncopy 4 from 6 back\n34 tokens wrote 1536 bytes; the page header says 1536\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/encodings/decode_a_column.py": {
+    "source_sha256": "f254b429fef47e5ad50af4ad1589a4b24aec5ee737ab783b303c1f18db6fb9fd",
+    "stdout": "DELTA_BYTE_ARRAY page\n  prefix lengths: header: 80 01 04 28 00\n    blocks of 128 values in 4 miniblocks; 40 values; the first is 0\n  prefix lengths: block 0: 01 05 01 00 00\n    smallest delta -1; bit widths [5, 1, 0, 0]\n  prefix lengths: block 0, miniblock 0: 3a 84 10 42 08 01 88 10 … (20 bytes)\n    5 bits per delta; deltas [25, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, -1, 1, 0]\n  prefix lengths: block 0, miniblock 1: 7f 00 00 00\n    1 bits per delta; deltas [0, 0, 0, 0, 0, 0, 0]\n  suffixes: lengths: header: 80 01 04 28 34\n    blocks of 128 values in 4 miniblocks; 40 values; the first is 26\n  suffixes: lengths: block 0: 31 05 05 00 00\n    smallest delta -25; bit widths [5, 5, 0, 0]\n  suffixes: lengths: block 0, miniblock 0: 20 e7 9c 73 ce 59 e3 9c … (20 bytes)\n    5 bits per delta; deltas [-25, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, -1, 0]\n  suffixes: lengths: block 0, miniblock 1: 39 e7 9c 73 06 00 00 00 … (20 bytes)\n    5 bits per delta; deltas [0, 0, 0, 0, 0, 0, 0]\n  suffixes: bytes: 68 74 74 70 73 3a 2f 2f … (68 bytes)\n    40 values' bytes, back to back\nvalues: \"https://shop.example/p/100\" \"https://shop.example/p/101\" \"https://shop.example/p/102\" \"https://shop.example/p/103\" …\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/encodings/delta_header.py": {
+    "source_sha256": "5c585981b929d97f617ea5d19b7a30be88c09c7331105bc2b6cb6285a00e6e74",
+    "stdout": "30 bytes; header 80 02 04 28 b0 86 c7 95 0d\nblocks of 256, 4 miniblocks, 40 values, first 1767432600\nmin delta 58; widths [2, 0, 0, 0]\nfirst deltas: [61, 61, 58, 61, 61, 58, 61, 61]\n",
+    "comparisons": [
+      {
+        "title": "A counter: order_id",
+        "explanation": "Every delta equals the minimum delta. The adjusted deltas are all zero, so their bit width is zero.",
+        "changes": [
+          [
+            "column = 1  # ordered_at",
+            "column = 0  # ordered_at"
+          ]
+        ],
+        "stdout": "11 bytes; header 80 02 04 28 d2 0f\nblocks of 256, 4 miniblocks, 40 values, first 1001\nmin delta 1; widths [0, 0, 0, 0]\nfirst deltas: [1, 1, 1, 1, 1, 1, 1, 1]\n"
+      }
+    ]
+  },
+  "walkthroughs/python/encodings/dictionary_by_hand.py": {
+    "source_sha256": "a382db0400aba1938afe5c1bb9ec04155fa1a21ec2123ad47446fc9491d5f639",
+    "stdout": "DICTIONARY_PAGE PLAIN ['UK', 'SE', 'PL', 'US']\nDATA_PAGE RLE_DICTIONARY: 6 bytes, width 2, header 05\nindices: [0, 1, 0, 2, 0, 3, 1, 0, 0, 2, 0, 1]\nvalues: ['UK', 'SE', 'UK', 'PL', 'UK', 'US', 'SE', 'UK', 'UK', 'PL', 'UK', 'SE']\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/encodings/encodings_with_a_library.py": {
+    "source_sha256": "fc2d320ce414a24451de0f9060ae9c520970008610a6bb32e4316ca387068b2c",
+    "stdout": "order_id ('RLE', 'DELTA_BINARY_PACKED')\nordered_at ('RLE', 'DELTA_BINARY_PACKED')\nsku ('RLE', 'DELTA_LENGTH_BYTE_ARRAY')\nurl ('RLE', 'DELTA_BYTE_ARRAY')\nweight_kg ('RLE', 'BYTE_STREAM_SPLIT')\ndictionary: ['UK', 'SE', 'PL', 'US']\nindices: [0, 1, 0, 2, 0, 3, 1, 0, 0, 2, 0, 1]\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/how_readers_read/read_with_a_strategy.py": {
+    "source_sha256": "f873a95ea5756905a7eb2e8193de10ec8e6c6dcb4bea4c0021ae0c1ee384ac98",
+    "stdout": "  0- 20 ms on 1: HEAD  learn the file size, to know where the end is\n 20- 40 ms on 1: GET bytes=26918-26925 read the trailer\n 40- 60 ms on 1: GET bytes=25026-26917 read the footer: the trailer says where it starts\n 60- 80 ms on 1: GET bytes=23340-23450 read the indexes the plan needs\n 80-100 ms on 1: GET bytes=24564-24619 read the indexes the plan needs\n100-120 ms on 1: GET bytes=24620-24675 read the indexes the plan needs\n120-140 ms on 1: GET bytes=24676-24738 read the indexes the plan needs\n140-160 ms on 1: GET bytes=24739-24794 read the indexes the plan needs\n160-180 ms on 1: GET bytes=10732-11070 read the pages the plan kept\n180-200 ms on 1: GET bytes=12427-12765 read the pages the plan kept\n200-220 ms on 1: GET bytes=14122-14171 read the pages the plan kept\n220-240 ms on 1: GET bytes=14172-14217 read the pages the plan kept\n240-260 ms on 1: GET bytes=14402-14740 read the pages the plan kept\n13 requests, 3355 bytes, 260 ms\nrows matching: [430]\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/how_readers_read/reads_with_a_library.py": {
+    "source_sha256": "31f8485ec2afbd7c50bdb2ded74195c424428c7d9a3d5a111689ca304e8d7fc8",
+    "stdout": "open, pre_buffer=False:\n  read 26926 bytes at 0\nread row group 2:\n  read 1695 bytes at 10732\n  read 1695 bytes at 12427\n  read 280 bytes at 14122\n  read 1695 bytes at 14402\n200 rows\nopen, pre_buffer=True:\n  read 26926 bytes at 0\nread row group 2:\n  read 5365 bytes at 10732\n200 rows\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/lakehouse_and_beyond/list_the_table.py": {
+    "source_sha256": "5154294dcb729fec97c6b28043cbbee3fa9b1f61164a7f68163a5baa7622bab7",
+    "stdout": "country=DE/part-0.parquet: country is DE, 4071 bytes\ncountry=FR/part-0.parquet: country is FR, 4051 bytes\ncountry=PL/part-0.parquet: country is PL, 4064 bytes\ncountry=SE/part-0.parquet: country is SE, 4069 bytes\ncountry=UK/part-0.parquet: country is UK, 4074 bytes\ncountry=UK/part-1.parquet: country is UK, 4062 bytes\ncountry=UK/part-2.parquet: country is UK, 4052 bytes\ncountry=US/part-0.parquet: country is US, 4049 bytes\ncountry=US/part-1.parquet: country is US, 1674 bytes\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/lakehouse_and_beyond/query_the_table.py": {
+    "source_sha256": "6d03da801b4f6bd40637b995a72f1a794665ce3b4a341ecbe2538e82d9e61325",
+    "stdout": "country=DE/part-0.parquet: skipped: country = UK, and its partition is country=DE\ncountry=FR/part-0.parquet: skipped: country = UK, and its partition is country=FR\ncountry=PL/part-0.parquet: skipped: country = UK, and its partition is country=PL\ncountry=SE/part-0.parquet: skipped: country = UK, and its partition is country=SE\ncountry=UK/part-0.parquet: read: nothing rules it out\ncountry=UK/part-1.parquet: skipped: order_id < 200, and the log says order_id runs from 274 to 533\ncountry=UK/part-2.parquet: skipped: order_id < 200, and the log says order_id runs from 536 to 797\ncountry=US/part-0.parquet: skipped: country = UK, and its partition is country=US\ncountry=US/part-1.parquet: skipped: country = UK, and its partition is country=US\n  0- 20 ms on 1: GET table/_delta_log/00000000000000000000.json, 6332 bytes\n 20- 40 ms on 2: GET table/country=UK/part-0.parquet, 4074 bytes\ncount(*)\n75\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/lakehouse_and_beyond/read_the_log.py": {
+    "source_sha256": "7315c31df5cee9306318dd3b99e332b1be64a4f191f956b4a1b51e56f455ac3e",
+    "stdout": "line 1: protocol\nline 2: metaData\nline 3: add country=DE/part-0.parquet, 100 rows, order_id 1 to 796\nline 4: add country=FR/part-0.parquet, 99 rows, order_id 10 to 800\nline 5: add country=PL/part-0.parquet, 100 rows, order_id 16 to 795\nline 6: add country=SE/part-0.parquet, 100 rows, order_id 5 to 790\nline 7: add country=UK/part-0.parquet, 100 rows, order_id 3 to 271\nline 8: add country=UK/part-1.parquet, 100 rows, order_id 274 to 533\nline 9: add country=UK/part-2.parquet, 99 rows, order_id 536 to 797\nline 10: add country=US/part-0.parquet, 100 rows, order_id 4 to 779\nline 11: add country=US/part-1.parquet, 2 rows, order_id 785 to 798\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/lakehouse_and_beyond/table_with_a_library.py": {
+    "source_sha256": "ec8ac2bcdf18a9c05944dd9c37d5f805c9a391af0c22fd63a09c8150b6283e29",
+    "stdout": "pyarrow.Field<country: string>\nfixtures/table/country=UK/part-0.parquet: order_id 3 to 271, row groups kept [0]\nfixtures/table/country=UK/part-1.parquet: order_id 274 to 533, row groups kept []\nfixtures/table/country=UK/part-2.parquet: order_id 536 to 797, row groups kept []\nrows: 75\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/metadata_and_statistics/byte_order.py": {
+    "source_sha256": "533b1f63660f0558b2ede8442c8c6834c592bdab2f86c54002ed4a755d672ce1",
+    "stdout": "Zürich 5a c3 bc 72 69 63 68\nŁódź c5 81 c3 b3 64 c5 ba\nAarhus 41 61 72 68 75 73\nÅrhus c3 85 72 68 75 73\nunsigned bytes: Aarhus, Zürich, Århus, Łódź\nsigned bytes:   Århus, Łódź, Aarhus, Zürich\nPython's sort:  Aarhus, Zürich, Århus, Łódź\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/metadata_and_statistics/signed_or_unsigned.py": {
+    "source_sha256": "f503a2de542ef7092264809c0323ea6bbf965e97477da41b02345b5abcf34305",
+    "stdout": "customer_id INT32 INTEGER(32, unsigned)\nrow group 0: max 00 5e d0 b2; unsigned [7, 3000000000], signed [7, -1294967296]\nrow group 1: max 00 28 6b ee; unsigned [8, 4000000000], signed [8, -294967296]\nrow group 2: max 00 f9 02 95; unsigned [1, 2500000000], signed [1, -1794967296]\n",
+    "comparisons": [
+      {
+        "title": "A signed column: delta",
+        "explanation": "For this column, use the signed interpretation. The logical type decides how to interpret the same physical integer storage.",
+        "changes": [
+          [
+            "column = 1",
+            "column = 2"
+          ]
+        ],
+        "stdout": "delta INT32 INTEGER(8, signed)\nrow group 0: max 07 00 00 00; unsigned [4294967176, 7], signed [-120, 7]\nrow group 1: max 64 00 00 00; unsigned [4294967295, 100], signed [-1, 100]\nrow group 2: max 0c 00 00 00; unsigned [4294967293, 12], signed [-3, 12]\n"
+      }
+    ]
+  },
+  "walkthroughs/python/metadata_and_statistics/statistics_with_a_library.py": {
+    "source_sha256": "c4540169f863de513cfb17f339ff60b893eb699369fb3c7a790f9f357b28649b",
+    "stdout": "the footer: 2139 bytes; sorted by (SortingColumn(column_index=0, descending=False, nulls_first=False),)\norder_id: 1 to 4, null count 0\ncustomer_id: 7 to 3000000000, null count 0\n  raw, as INT32: 7 to -1294967296\ndelta: -120 to 7, null count 0\ncity: 'Aarhus' to 'Łódź', null count 0\n  raw, as BYTE_ARRAY: b'Aarhus' to b'\\xc5\\x81\\xc3\\xb3d\\xc5\\xba'\ntemp_c: -3.0 to 12.5, null count 0\namount: Decimal('-5.00') to Decimal('42.10'), null count 0\n  raw, as FIXED_LEN_BYTE_ARRAY: b'\\xff\\xff\\xfe\\x0c' to b'\\x00\\x00\\x10r'\ncoupon: 'SPRING' to 'WELCOME', null count 1\n  raw, as BYTE_ARRAY: b'SPRING' to b'WELCOME'\nnote: no statistics\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/metadata_and_statistics/the_reader_decides.py": {
+    "source_sha256": "e320fb636f6babbffacf392dbb5caefe9ef82835371df859731d99042250e7ec",
+    "stdout": "order_id, compared as signed integers:\n  row group 0: 1 to 4, from min_value and max_value\n  row group 1: 5 to 8, from min_value and max_value\n  row group 2: 9 to 12, from min_value and max_value\ncustomer_id, compared as unsigned integers:\n  row group 0: 7 to 3000000000, from min_value and max_value\n  row group 1: 8 to 4000000000, from min_value and max_value\n  row group 2: 1 to 2500000000, from min_value and max_value\ndelta, compared as signed integers:\n  row group 0: -120 to 7, from min_value and max_value\n  row group 1: -1 to 100, from min_value and max_value\n  row group 2: -3 to 12, from min_value and max_value\ncity, compared as unsigned bytes:\n  row group 0: \"Aarhus\" to \"Łódź\", from min_value and max_value\n  row group 1: \"Bergen\" to \"Écija\", from min_value and max_value\n  row group 2: \"Cork\" to \"Ängelholm\", from min_value and max_value\ntemp_c, compared as floating-point values, leaving out NaN:\n  row group 0: -3 to 12.5, from min_value and max_value\n  row group 1: -0 to 20, from min_value and max_value\n  row group 2: 1 to 7.5, from min_value and max_value\namount, compared as signed big-endian integers:\n  row group 0: -5.00 to 42.10, from min_value and max_value\n  row group 1: -19.99 to 7.25, from min_value and max_value\n  row group 2: -100.00 to 12.00, from min_value and max_value\ncoupon, compared as unsigned bytes:\n  row group 0: \"SPRING\" to \"WELCOME\", from min_value and max_value\n  row group 1: refused, the footer records no minimum and maximum for this column chunk; null count 4\n  row group 2: \"SUMMER\" to \"SUMMER\", from min_value and max_value\nnote, compared as unsigned bytes:\n  row group 0: no statistics\n  row group 1: no statistics\n  row group 2: no statistics\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/modular_encryption/encryption_with_a_library.py": {
+    "source_sha256": "a0cbc7211c6c5e7b131c5f004aa7dd92f1256d44fb9f6ace19792e90b2bee84b",
+    "stdout": "plaintext-footer.parquet: 12 rows\n  order_id: statistics 1 to 12\n  country: statistics PL to US\n  read ['order_id', 'country']: 12 rows\n  read ['email']: Cannot decrypt ColumnMetadata. FileDecryption is not setup correctly\nencrypted-footer.parquet: Could not read encrypted metadata, no decryption found in reader's properties\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/modular_encryption/footer_modes.py": {
+    "source_sha256": "5611cd2e641cd461596aba0bd414a5f3d09d5ba0f0d173fdf3fb1e675dd98e4f",
+    "stdout": "plaintext-footer.parquet starts b'PAR1' and ends b'PAR1'\nencrypted-footer.parquet starts b'PARE' and ends b'PARE'\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/modular_encryption/keys_by_name.py": {
+    "source_sha256": "1bfaf587e8789ae7e8ee2f480c096fc56c7d8bd7c45c4237ae820234e24de889",
+    "stdout": "plaintext-footer.parquet, keys named in the clear: 3\n  column key 'pii', wrapped data key kDCfNQkEKb3ph8eevfi83g==\n  column key 'finance', wrapped data key mdP1xWlgq/LpdeghSAEtWg==\n  footer key 'footer', wrapped data key 850XPD1E9xf+oYHOfJk1HA==\nencrypted-footer.parquet, keys named in the clear: 1\n  footer key 'footer', wrapped data key QU/RdEpBVWDcoGPTQ2UI4g==\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/modular_encryption/one_module.py": {
+    "source_sha256": "ba7963b9efcd21c82b602eb256eaa1a819462a6f65b670f0d445ec5072d85a34",
+    "stdout": "email: bytes 270 to 709, statistics None\na module at byte 270: length 100\n  nonce: 5a 8e be 21 b7 77 c9 2a 11 d4 81 f5\n  ciphertext: 72 bytes\n  tag: b0 cd f2 80 98 58 44 cd 7e 6c 2f fa fc 74 83 03\nthe next module starts at byte 374\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/nested_data/levels_of_a_column.py": {
+    "source_sha256": "8dd5bd354a565b6b6f60f45429edd3f2d116dca7fe8cf9f615062207fe03621f",
+    "stdout": "tags[]  max levels: definition 3, repetition 1\nr d value\n0 3 \"gift\"\n1 3 \"express\"\n0 1 null\n0 0 null\n0 3 \"sale\"\n1 2 null\n{\"tags\": [\"gift\", \"express\"]}\n{\"tags\": []}\n{\"tags\": null}\n{\"tags\": [\"sale\", null]}\n",
+    "comparisons": [
+      {
+        "title": "An optional scalar: email",
+        "explanation": "There is one slot per record. A null lowers the definition level; without a list, no repetition level is needed on disk.",
+        "changes": [
+          [
+            "name = \"tags\"",
+            "name = \"email\""
+          ]
+        ],
+        "stdout": "email  max levels: definition 1, repetition 0\nr d value\n0 1 \"ann@example.com\"\n0 0 null\n0 1 \"cat@example.com\"\n0 1 \"dan@example.com\"\n{\"email\": \"ann@example.com\"}\n{\"email\": null}\n{\"email\": \"cat@example.com\"}\n{\"email\": \"dan@example.com\"}\n"
+      }
+    ]
+  },
+  "walkthroughs/python/nested_data/levels_with_a_library.py": {
+    "source_sha256": "37474bbb2b608c59498960fc5edd07e0b60f873c034024333cf22e9a404a15bb",
+    "stdout": "offsets: [0, 2, 2, 2, 4]\nnull lists: [False, False, True, False]\nvalues: ['gift', 'express', 'sale', None]\nrecords: [['gift', 'express'], [], None, ['sale', None]]\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/nested_data/unpack_the_levels.py": {
+    "source_sha256": "5797f3ae94ea877ee12327388570898dc8b81a96eecd14d3f70e0ad1735ce1a3",
+    "stdout": "rep: 3 bytes, header 03, bit-packed, 1 group: 0 2 1 0 0 0 (+2 padding)\ndef: 4 bytes, header 03, bit-packed, 1 group: 6 6 4 1 6 0 (+2 padding)\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/pages/damage_a_page.py": {
+    "source_sha256": "0e6c0b54deb095885e52817f850df0502665533a0feaab13a04dcf0560d36e48",
+    "stdout": "DATA_PAGE_V2 at 984: its header says b8c929a8\nthe body as written: b8c929a8, matches the header: True\none bit flipped: a1d218e9, matches the header: False\nthe reader's walk: [True, True, True, True, False]\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/pages/pages_with_a_library.py": {
+    "source_sha256": "26537d31458c60242bd5e691defdda1b4052f95a7d6343d9b18c6256ee4ff64b",
+    "stdout": "country: bytes 788 to 1035\nthe dictionary page at 788, the first data page at 831\nunchecked, row 58 reads 'SE', not 'PL'\nchecked, it refuses: could not verify page integrity, CRC checksum verification failed for page_ordinal 3\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/pages/walk_the_pages.py": {
+    "source_sha256": "1f09da25c89ca6bfad9969636787abfb3f0763a0f010312008fd4a0fd75be922",
+    "stdout": "country: bytes 744 to 958\nDICTIONARY_PAGE at 744: 14-byte header, 24-byte body, 4 values\nDATA_PAGE at 782: 31-byte header, 13-byte body, 16 values\nDATA_PAGE at 826: 31-byte header, 13-byte body, 16 values\nDATA_PAGE at 870: 31-byte header, 13-byte body, 16 values\nDATA_PAGE at 914: 31-byte header, 13-byte body, 12 values\n",
+    "comparisons": [
+      {
+        "title": "The same rows in version-2 pages",
+        "explanation": "Version-2 headers also report row and null counts. The dictionary still occupies a separate page.",
+        "changes": [
+          [
+            "\"fixtures/pages.parquet\"",
+            "\"fixtures/pages-v2.parquet\""
+          ]
+        ],
+        "stdout": "country: bytes 788 to 1035\nDICTIONARY_PAGE at 788: 19-byte header, 24-byte body, 4 values\nDATA_PAGE_V2 at 831: 42-byte header, 9-byte body, 16 values, 16 rows, 3 nulls\nDATA_PAGE_V2 at 882: 42-byte header, 9-byte body, 16 values, 16 rows, 2 nulls\nDATA_PAGE_V2 at 933: 42-byte header, 9-byte body, 16 values, 16 rows, 2 nulls\nDATA_PAGE_V2 at 984: 42-byte header, 9-byte body, 12 values, 12 rows, 2 nulls\n"
+      }
+    ]
+  },
+  "walkthroughs/python/skipping_data/pages_of_one_group.py": {
+    "source_sha256": "cce63977731e79db9c16446a76e0a975460ba3a2f21d3f738444649d67adbb3e",
+    "stdout": "5 pages, boundary order ASCENDING\npage 0: order_id 401 to 440, read; rows from 0, bytes 10732 to 11071\npage 1: order_id 441 to 480, skip; rows from 40, bytes 11071 to 11410\npage 2: order_id 481 to 520, skip; rows from 80, bytes 11410 to 11749\npage 3: order_id 521 to 560, skip; rows from 120, bytes 11749 to 12088\npage 4: order_id 561 to 600, skip; rows from 160, bytes 12088 to 12427\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/skipping_data/plan_a_read.py": {
+    "source_sha256": "6928ee2110e2aef437916b71c6ef7a4b8b6305fedc5d68c544f0fead21156644",
+    "stdout": "row group 0: skip\n  statistics: skip, the value is above the maximum\nrow group 1: skip\n  statistics: skip, the value is above the maximum\nrow group 2: read rows [(0, 40)]\n  statistics: read, the range may hold a match\n  page index: read, 1 of 5 pages may hold a match\nrow group 3: skip\n  statistics: skip, the value is below the minimum\n1113 bytes of column chunks, 342 to decide\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/skipping_data/probe_a_bloom_filter.py": {
+    "source_sha256": "ef67c1cf7aa47f31e2e5c9828d0b61dc60b976fb76031ac63c63aec5faa75a7d",
+    "stdout": "xxHash64 of 32 79 06 00 00 00 00 00: 069d06560374f61c\nrow group 0: block 0 of 8, bits [(2, True), (23, True), (24, False), (1, False), (24, True), (24, True), (27, True), (8, False)]\n  may contain it: False\nrow group 1: block 0 of 8, bits [(2, False), (23, False), (24, True), (1, False), (24, True), (24, False), (27, True), (8, True)]\n  may contain it: False\nrow group 2: block 0 of 8, bits [(2, False), (23, False), (24, True), (1, True), (24, False), (24, True), (27, True), (8, True)]\n  may contain it: False\nrow group 3: block 0 of 8, bits [(2, True), (23, True), (24, True), (1, True), (24, True), (24, True), (27, False), (8, True)]\n  may contain it: False\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/skipping_data/row_group_bounds.py": {
+    "source_sha256": "c4cd4af487a13a1d409be6ee75ac63b8725d3d8ff663e4e77b383538126bb97d",
+    "stdout": "row group 0: order_id 1 to 200, skip\nrow group 1: order_id 201 to 400, skip\nrow group 2: order_id 401 to 600, read\nrow group 3: order_id 601 to 800, skip\n",
+    "comparisons": [
+      {
+        "title": "Shuffle the same orders",
+        "explanation": "Every row group's range now admits the wanted value. Statistics cannot prove that any group is safe to skip.",
+        "changes": [
+          [
+            "path = \"fixtures/pruning-sorted.parquet\"",
+            "path = \"fixtures/pruning-shuffled.parquet\""
+          ]
+        ],
+        "stdout": "row group 0: order_id 4 to 797, read\nrow group 1: order_id 1 to 792, read\nrow group 2: order_id 2 to 799, read\nrow group 3: order_id 3 to 800, read\n"
+      },
+      {
+        "title": "The last order in a band",
+        "explanation": "The maximum is inclusive, so the group ending at the wanted value must be read.",
+        "changes": [
+          [
+            "wanted = 431",
+            "wanted = 200"
+          ]
+        ],
+        "stdout": "row group 0: order_id 1 to 200, read\nrow group 1: order_id 201 to 400, skip\nrow group 2: order_id 401 to 600, skip\nrow group 3: order_id 601 to 800, skip\n"
+      },
+      {
+        "title": "The first order in the next band",
+        "explanation": "Moving past that maximum changes which group must be read.",
+        "changes": [
+          [
+            "wanted = 431",
+            "wanted = 201"
+          ]
+        ],
+        "stdout": "row group 0: order_id 1 to 200, skip\nrow group 1: order_id 201 to 400, read\nrow group 2: order_id 401 to 600, skip\nrow group 3: order_id 601 to 800, skip\n"
+      }
+    ]
+  },
+  "walkthroughs/python/skipping_data/skipping_with_a_library.py": {
+    "source_sha256": "463893e2249e5ae767563f86b40aa4e816abac5a77f64421ce6de6cafbd218fa",
+    "stdout": "order_id = 431: kept row groups [2]\ncustomer_id = 424242: kept row groups [0, 1, 2, 3]\na column index: True; an offset index: True\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/the_type_system/rebuild_the_tree.py": {
+    "source_sha256": "ad180582ac3369aa500d829d4d93ac9a74f97e0273cb62e91ae3527d8e09792c",
+    "stdout": "schema\n  is_paid  max levels: definition 0, repetition 0\n  quantity  max levels: definition 0, repetition 0\n  store_id  max levels: definition 0, repetition 0\n  order_id  max levels: definition 0, repetition 0\n  weight_kg  max levels: definition 0, repetition 0\n  amount  max levels: definition 0, repetition 0\n  country  max levels: definition 1, repetition 0\n  order_date  max levels: definition 0, repetition 0\n  paid_at  max levels: definition 0, repetition 0\n  shipping\n    city  max levels: definition 2, repetition 0\n    postcode  max levels: definition 2, repetition 0\nthe reader's build finds 11 columns\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/the_type_system/same_bytes_two_ways.py": {
+    "source_sha256": "d03e382defabc1b351f2a1ff0f907a5f3823482968b215702b65a611fd474aa3",
+    "stdout": "order_date e8 4f 00 00 -> 20456 -> 2026-01-03\npaid_at 00 96 49 78 78 47 06 00 -> 1767432600000000 -> 2026-01-03 09:30:00+00:00\namount 00 00 01 f4 -> 500 -> 5.00\n",
+    "comparisons": [
+      {
+        "title": "Read the decimal in the wrong byte order",
+        "explanation": "The date and timestamp are unchanged. Reversing the decimal's byte order produces a different amount, because its byte array uses big-endian order.",
+        "changes": [
+          [
+            "int.from_bytes(raw, \"big\", signed=True)",
+            "int.from_bytes(raw, \"little\", signed=True)"
+          ]
+        ],
+        "stdout": "order_date e8 4f 00 00 -> 20456 -> 2026-01-03\npaid_at 00 96 49 78 78 47 06 00 -> 1767432600000000 -> 2026-01-03 09:30:00+00:00\namount 00 00 01 f4 -> -201261056 -> -2012610.56\n"
+      }
+    ]
+  },
+  "walkthroughs/python/the_type_system/schema_as_stored.py": {
+    "source_sha256": "d21e4ccbb13174ff6c890edb065ad9f68c05dbd499babedc1652d013f8d2cfb8",
+    "stdout": "schema 10 children REQUIRED\nis_paid REQUIRED BOOLEAN \nquantity REQUIRED INT32 INTEGER(8, signed)\nstore_id REQUIRED INT32 INTEGER(16, unsigned)\norder_id REQUIRED INT64 \nweight_kg REQUIRED FLOAT \namount REQUIRED FIXED_LEN_BYTE_ARRAY DECIMAL(9, 2)\ncountry OPTIONAL BYTE_ARRAY STRING\norder_date REQUIRED INT32 DATE\npaid_at REQUIRED INT64 TIMESTAMP(MICROS, UTC)\nshipping 2 children OPTIONAL\ncity OPTIONAL BYTE_ARRAY STRING\npostcode OPTIONAL BYTE_ARRAY STRING\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/the_type_system/schema_with_a_library.py": {
+    "source_sha256": "cd5485f1150d3978c68fcf8b5012d2aa1aa076a060fca17d41c02ec99e195e00",
+    "stdout": "required group field_id=-1 schema {\n  required boolean field_id=-1 is_paid;\n  required int32 field_id=-1 quantity (Int(bitWidth=8, isSigned=true));\n  required int32 field_id=-1 store_id (Int(bitWidth=16, isSigned=false));\n  required int64 field_id=-1 order_id;\n  required float field_id=-1 weight_kg;\n  required fixed_len_byte_array(4) field_id=-1 amount (Decimal(precision=9, scale=2));\n  optional binary field_id=-1 country (String);\n  required int32 field_id=-1 order_date (Date);\n  required int64 field_id=-1 paid_at (Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false));\n  optional group field_id=-1 shipping {\n    optional binary field_id=-1 city (String);\n    optional binary field_id=-1 postcode (String);\n  }\n}\n\nis_paid: max levels 0 0, BOOLEAN, min False\nquantity: max levels 0 0, INT32, min 1\nstore_id: max levels 0 0, INT32, min 7\norder_id: max levels 0 0, INT64, min 1\nweight_kg: max levels 0 0, FLOAT, min 0.5\namount: max levels 0 0, FIXED_LEN_BYTE_ARRAY, min Decimal('5.00')\ncountry: max levels 1 0, BYTE_ARRAY, min 'PL'\norder_date: max levels 0 0, INT32, min datetime.date(2026, 1, 3)\npaid_at: max levels 0 0, INT64, min datetime.datetime(2026, 1, 3, 9, 30, tzinfo=zoneinfo.ZoneInfo(key='UTC'))\nshipping.city: max levels 2 0, BYTE_ARRAY, min 'Kraków'\nshipping.postcode: max levels 2 0, BYTE_ARRAY, min 'LS1'\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/what_a_query_engine_does/query_with_a_library.py": {
+    "source_sha256": "c1074a8a06dabe86c223230f5d55eaf599609a50ab11939fc8ac08f215c5ec44",
+    "stdout": "row groups kept: [0, 1]\nDE 37\nFR 36\nPL 39\nSE 40\nUK 108\nUS 39\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/what_a_query_engine_does/run_a_query.py": {
+    "source_sha256": "e4ed5d7c5e7233a5ddfb1937fed2aa0f6287d84559e2c9a3bdaf95fdaa097f52",
+    "stdout": "Scan: 800 rows in, 400 out\n  read 2 of 4 row groups, 2690 bytes of column chunks\n  skipped row group 2: order_id < 300: the minimum is too large\n  row group 3: order_id < 300: the minimum is too large\nFilter: 400 rows in, 299 out\n  order_id < 300\nAggregate: 299 rows in, 6 out\n  by country\nSort: 6 rows in, 6 out\n  country\ncountry count(*)\nDE 37\nFR 36\nPL 39\nSE 40\nUK 108\nUS 39\n",
+    "comparisons": [
+      {
+        "title": "Count all rows without a filter",
+        "explanation": "The footer already holds the row counts. This query needs no column data.",
+        "changes": [
+          [
+            "SELECT country, count(*) FROM orders WHERE order_id < 300\n         GROUP BY country ORDER BY country",
+            "SELECT count(*) FROM orders"
+          ]
+        ],
+        "stdout": "Scan: 800 rows in, 800 out\n  read 4 of 4 row groups, 0 bytes of column chunks\nAggregate: 800 rows in, 1 out\n  all rows as one group\ncount(*)\n800\n"
+      }
+    ]
+  },
+  "walkthroughs/python/what_iceberg_adds/field_ids_by_hand.py": {
+    "source_sha256": "afd3bf5c70d75f38318d5823f8694fb3102738f301967aeeec1403bc76345492",
+    "stdout": "field id 1: order_id\nfield id 2: ordered_at\nfield id 3: customer_id\nfield id 4: country\nfield id 5: status\nfield id 6: amount_cents\norder_number (id 1) <- order_id: 1\ncountry (id 4) <- country: DE\namount_cents (id 6) <- amount_cents: 379\nchannel (id 7) <- no column: None\nby name, the file has no order_number, channel\n",
+    "comparisons": [
+      {
+        "title": "Reuse an existing field id for channel",
+        "explanation": "The new name now selects the old status column. A field id carries identity, so reusing it changes what the column means.",
+        "changes": [
+          [
+            "7: \"channel\"",
+            "5: \"channel\""
+          ]
+        ],
+        "stdout": "field id 1: order_id\nfield id 2: ordered_at\nfield id 3: customer_id\nfield id 4: country\nfield id 5: status\nfield id 6: amount_cents\norder_number (id 1) <- order_id: 1\ncountry (id 4) <- country: DE\namount_cents (id 6) <- amount_cents: 379\nchannel (id 5) <- status: paid\nby name, the file has no order_number, channel\n"
+      }
+    ]
+  },
+  "walkthroughs/python/what_iceberg_adds/field_ids_with_a_library.py": {
+    "source_sha256": "8d2404423a424e34456dd98e8e863311c8bee84999bcad208859635eb073587e",
+    "stdout": "field id 1: order_id\nfield id 2: ordered_at\nfield id 3: customer_id\nfield id 4: country\nfield id 5: status\nfield id 6: amount_cents\nid 1 <- order_id: 1\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/why_parquet_exists/columns_with_a_library.py": {
+    "source_sha256": "e70e02417851581de5bb88f046bf5e19a86ed68f2c2859739dd9f646163c50b7",
+    "stdout": "read 90241 of 125325 bytes\namount_cents in the UK: 9518497\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/why_parquet_exists/read_a_csv.py": {
+    "source_sha256": "7212e6aacbbf239baa0a6ac477f413a9278d170abd679d789b58ccc3e87b4330",
+    "stdout": "read 270732 of 270732 bytes\namount_cents in the UK: 9518497\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/why_parquet_exists/two_layouts.py": {
+    "source_sha256": "320c0429bdeb4f71c099897eb80c89e301b03d81f7da623bae7e3ec715f467c7",
+    "stdout": "by rows, 8 runs:\n..##...##...##...##...##...##...##...##.\nby columns, 1 run:\n................################........\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/writing_parquet_well/query_every_file.py": {
+    "source_sha256": "2d3b28a7c46774015193e1700da814baeaf6eb002ae15b89d6298bc072be97ec",
+    "stdout": "writing-baseline: 4764 bytes in 8 requests, 1 rows matching\nwriting-one-group: 17373 bytes in 14 requests, 1 rows matching\nwriting-small-groups: 1388 bytes in 3 requests, 1 rows matching\nwriting-by-country: 21078 bytes in 41 requests, 1 rows matching\nwriting-shuffled: 23828 bytes in 6 requests, 1 rows matching\nwriting-plain: 1584 bytes in 8 requests, 1 rows matching\nwriting-no-index: 6650 bytes in 1 requests, 1 rows matching\n",
+    "comparisons": [
+      {
+        "title": "Filter on country instead of order_id",
+        "explanation": "The layout sorted by country now prunes effectively. A useful sort order depends on the query.",
+        "changes": [
+          [
+            "(0, Op.EQ, \"431\")",
+            "(3, Op.EQ, \"FR\")"
+          ]
+        ],
+        "stdout": "writing-baseline: 23610 bytes in 6 requests, 99 rows matching\nwriting-one-group: 23361 bytes in 3 requests, 99 rows matching\nwriting-small-groups: 27428 bytes in 22 requests, 99 rows matching\nwriting-by-country: 5289 bytes in 9 requests, 99 rows matching\nwriting-shuffled: 23588 bytes in 6 requests, 99 rows matching\nwriting-plain: 24011 bytes in 6 requests, 99 rows matching\nwriting-no-index: 26608 bytes in 1 requests, 99 rows matching\n"
+      }
+    ]
+  },
+  "walkthroughs/python/writing_parquet_well/row_groups_per_lookup.py": {
+    "source_sha256": "1ac961735d942348ed4ef7597e85c68d7c7986edbca2912bda3b520447bbcc8c",
+    "stdout": "writing-baseline: footer 2935 bytes, 1 of 4 row groups may hold it\nwriting-one-group: footer 889 bytes, 1 of 1 row groups may hold it\nwriting-small-groups: footer 13648 bytes, 1 of 20 row groups may hold it\nwriting-by-country: footer 2935 bytes, 4 of 4 row groups may hold it\nwriting-shuffled: footer 2935 bytes, 4 of 4 row groups may hold it\nwriting-plain: footer 2665 bytes, 1 of 4 row groups may hold it\nwriting-no-index: footer 2633 bytes, 1 of 4 row groups may hold it\n",
+    "comparisons": []
+  },
+  "walkthroughs/python/writing_parquet_well/writing_with_a_library.py": {
+    "source_sha256": "57c0af74798ac9db617aba860bf28a499578c1dd6d07e252dceca191aa1dac35",
+    "stdout": "the baseline: 28779 bytes, footer 2935, 4 row groups\n  dictionary True, column index True, sorted by ()\nrow groups of 40: 44190 bytes, footer 13648, 20 row groups\n  dictionary True, column index True, sorted by ()\nno dictionary: 28910 bytes, footer 2665, 4 row groups\n  dictionary False, column index True, sorted by ()\nno page index: 29253 bytes, footer 2633, 4 row groups\n  dictionary True, column index False, sorted by ()\nthe sort declared: 28807 bytes, footer 2963, 4 row groups\n  dictionary True, column index True, sorted by (SortingColumn(column_index=0, descending=False, nulls_first=False),)\n",
+    "comparisons": []
+  }
+}

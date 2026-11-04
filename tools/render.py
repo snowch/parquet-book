@@ -30,10 +30,12 @@ from __future__ import annotations
 import html
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from tools.highlight import highlight
 from tools.outline import BY_ANCHOR, EXPERIMENTS
+from tools.walkthrough_results import RESULTS, source_digest
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO_URL = "https://github.com/snowch/parquet-book/blob/main/"
@@ -133,10 +135,12 @@ def parse_problems_block(value: str) -> str:
 def _problems(node: dict) -> str:
     slug = parse_problems_block(str(node.get("value", "")))
     return (
+        '<details class="code-disclosure exercise-disclosure">'
+        "<summary>Try the coding exercises (optional)</summary>"
         f'<div class="workbench" data-chapter="{html.escape(slug)}">'
         '<p class="lab-fallback">Here you can edit this chapter\'s problems and run their tests in your '
         "browser, in Python. It needs JavaScript. The same problems run at a desk: see "
-        '<a href="running-the-lab.html">Appendix A</a>.</p></div>'
+        '<a href="running-the-lab.html">Appendix A</a>.</p></div></details>'
     )
 
 
@@ -187,7 +191,71 @@ def _tab_set(node: dict, footnotes: list | None) -> str:
         + "</div>"
         for i in items
     )
-    return f'<div class="tab-set"><div class="tab-bar" aria-label="Language">{bar}</div>{panels}</div>'
+    tabs = f'<div class="tab-set"><div class="tab-bar" aria-label="Language">{bar}</div>{panels}</div>'
+    sources = list(_included_sources(node))
+    walkthroughs = [p for p in sources if p.startswith("walkthroughs/python/")]
+    if walkthroughs:
+        if len(walkthroughs) != 1:
+            raise TabSetError("each walkthrough tab set must quote one Python example")
+        result = _worked_result(walkthroughs[0])
+        return result + _optional_code(tabs, "Read or run the code")
+    return _optional_code(tabs, "Read the implementation code" if sources else "Run the checks")
+
+
+def _included_sources(node: dict):
+    if node.get("type") == "include" and node.get("literal"):
+        yield _repo_path(node)
+    for child in node.get("children", []):
+        yield from _included_sources(child)
+
+
+def _optional_code(body: str, label: str) -> str:
+    return f'<details class="code-disclosure"><summary>{label}</summary>{body}</details>'
+
+
+@lru_cache(maxsize=1)
+def _saved_results() -> dict:
+    return json.loads(RESULTS.read_text())
+
+
+def _worked_result(path: str) -> str:
+    saved = _saved_results().get(path)
+    if saved is None or saved["source_sha256"] != source_digest((ROOT / path).read_text()):
+        raise ValueError(f"missing or stale walkthrough result for {path}; run make figures")
+    note = ""
+    if re.search(r"\b\d+ ms\b", saved["stdout"]):
+        note = '<p class="result-note">Request times use the chapter\'s simulated network.</p>'
+    if path.endswith("_with_a_library.py"):
+        note += (
+            '<p class="result-note">Recorded with the desktop library. '
+            'The <a href="running-the-lab.html#two-pyarrows">browser library can differ</a>.</p>'
+        )
+    cases = ""
+    for case in saved["comparisons"]:
+        cases += (
+            '<section class="example-comparison">'
+            f'<p class="comparison-title">{html.escape(case["title"])}</p>'
+            f'<pre tabindex="0" aria-label="Comparison output">{html.escape(case["stdout"])}</pre>'
+            f"<p>{html.escape(case['explanation'])}</p></section>"
+        )
+    return (
+        f'<figure class="example-result" data-source="{html.escape(path)}">'
+        "<figcaption><span>Worked result</span><small>Python output · no need to run</small></figcaption>"
+        f'<pre tabindex="0" aria-label="Worked example output">{html.escape(saved["stdout"])}</pre>'
+        f"{note}{cases}</figure>"
+    )
+
+
+def _checkpoint(value: str) -> str:
+    fields = parse_key_values(value, "checkpoint")
+    if set(fields) != {"question", "answer"} or not all(fields.values()):
+        raise ValueError("a checkpoint needs a question and an answer")
+    return (
+        '<aside class="checkpoint"><p class="eyebrow">Check your understanding</p>'
+        f"<p>{html.escape(fields['question'])}</p>"
+        "<details><summary>Show the explanation</summary>"
+        f"<p>{html.escape(fields['answer'])}</p></details></aside>"
+    )
 
 
 def _xref(node: dict, inner: str) -> str:
@@ -307,6 +375,8 @@ def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
     if kind == "comment":
         return ""
     if kind == "code":
+        if node.get("lang") == "checkpoint":
+            return _checkpoint(str(node.get("value", "")))
         if node.get("lang") == "lab":
             return _lab(node)
         if node.get("lang") == "problems":

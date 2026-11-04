@@ -8,7 +8,8 @@ title: Preface
 ## What this book is
 
 This book is for data engineers who write Parquet every day and want to know what is in the
-files. You learn the format by reading it in code. Each chapter asks one question about the
+files. You can learn from the explanations and worked results, then explore the code if you want
+to. Each chapter asks one question about the
 format and answers it on the bytes of a real Parquet file, in three steps:
 
 1. **By hand.** A few lines of Python or Rust that open the file and print the structure the
@@ -34,14 +35,15 @@ footer length, a byte range or a request, the reader computed it from the bytes 
 Every chapter has the same seven sections, so you always know where you are:
 
 1. **The question** it answers, and why the previous chapter left it open.
-2. **The experiment**: code you run and change to read the file by hand, the reader's view of the
-   same bytes, and generated tables. Where a picture helps (a map of a file's bytes, a timeline
+2. **The experiment**: worked results you can read immediately, optional code you can run and
+   change, the reader's view of the same bytes, and generated tables. Where a picture helps (a map of a file's bytes, a timeline
    of requests), a panel draws what the reader returned.
-3. **Building it**: the reader's code, quoted from the implementation, and then the same answer
+3. **Building it**, optional: the reader's code, quoted from the implementation, and then the same answer
    from a library.
 4. **What this cannot tell you**: the limits of the experiment and of the code.
-5. **Key takeaways**.
-6. **Problems**: functions for you to write, with tests that fail until they are right, and one
+5. **Key takeaways**, followed by a question you can answer without code. Try explaining your
+   answer before opening the explanation.
+6. **Problems**, optional: functions for you to write, with tests that fail until they are right, and one
    question about your own tables.
 7. **Where to go next**: primary sources.
 
@@ -50,6 +52,30 @@ questions to reason about. [ch01](#why-parquet-exists) sets up the question the 
 before there is a file to open. [ch12](#what-a-query-engine-does) describes what a query engine
 does with a file. [ch16](#what-iceberg-adds), the last, maps what Apache Iceberg adds above
 Parquet files to the chapters that show it.
+
+## Choose how to read
+
+**Read for understanding.** Follow the question, explanations, diagrams and worked results.
+Every walkthrough shows its Python output before the code, and important comparisons show what
+changes. You do not need to install anything or press Run. Skip *Building it* if you wish, but
+keep *What this cannot tell you*: its limits are part of the lesson. Finish with the takeaways
+and the understanding check. An occasional byte sequence or SQL expression is worth reading;
+writing a program is optional.
+
+**Explore the examples.** Open **Read or run the code** beside a worked result. Pick Python or
+Rust, read the source, or change an input and predict the result before running it. Python can
+run in the page; Rust runs in a Codespace or at a desk. The saved result stays beside your run
+so you can compare them. The displayed output uses Python's notation; the Rust examples are
+checked against the same facts but may format them differently.
+
+**Build the reader.** Add *Building it* and the coding problems to that reading path. Open the
+implementation excerpts, run the checks, and extend the reader yourself. The explanations and
+worked results remain available whichever path you choose.
+
+Worked results are produced by running the examples when the book is built and checked again
+by its tests. Request times from the teaching object store use a fixed network model; they are
+not timings measured on your computer. A library may choose different reads in another version
+or environment. The chapter explains those limits.
 
 ## Two rules the book keeps
 
@@ -64,14 +90,15 @@ block names the file.
 
 ## What you need
 
-To read the book and run its Python: a browser. Python steps and problems run in the page.
+To read the book: a browser. Explanations, worked results, diagrams and answer reveals remain
+available with JavaScript disabled. Running Python steps and problems in the page needs JavaScript.
 
 To run the Rust, or everything at a desk: Python with pyarrow, and a Rust toolchain, or a
 Codespace, which has both. [Appendix A](#running-the-lab) has the commands. From a fresh clone,
 `make` builds everything and `make serve` serves this book locally.
 
-You should be comfortable reading code in one of the two languages. The code is deliberately
-plain, and every chapter says what each quoted block does.
+To explore or build, you should be comfortable reading code in one of the two languages. The code
+is deliberately plain, and every chapter says what each quoted block does.
 
 ## Where this starts
 

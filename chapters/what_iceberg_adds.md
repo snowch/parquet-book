@@ -19,6 +19,14 @@ This chapter maps each feature to the chapter that shows it, and describes brief
 chapter does. It reads one of them out of a footer: the number by which a table names each
 column. It builds nothing new.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Locate the boundary between Parquet files and Iceberg table metadata, and explain why schema evolution needs stable field identities.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Above the files
@@ -310,6 +318,11 @@ was written.
 - **Delta Lake and Hudi solve the same problems differently.** A log of actions, or a timeline
   with keyed file groups, over the same Parquet files.
 :::
+
+```checkpoint
+question: Why is a stable field id safer than a column name when a table renames a field?
+answer: A rename changes the label but preserves the identity. An older file can still supply the field through its id even when its stored name differs. Reusing that id for a different field would silently select the old data, so ids must retain their meaning.
+```
 
 ## Problems
 
