@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 365" role="img" aria-labelledby="title description">
+<title id="title">Find the footer by reading backwards</title><desc id="description">File order is opening PAR1, data, footer, footer length and closing PAR1. Read the last eight bytes, then subtract their length and the decoded footer length from the file size to locate the footer.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="365" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Find the footer by reading backwards</text>
+<rect x="24" y="72" width="70" height="44" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="36" y="99" class="strong">PAR1</text>
+<rect x="98" y="72" width="190" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="110" y="99" class="strong">Data</text>
+<rect x="292" y="72" width="190" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="304" y="99" class="strong">Footer</text>
+<rect x="486" y="72" width="80" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="498" y="99" class="strong">Length</text>
+<rect x="570" y="72" width="86" height="44" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="582" y="99" class="strong">PAR1</text>
+<text x="24" y="144" class="small">File order →</text>
+<path d="M615 166 L530 166" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="282" y="195" class="strong">Start at the trailer</text>
+<rect x="282" y="211" width="374" height="68" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="294" y="238" class="strong">7c 01 00 00 50 41 52 31</text>
+<text x="294" y="262" class="small">footer length (little-endian) + PAR1</text>
+<path d="M530 292 L292 292" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="24" y="322" class="mono">Footer starts at 637 − 8 − 380 = 249</text>
+<text x="24" y="350" class="small">Offsets are absolute; block widths are not byte counts.</text>
+</svg>

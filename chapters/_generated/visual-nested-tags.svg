@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 504" role="img" aria-labelledby="title description">
+<title id="title">Keep each record beside its level slots</title><desc id="description">Each tags record is aligned with its repetition, definition and value slots. Repetition zero starts a record; repetition one continues its list. Empty and absent lists each have a slot without a value. The same records are reconstructed from these slots.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="504" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Keep each record beside its level slots</text>
+<text x="24" y="75" class="strong">Record: tags</text>
+<text x="310" y="75" class="strong">r</text>
+<text x="370" y="75" class="strong">d</text>
+<text x="430" y="75" class="strong">Stored value</text>
+<rect x="24" y="92" width="245" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="119" class="strong">[&quot;gift&quot;,&quot;express&quot;]</text>
+<rect x="300" y="92" width="352" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="310" y="120" class="mono">0</text>
+<text x="370" y="120" class="mono">3</text>
+<text x="430" y="120" class="mono">gift</text>
+<path d="M275 114 L295 168" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="300" y="146" width="352" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="310" y="174" class="mono">1</text>
+<text x="370" y="174" class="mono">3</text>
+<text x="430" y="174" class="mono">express</text>
+<rect x="24" y="200" width="245" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="227" class="strong">[]</text>
+<rect x="300" y="200" width="352" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="310" y="228" class="mono">0</text>
+<text x="370" y="228" class="mono">1</text>
+<text x="430" y="228" class="mono">∅ (no value)</text>
+<rect x="24" y="254" width="245" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="36" y="281" class="strong">null</text>
+<rect x="300" y="254" width="352" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="310" y="282" class="mono">0</text>
+<text x="370" y="282" class="mono">0</text>
+<text x="430" y="282" class="mono">∅ (no value)</text>
+<rect x="24" y="308" width="245" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="36" y="335" class="strong">[&quot;sale&quot;,null]</text>
+<rect x="300" y="308" width="352" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="310" y="336" class="mono">0</text>
+<text x="370" y="336" class="mono">3</text>
+<text x="430" y="336" class="mono">sale</text>
+<path d="M275 330 L295 384" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="300" y="362" width="352" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="310" y="390" class="mono">1</text>
+<text x="370" y="390" class="mono">2</text>
+<text x="430" y="390" class="mono">∅ (no value)</text>
+<text x="24" y="434" class="small">r = 0 starts a record; r = 1 adds an element to the same list.</text>
+<text x="24" y="462" class="small">Read the slots back → the same records, including empty and null.</text>
+</svg>

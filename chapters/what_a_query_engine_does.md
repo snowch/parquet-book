@@ -90,6 +90,12 @@ their `order_id` statistics, and read the two columns the query names from the o
 Filter stage kept the rows whose `order_id` passes the condition, the Aggregate stage counted each country, and the
 Sort stage ordered the countries. Each of them worked on rows the scan had already decoded.
 
+Follow the same query through its stages below. The scan admits possible matches; the filter checks
+the decoded rows before grouping.
+
+```{include} _generated/visual-query-stages.md
+```
+
 Change the query to `SELECT count(*) FROM orders`, and the scan reads no column at all. Then try
 the queries in the table below, and watch the Scan line.
 

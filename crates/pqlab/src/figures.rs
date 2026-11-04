@@ -20,6 +20,8 @@ use parquet_lab::object_store::{MemoryStore, NetworkModel, TracingStore};
 use parquet_lab::reader::{read_footer, FooterOptions, SizeSource};
 use parquet_lab::report::open_bytes;
 
+mod diagrams;
+
 struct Figure {
     file: &'static str,
     render: fn(&Path) -> Result<String, String>,
@@ -249,9 +251,14 @@ pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
             .map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     }
     let mut stale = Vec::new();
+    let mut outputs = Vec::new();
     for fig in FIGURES {
-        let body = (fig.render)(root)?;
-        let path = dir.join(fig.file);
+        outputs.push((fig.file.to_string(), (fig.render)(root)?));
+    }
+    outputs.extend(diagrams::render(root)?);
+    let count = outputs.len();
+    for (file, body) in outputs {
+        let path = dir.join(file);
         if check {
             if std::fs::read_to_string(&path).ok().as_deref() != Some(body.as_str()) {
                 stale.push(path.display().to_string());
@@ -270,10 +277,7 @@ pub fn run(root: &Path, out: &Path, check: bool) -> Result<ExitCode, String> {
         return Ok(ExitCode::from(1));
     }
     if check {
-        println!(
-            "  {} fragments match what the reader computes",
-            FIGURES.len()
-        );
+        println!("  {} fragments match what the reader computes", count);
     }
     Ok(ExitCode::SUCCESS)
 }

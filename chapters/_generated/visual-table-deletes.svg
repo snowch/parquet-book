@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 520" role="img" aria-labelledby="title description">
+<title id="title">Delete a row: choose where the work happens</title><desc id="description">Both approaches keep the original immutable data file available to old snapshots. Copy-on-write creates a replacement without the deleted row. Merge-on-read retains the data file and adds a position delete file; readers combine them. Compaction later creates replacement files with deletes applied.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="520" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Delete a row: choose where the work happens</text>
+<rect x="195" y="65" width="290" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="207" y="92" class="strong">Original data file</text>
+<text x="207" y="116" class="small">A   B   C</text>
+<path d="M260 138 L174 181" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M460 138 L625 181" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="24" y="171" class="strong">Copy-on-write</text>
+<text x="354" y="171" class="strong">Merge-on-read</text>
+<rect x="24" y="193" width="300" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="220" class="strong">Write a replacement</text>
+<text x="36" y="244" class="small">A        C</text>
+<rect x="354" y="193" width="300" height="68" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="366" y="220" class="strong">Keep original + add delete</text>
+<text x="366" y="244" class="small">A   B   C    +    delete B</text>
+<text x="24" y="292" class="small">Writer rewrites the data file.</text>
+<text x="354" y="292" class="small">Reader applies the delete.</text>
+<path d="M510 309 L510 336" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="354" y="348" width="300" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="366" y="375" class="strong">Compact into a new file</text>
+<text x="366" y="399" class="small">A        C</text>
+<text x="24" y="455" class="strong">New snapshots point to the new set of files.</text>
+<text x="24" y="487" class="small">Old snapshots can still need the original files; do not erase them yet.</text>
+</svg>

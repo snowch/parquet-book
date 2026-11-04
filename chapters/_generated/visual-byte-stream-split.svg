@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 405" role="img" aria-labelledby="title description">
+<title id="title">Group the same byte positions together</title><desc id="description">The first four weight values are shown as rows of bytes, then transposed into byte-position streams. Byte labels identify their original positions. The bytes are unchanged and the encoding alone saves no space.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="405" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Group the same byte positions together</text>
+<text x="24" y="78" class="strong">Bytes grouped by value</text>
+<text x="370" y="78" class="strong">Bytes grouped by position</text>
+<rect x="24" y="100" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="127" class="strong">00</text>
+<rect x="370" y="100" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="382" y="127" class="strong">00</text>
+<rect x="89" y="100" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="101" y="127" class="strong">00</text>
+<rect x="370" y="152" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="382" y="179" class="strong">00</text>
+<rect x="154" y="100" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="166" y="127" class="strong">80</text>
+<rect x="370" y="204" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="382" y="231" class="strong">80</text>
+<rect x="219" y="100" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="231" y="127" class="strong">3e</text>
+<rect x="370" y="256" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="382" y="283" class="strong">3e</text>
+<rect x="24" y="152" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="179" class="strong">9a</text>
+<rect x="435" y="100" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="447" y="127" class="strong">9a</text>
+<rect x="89" y="152" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="101" y="179" class="strong">99</text>
+<rect x="435" y="152" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="447" y="179" class="strong">99</text>
+<rect x="154" y="152" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="166" y="179" class="strong">99</text>
+<rect x="435" y="204" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="447" y="231" class="strong">99</text>
+<rect x="219" y="152" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="231" y="179" class="strong">3e</text>
+<rect x="435" y="256" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="447" y="283" class="strong">3e</text>
+<rect x="24" y="204" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="231" class="strong">33</text>
+<rect x="500" y="100" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="512" y="127" class="strong">33</text>
+<rect x="89" y="204" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="101" y="231" class="strong">33</text>
+<rect x="500" y="152" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="512" y="179" class="strong">33</text>
+<rect x="154" y="204" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="166" y="231" class="strong">b3</text>
+<rect x="500" y="204" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="512" y="231" class="strong">b3</text>
+<rect x="219" y="204" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="231" y="231" class="strong">3e</text>
+<rect x="500" y="256" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="512" y="283" class="strong">3e</text>
+<rect x="24" y="256" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="283" class="strong">cd</text>
+<rect x="565" y="100" width="58" height="44" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="577" y="127" class="strong">cd</text>
+<rect x="89" y="256" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="101" y="283" class="strong">cc</text>
+<rect x="565" y="152" width="58" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="577" y="179" class="strong">cc</text>
+<rect x="154" y="256" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="166" y="283" class="strong">cc</text>
+<rect x="565" y="204" width="58" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="577" y="231" class="strong">cc</text>
+<rect x="219" y="256" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="231" y="283" class="strong">3e</text>
+<rect x="565" y="256" width="58" height="44" rx="5" fill="#e8e0f2" stroke="#71818c"/>
+<text x="577" y="283" class="strong">3e</text>
+<path d="M295 195 L352 195" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="35" y="326" class="mono">b0</text>
+<text x="640" y="129" class="small">b0</text>
+<text x="100" y="326" class="mono">b1</text>
+<text x="640" y="181" class="small">b1</text>
+<text x="165" y="326" class="mono">b2</text>
+<text x="640" y="233" class="small">b2</text>
+<text x="230" y="326" class="mono">b3</text>
+<text x="640" y="285" class="small">b3</text>
+<text x="24" y="375" class="strong">16 bytes before → 16 bytes after; compression comes next.</text>
+</svg>

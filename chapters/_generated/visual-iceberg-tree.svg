@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 660" role="img" aria-labelledby="title description">
+<title id="title">Iceberg finds data through metadata</title><desc id="description">A catalog points to the current metadata JSON, which identifies snapshots and their manifest lists. An old and a new snapshot can share an unchanged manifest. A new manifest can describe added files. Manifest lists and manifests use Avro; the data and delete files shown here use Parquet.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="660" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Iceberg finds data through metadata</text>
+<rect x="175" y="64" width="330" height="68" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="187" y="91" class="strong">Catalog pointer</text>
+<text x="187" y="115" class="small">Current metadata location</text>
+<path d="M340 137 L340 157" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="175" y="165" width="330" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="187" y="192" class="strong">Metadata file · JSON</text>
+<text x="187" y="216" class="small">Schemas and snapshot references</text>
+<path d="M245 239 L175 272" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M435 239 L505 272" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="280" width="300" height="68" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="36" y="307" class="strong">Earlier snapshot</text>
+<text x="36" y="331" class="small">Manifest list · Avro</text>
+<rect x="354" y="280" width="300" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="366" y="307" class="strong">Current snapshot</text>
+<text x="366" y="331" class="small">Manifest list · Avro</text>
+<path d="M174 349 L174 412" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M475 349 L195 412" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M525 349 L505 412" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="420" width="300" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="447" class="strong">Shared manifest · Avro</text>
+<text x="36" y="471" class="small">File paths, partitions, bounds</text>
+<rect x="354" y="420" width="300" height="68" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="366" y="447" class="strong">New manifest · Avro</text>
+<text x="366" y="471" class="small">New file entries</text>
+<path d="M174 489 L174 517" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M504 489 L504 517" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="525" width="300" height="44" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="552" class="strong">Existing Parquet files</text>
+<rect x="354" y="525" width="300" height="44" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="366" y="552" class="strong">Added Parquet files</text>
+<text x="24" y="604" class="small">Manifests list data files or delete files, never both in one manifest.</text>
+<text x="24" y="634" class="small">File bounds → row-group bounds → page bounds: progressively less data.</text>
+</svg>

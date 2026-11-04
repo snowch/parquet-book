@@ -96,6 +96,12 @@ Every file returns the same order. What it cost differs:
   one request. The baseline read fewer bytes in more requests. Against object storage, as
   [ch10](#how-readers-read) measured, the requests can cost more than the bytes saved.
 
+Compare the bytes for this lookup below. Keep the request counts in view too: the chart measures
+transferred bytes, not time.
+
+```{include} _generated/visual-writing-costs.md
+```
+
 Change the condition to `country = 'FR'`, with column `3` and `"FR"`: now the file sorted by
 country reads least. Then try `status = 'refunded'`, with column `4`. No file does well. Refunds
 are rare and spread through every row group, and no single sort order serves every column. The

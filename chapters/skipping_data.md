@@ -86,6 +86,12 @@ mechanism this chapter describes:
 ```{include} _generated/skipping-compare.md
 ```
 
+The line below marks the same lookup in both layouts. A range crossing it must be kept, even when it
+contains no matching row.
+
+```{include} _generated/visual-pruning.md
+```
+
 Sorting is what makes statistics work. In the sorted file each row group covers a narrow band of
 order numbers, and a condition on `order_id` rules out all but a few. In the shuffled file the
 same statistics are true and useless: every band is almost the whole range. Columns nobody sorted

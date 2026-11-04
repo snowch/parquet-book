@@ -207,6 +207,12 @@ so on. Each byte position varies in its own way:
 ```{include} _generated/split-weights.md
 ```
 
+Read each value across on the left, then follow its byte positions into the streams on the right.
+The labels and colours identify the same positions in both views.
+
+```{include} _generated/visual-byte-stream-split.md
+```
+
 The last stream holds the sign and most of the exponent, and has almost no variety. The stream
 before it, the top of the mantissa, varies most. The two low streams repeat a few bytes, because
 these weights go up in steps of a twentieth, and the mantissa of such a fraction repeats one bit

@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 770" role="img" aria-labelledby="title description">
+<title id="title">Sorting narrows the ranges a query must read</title><desc id="description">Sorted and shuffled row groups use the same value axis. The vertical line marks order_id 431. A group is kept only when its minimum-to-maximum interval crosses the line; all others are labelled skip. Statistics decide possible matches, not exact matching rows.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="770" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Sorting narrows the ranges a query must read</text>
+<text x="24" y="73" class="strong">Predicate: order_id = 431</text>
+<text x="24" y="118" class="strong">Sorted by order_id</text>
+<text x="24" y="161" class="small">Group 0</text>
+<rect x="130" y="138" width="96" height="28" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="535" y="159" class="strong">SKIP</text>
+<text x="130" y="185" class="small">1 … 200</text>
+<text x="24" y="216" class="small">Group 1</text>
+<rect x="225" y="193" width="96" height="28" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="535" y="214" class="strong">SKIP</text>
+<text x="130" y="240" class="small">201 … 400</text>
+<text x="24" y="271" class="small">Group 2</text>
+<rect x="320" y="248" width="96" height="28" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="535" y="269" class="strong">KEEP</text>
+<text x="130" y="295" class="small">401 … 600</text>
+<text x="24" y="326" class="small">Group 3</text>
+<rect x="415" y="303" width="96" height="28" rx="5" fill="#edf0f3" stroke="#71818c"/>
+<text x="535" y="324" class="strong">SKIP</text>
+<text x="130" y="350" class="small">601 … 800</text>
+<path d="M335 138 V358" stroke="#9a4c16" stroke-width="2" stroke-dasharray="5 4"/>
+<text x="24" y="403" class="strong">Shuffled</text>
+<text x="24" y="446" class="small">Group 0</text>
+<rect x="131" y="423" width="379" height="28" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="535" y="444" class="strong">KEEP</text>
+<text x="130" y="470" class="small">4 … 797</text>
+<text x="24" y="501" class="small">Group 1</text>
+<rect x="130" y="478" width="377" height="28" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="535" y="499" class="strong">KEEP</text>
+<text x="130" y="525" class="small">1 … 792</text>
+<text x="24" y="556" class="small">Group 2</text>
+<rect x="130" y="533" width="381" height="28" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="535" y="554" class="strong">KEEP</text>
+<text x="130" y="580" class="small">2 … 799</text>
+<text x="24" y="611" class="small">Group 3</text>
+<rect x="131" y="588" width="380" height="28" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="535" y="609" class="strong">KEEP</text>
+<text x="130" y="635" class="small">3 … 800</text>
+<path d="M335 423 V643" stroke="#9a4c16" stroke-width="2" stroke-dasharray="5 4"/>
+<text x="130" y="688" class="small">Common value axis: 1 … 800</text>
+</svg>
