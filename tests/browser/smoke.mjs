@@ -881,6 +881,56 @@ await page.goto(base + "writing-parquet-well.html");
   await app.close();
 }
 
+// Static figures must teach without the runtime, keep their labels on the canvas, and scroll
+// inside their own region on a phone. Check the published assets under the same base URL.
+{
+  const figures = (await readdir(root)).filter((name) => /^visual-.*\.svg$/.test(name));
+  check(figures.length === 14, "all fourteen explanatory diagrams are published");
+  for (const name of figures) {
+    await page.goto(base + name);
+    const clipped = await page.locator("svg").evaluate((svg) => {
+      const box = svg.viewBox.baseVal;
+      return [...svg.querySelectorAll("text")].filter((text) => {
+        const r = text.getBBox();
+        return r.x < 0 || r.y < 0 || r.x + r.width > box.width || r.y + r.height > box.height;
+      }).map((text) => text.textContent);
+    });
+    check(clipped.length === 0, `${name}: every label fits the drawing${clipped.length ? `: ${clipped}` : ""}`);
+  }
+  const chapters = [
+    ["why-parquet-exists", 1], ["anatomy-of-a-parquet-file", 3], ["nested-data", 3],
+    ["encodings", 1], ["pages", 1], ["skipping-data", 1], ["writing-parquet-well", 1],
+    ["what-a-query-engine-does", 1], ["changing-a-table", 1], ["what-iceberg-adds", 1],
+  ];
+  for (const width of [390, 1440]) {
+    const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 } });
+    const tab = await context.newPage();
+    for (const [slug, count] of chapters) {
+      await tab.goto(base + slug + ".html");
+      const regions = tab.locator(".diagram-scroll");
+      const usable = await regions.evaluateAll((els) => els.every((e) => {
+        const img = e.querySelector("img");
+        return img.complete && img.naturalWidth > 0 && img.alt.length > 80 &&
+          e.tabIndex === 0 && img.getBoundingClientRect().width >= 640;
+      }));
+      check(await regions.count() === count && usable,
+        `${slug} at ${width}px: diagrams load with alternatives and keyboard access without JavaScript`);
+      check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `${slug} at ${width}px: diagrams do not widen the page`);
+      if (width === 390) {
+        await regions.first().focus();
+        await tab.keyboard.press("End");
+        await tab.waitForTimeout(200);
+        // A horizontal arrow is the portable way to scroll a focused overflow region.
+        await tab.keyboard.press("ArrowRight");
+        await tab.waitForTimeout(200);
+        check(await regions.first().evaluate((e) => e.scrollLeft > 0), `${slug}: keyboard scroll reaches the rest of the figure`);
+      }
+    }
+    await context.close();
+  }
+}
+
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);
 await browser.close();
 server.close();

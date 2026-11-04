@@ -61,6 +61,12 @@ Iceberg keeps a table's metadata as a tree of files, read from the top:
   values, its row count and size, and statistics for each column.
 - **A catalog** holds one pointer per table, to its current metadata file.
 
+Follow the pointers below from the catalog to the data. Both snapshots refer to the shared manifest;
+the append adds another branch.
+
+```{include} _generated/visual-iceberg-tree.md
+```
+
 Manifest lists and manifests are Avro files, a row format. Each is written once, in one pass, and
 read one whole entry at a time, so a row layout suits them ([ch01](#why-parquet-exists)).
 

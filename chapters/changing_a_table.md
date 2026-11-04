@@ -174,6 +174,12 @@ out. Both first find the row, which is the lookup above:
 ```{include} _generated/changes-writes.md
 ```
 
+The two paths below produce the same visible rows. Their arrows show which files the next snapshot
+uses and where the work moves.
+
+```{include} _generated/visual-table-deletes.md
+```
+
 Copy-on-write writes a whole file to change one row: its *write amplification* is the file's
 size over the row's. Nothing is left for readers to do afterwards, so every later scan costs what
 it did before. Merge-on-read writes far less, though still many times the row's size, because

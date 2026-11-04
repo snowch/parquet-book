@@ -99,6 +99,12 @@ is what network protocols use, and would make every reader on common hardware re
 value it reads. Apache Arrow, which Parquet is often read into, made the same choice.
 :::
 
+The same trailer sits at the right of this file strip. Follow the arrow backwards to locate the
+footer.
+
+```{include} _generated/visual-footer.md
+```
+
 **Where the footer is.** The footer ends where the last eight bytes begin, and it is as long as
 they say, so it starts that many bytes earlier:
 
@@ -213,6 +219,9 @@ it reads the trailer. Only then can it ask for the footer:
 ```{include} _generated/tiny-trace.md
 ```
 
+```{include} _generated/visual-footer-requests.md
+```
+
 Every request waits for the one before it, because each needs a number the previous one
 returned. On object storage the wait is the expensive part. A request takes a long time to start
 and then moves bytes quickly, so three small requests cost far more than one large one.
@@ -270,6 +279,12 @@ Read the structure view from the top, and the file's design appears:
   value byte of `order_id`'s page body and read it as a 64-bit integer.
 - **The footer** is a `FileMetaData` structure: the schema, the row count, and for every column
   chunk its offsets, sizes, encodings, compression and statistics.
+
+The table and the file have different shapes. Follow one row group into its column chunks, then
+expand a chunk into pages.
+
+```{include} _generated/visual-hierarchy.md
+```
 
 The footer is at the end because the writer does not know those offsets until it has written the
 data. Putting the map last lets a writer stream row groups out in one pass, remembering where each

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 400" role="img" aria-labelledby="title description">
+<title id="title">Each request learns what the next one needs</title><desc id="description">The default opening strategy asks for the size, then the trailer, then the footer. The size locates the trailer; the trailer locates the footer; the footer locates the columns.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#435764"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;font-size:18px;fill:#233641}.heading{font-size:22px;font-weight:700}.strong{font-weight:600}.small{font-size:16px}.mono{font-family:ui-monospace,monospace;font-size:17px}</style>
+<rect width="680" height="400" rx="8" fill="#ffffff"/>
+<text x="24" y="36" class="heading">Each request learns what the next one needs</text>
+<rect x="24" y="68" width="310" height="68" rx="5" fill="#dceaf5" stroke="#71818c"/>
+<text x="36" y="95" class="strong">HEAD file size</text>
+<text x="36" y="119" class="small">0 bytes returned</text>
+<text x="350" y="96" class="small">Size locates the trailer</text>
+<path d="M170 140 L170 167" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="173" width="310" height="68" rx="5" fill="#dceee6" stroke="#71818c"/>
+<text x="36" y="200" class="strong">GET bytes=629-636</text>
+<text x="36" y="224" class="small">8 bytes returned</text>
+<text x="350" y="201" class="small">Length locates the footer</text>
+<path d="M170 245 L170 272" fill="none" stroke="#435764" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="24" y="278" width="310" height="68" rx="5" fill="#f8e7c9" stroke="#71818c"/>
+<text x="36" y="305" class="strong">GET bytes=249-628</text>
+<text x="36" y="329" class="small">380 bytes returned</text>
+<text x="350" y="306" class="small">Metadata locates columns</text>
+</svg>

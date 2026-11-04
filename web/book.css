@@ -232,6 +232,22 @@ pre code { background: none; padding: 0; font-size: inherit; }
 .tok-type { color: var(--tok-type); }
 .tok-attr, .tok-macro { color: var(--tok-attr); }
 figure.quoted { margin: 1.3rem 0; }
+/* Generated diagrams keep legible labels on phones. Only the figure scrolls, never the page.
+   The original SVG remains available for zoom, printing and reading without JavaScript. */
+.diagram-scroll { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px;
+  background: #fff; margin-top: 1.5rem; }
+.diagram-scroll:focus-visible { outline: 3px solid #35648f; outline-offset: 3px; }
+.diagram-scroll img { display: block; width: 100%; min-width: 640px; height: auto; }
+.diagram-link { font: 14px/1.5 var(--chrome); margin: .5rem 0; }
+.diagram-hint { display: none; }
+figure:has(.diagram-scroll) { margin-inline: 0; }
+figure:has(.diagram-scroll) figcaption { font: 16px/1.5 var(--chrome); margin: .8rem 0; }
+@media (max-width: 44rem) { .diagram-hint { display: inline; } }
+@media print {
+  .diagram-scroll { overflow: visible; break-inside: avoid; }
+  .diagram-scroll img { min-width: 0; }
+  .diagram-link { display: none; }
+}
 figure.quoted pre { margin-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
 .source-bar { display: flex; gap: 1rem; align-items: baseline;
               font: 12px/1.4 var(--chrome); color: var(--faint); background: var(--panel);
