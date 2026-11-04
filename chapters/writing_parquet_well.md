@@ -14,6 +14,14 @@ can avoid only what the file lets it. Row groups, their order, pages, encodings 
 all fixed when the file is written, and no reader can undo a writer's choice. This chapter writes
 the same rows seven ways and measures each by what queries against it cost.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Connect sorting, row-group size, encoding and indexes to the queries a file must serve.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Seven files, one table
@@ -24,9 +32,9 @@ of small pages with a page index. Each other file changes one of those settings:
 many small ones, sorted by country, shuffled, no dictionary, or no page index.
 [Appendix B](#the-fixtures) lists them.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name.
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab).
 
 **Row groups a lookup reads.** The query is `order_id = 431`. A reader reads every row group whose
 footer range could hold the value. Read each file's footer, as [ch09](#skipping-data) did, and
@@ -152,6 +160,14 @@ No setting is right for every table, but the measurements point one way:
   [ch09](#skipping-data) showed for customer numbers.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#writing-parquet-well-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps read each footer by hand, then called the reader's `scan`, which
 [ch10](#how-readers-read) built. The reader is the same for every file; only the files differ.
@@ -294,6 +310,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin writing_with_a_library
 ```
 
+(writing-parquet-well-limits)=
 ## What this cannot tell you
 
 **How the settings behave at scale.** The fixtures hold few enough rows that every row group is
@@ -322,7 +339,15 @@ writers choose differently, and a file's `created_by` says which one wrote it.
 - **Indexes trade bytes for requests.** Whether that pays depends on the storage.
 :::
 
+```checkpoint
+question: A file sorted by order_id serves lookups well. Will that sorting help equally when filtering on country?
+answer: Only if the layout also gives country narrow ranges. Sorting by one key does not guarantee useful bounds for another. Choose the sort order from the workload, and compare the resulting bytes and requests for those queries.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/writing_parquet_well.py`, or in Rust in
 `exercises/src/writing_parquet_well.rs`. The first two have tests. The third has none.

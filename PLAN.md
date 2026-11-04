@@ -7,18 +7,18 @@ about *why*.
 
 ## 1. The premise
 
-**The book should not explain how Parquet works. The reader should build a working Parquet reader
-while reading it.**
+**The book explains Parquet through real bytes and worked results. Readers can follow the
+concepts without reading or running code, explore examples, or build the working reader.**
 
 A prose explanation of a file format is easy to nod along to and hard to use. The questions an
 engineer brings to Parquet are concrete: *why did my engine make forty requests to open one
 file?*, *which bytes does this predicate let it skip?*, *why is this file slow to open?* They are
-answered by looking at bytes and requests, so the book shows bytes and requests, and makes the
-reader write the code that produces them.
+answered by looking at bytes and requests, so the book shows bytes and requests, and offers the
+code that produces them as an optional next step.
 
 The audience is data engineers: people who write Parquet every day through pyarrow, Spark or a
-warehouse, and read code more readily than diagrams. So the book's interface is code. The reader
-inspects a file by running code that prints its structure, not by clicking through a viewer.
+warehouse, and read code more readily than diagrams. So the book shows the results of real code before offering the code itself. Readers can inspect
+the saved results or run and change the examples.
 (`sizing-and-tco`, whose architecture this book copies, needed an interactive viewer because its
 readers explore a model; these readers want to hold the file in their own code.)
 
@@ -41,8 +41,8 @@ row group lit up by a predicate. A panel is a picture and nothing else, drawn by
 compiled to WebAssembly; the code a reader runs and changes is in the steps. Elsewhere the printed
 output is the experiment.
 
-The implementation is the teaching instrument. A chapter should leave the reader with something
-concrete that works, and with the library call that does the same at work.
+The implementation is the teaching instrument. A chapter should leave every reader able to
+explain the result, with working code and the corresponding library call available to explore.
 
 ## 2. The reader, built in phases
 

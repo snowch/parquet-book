@@ -15,6 +15,14 @@ many pages. A writer ends a page when it reaches a size limit, and each page is 
 a reader must decode, and later decompress, to reach any value inside it. Here you walk column
 chunks page by page, and compare the two versions of the data page.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Trace a column chunk through its page headers, and distinguish a checksum failure from a decoding failure.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Walk the pages yourself
@@ -24,9 +32,9 @@ pages small, so each column chunk holds several. Every seventh country is null. 
 uses data page version 1; the second uses version 2 and puts a checksum in every page header.
 [Appendix B](#the-fixtures) says how pyarrow wrote both.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did.
 
 **A column chunk, header by header.** The footer says where `country`'s column chunk starts and
@@ -173,6 +181,14 @@ trade-off is the same at any size:
   decode more.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#pages-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps looped the reader's `read_page` over a column chunk and compared a body with its
 checksum. This section builds the reader's parts they used: the walk, the body and its checksum,
@@ -328,6 +344,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin pages_with_a_library
 ```
 
+(pages-limits)=
 ## What this cannot tell you
 
 **What compressed pages look like.** Every page here is uncompressed, so a header's two sizes are
@@ -361,7 +378,15 @@ guessing at it.
   unusual data.
 :::
 
+```checkpoint
+question: A damaged page has no checksum. Does successful decoding prove that its values are unchanged?
+answer: No. A changed byte can still form a valid encoded value. A checksum can detect accidental corruption when present and checked; parsing alone cannot establish that the original bytes survived.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/pages.py`, or in Rust in
 `exercises/src/pages.rs`. The first two have tests. The third has none.

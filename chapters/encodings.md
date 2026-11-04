@@ -19,6 +19,14 @@ these. It happens before compression ([ch07](#compression)), it knows what the v
 reader can decode it quickly. This chapter reads the encodings a writer chooses between, from
 their bytes.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Match repetition, steadily changing numbers and shared string prefixes to the encodings that exploit them.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Read the encodings yourself
@@ -27,9 +35,9 @@ their bytes.
 its values. `dictionary.parquet` holds twelve orders written with the default, dictionary
 encoding. [Appendix B](#the-fixtures) says how pyarrow wrote each.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, and the reader's `walk_pages` finds a column chunk's
 pages as it did in [ch04](#nested-data). Every column in both files is required, so a data page's
 body holds values and no levels.
@@ -231,6 +239,14 @@ guess.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#encodings-limits),
+then the takeaways and the understanding check.
+:::
+
 The steps read a delta header and a dictionary by hand, then asked the reader to decode a column.
 This section builds the reader's parts they used: the dictionary page and its indices, the delta
 decoder, and the loop that rebuilds strings from shared prefixes. The tabs switch every excerpt
@@ -410,6 +426,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encodings_with_a_library
 ```
 
+(encodings-limits)=
 ## What this cannot tell you
 
 **How much encoding saves on your data.** The fixtures' columns were chosen to suit their
@@ -448,7 +465,15 @@ only data page version 2 uses; [ch06](#pages) returns to that.
   indices.
 :::
 
+```checkpoint
+question: Would dictionary encoding necessarily save space for a column whose values are all distinct?
+answer: No. The dictionary must store every value, and the data pages must also store their indices. That extra structure can make the result larger than PLAIN. A counter may instead compress well as deltas, even though none of its values repeat.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Four, in `exercises/python/encodings.py`, or in Rust in
 `exercises/src/encodings.rs`. The first three have tests. The fourth has none.

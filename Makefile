@@ -40,6 +40,7 @@ wasm:  ## Compile the reader to WebAssembly for the browser
 .PHONY: figures
 figures:  ## Recompute every generated fragment the chapters include
 	$(CARGO) run --quiet -p pqlab -- figures
+	$(PYTHON) -m tools.walkthrough_results
 
 .PHONY: fixtures
 fixtures:  ## Rewrite the Parquet fixtures with the pinned pyarrow (rarely needed)

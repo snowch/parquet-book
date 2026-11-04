@@ -1,12 +1,12 @@
 # Parquet, byte by byte
 
-An interactive technical book about Apache Parquet, for data engineers, in which you build a
-working Parquet reader while you read.
+A technical book about Apache Parquet for data engineers. Read the explanations, diagrams and
+worked results without running anything, explore the optional code, or build a working reader.
 
 Each chapter asks one question about the format and answers it in code on the bytes of a real
 Parquet file: first by hand, in a few lines you run and change, then as a piece of the reader,
 then with a library you already use (pyarrow, or the Rust `parquet` crate), checked against what
-you found by hand. ch02 has all three steps; the later chapters are being revised to them. The reader is
+you found by hand. Every walkthrough shows its saved Python output before its optional code. The reader is
 written twice, in Python and in Rust, each with no dependencies, and tests hold the two to
 identical answers. The pages show every step in both languages, and run both in the browser:
 Python through Pyodide in the walkthrough steps, the Run buttons and the problems workbench, and

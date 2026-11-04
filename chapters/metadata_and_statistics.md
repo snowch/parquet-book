@@ -18,6 +18,14 @@ compare that amount with each chunk's maximum and skip the chunks that cannot ho
 First there is a narrower question. A minimum is stored as bytes, and bytes mean nothing without
 an order. When is the footer's minimum the value a reader thinks it is?
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Decide when a minimum and maximum can be trusted, including signedness, byte order and missing bounds.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Read the statistics yourself
@@ -25,9 +33,9 @@ an order. When is the footer's minimum the value a reader thinks it is?
 `statistics.parquet` holds twelve orders, four to a row group. Each column was chosen for a way
 statistics are misread. [Appendix B](#the-fixtures) says how pyarrow wrote it.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
 `decode_file_metadata` from [ch03](#the-type-system).
 
@@ -227,6 +235,14 @@ groups.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#metadata-and-statistics-limits),
+then the takeaways and the understanding check.
+:::
+
 The steps read bounds out of the footer, compared bytes in two orders, and asked the reader which
 bounds it may use. This section builds the two parts of the reader the last step called: the
 comparator for a column, and the rules in `bounds`. The tabs switch every excerpt on the page
@@ -368,6 +384,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin statistics_with_a_library
 ```
 
+(metadata-and-statistics-limits)=
 ## What this cannot tell you
 
 **Whether a query can skip a chunk.** The bounds say what a chunk may hold. Turning a query's
@@ -400,7 +417,15 @@ language does cannot use these bounds directly.
 - **The footer is not free.** Every statistic is read by every query before any data.
 :::
 
+```checkpoint
+question: A reader cannot interpret a column's sort order. Should it use the raw minimum and maximum bytes to skip a group?
+answer: No. Byte order and value order need not agree. Bounds can only justify a skip when their meaning and validity are known. Otherwise the reader must keep the group as a possible match.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/metadata_and_statistics.py`, or in Rust in
 `exercises/src/metadata_and_statistics.rs`. The first two have tests. The third has

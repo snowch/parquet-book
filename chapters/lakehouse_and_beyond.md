@@ -15,6 +15,14 @@ reader can use anything from [ch09](#skipping-data) or [ch10](#how-readers-read)
 which files there are, and it would rather not open the ones that cannot hold an answer. This
 chapter queries a table of nine files, and compares three ways of finding them.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Explain what table metadata adds above individual files, including file discovery and pruning before footer reads.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### A table of nine files
@@ -23,9 +31,9 @@ chapter queries a table of nine files, and compares three ways of finding them.
 dataset writer. The writer split the rows by `country` into one directory per value, and wrote at
 most a hundred rows to a file.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name.
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab).
 
 **List the table.** Walk the directories and print each Parquet file with the directory it sits
 in and its size:
@@ -216,6 +224,14 @@ These are why table formats exist, and the files do not change for any of them. 
 Parquet file exactly as the earlier chapters read it.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#lakehouse-and-beyond-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps read the paths and the log by hand, and then asked the reader for a plan. The reader's
 `table` module writes the same reading once: partition values from a path, the files a log adds
@@ -408,6 +424,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin table_with_a_library
 ```
 
+(lakehouse-and-beyond-limits)=
 ## What this cannot tell you
 
 **How a real log grows.** This reader reads one log file. A real Delta log has one file per
@@ -446,7 +463,15 @@ at a time, and makes the log the only practical way to plan a query at all.
   files a table, with versions; every file is still Parquet.
 :::
 
+```checkpoint
+question: Why can table-level statistics save work even when every Parquet footer already contains statistics?
+answer: Table metadata can rule out files before opening their footers. Without it, the engine must discover candidates and fetch their metadata first. The table layer also records which files belong to the current table, which individual footers cannot tell you.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/lakehouse_and_beyond.py`, or in Rust in
 `exercises/src/lakehouse_and_beyond.rs`. The first two have tests. The third has none.

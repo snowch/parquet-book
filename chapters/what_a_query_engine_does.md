@@ -16,6 +16,14 @@ a dataframe expression, and a query engine decides which pieces to use. How an e
 inside would take a book of its own. This chapter is about its role: what it asks of a Parquet
 file, and what the common operations cost against one. It builds nothing new.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Separate file pruning from row filtering, and explain which queries can be answered from metadata.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Who does what
@@ -321,6 +329,11 @@ groups, projection and skipping save far more.
 - **A join's build side becomes a filter on its probe side.** Its keys' range skips the probe
   side's row groups when the probe side is sorted on the key and the keys are close together.
 :::
+
+```checkpoint
+question: A row group's bounds overlap a filter. Does that mean every row in the group passes?
+answer: No. Overlap means the scan cannot rule the group out. The filter must check decoded rows, unless metadata proves the condition true for every row. Pruning selects candidate regions; filtering decides which individual rows match.
+```
 
 ## Problems
 

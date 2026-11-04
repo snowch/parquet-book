@@ -19,6 +19,14 @@ which record a value belongs to, where one list ends and the next begins, or whe
 value was null, in an empty list, or under a null parent. Parquet keeps the shape in two small
 integers stored beside every value, a method it takes from Google's Dremel paper.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Distinguish a null list, an empty list and a null element, and reconstruct records from definition and repetition levels.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Four orders, every way of being missing
@@ -28,9 +36,9 @@ an optional list of `items`, where each item has a `sku` and its own list of `di
 them the orders contain a null string, a null list, an empty list, a list holding a null, and a
 list inside a list. [Appendix B](#the-fixtures) says how pyarrow wrote it.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name. Each step finds the footer as
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did and rebuilds the schema as [ch03](#the-type-system) did.
 
 **The levels as stored.** A column chunk is a run of pages, each a header and a body.
@@ -178,6 +186,14 @@ three bits each and take three. With the header byte, those are the stream lengt
 printed. The page has six slots, so the last two values in each group are padding.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#nested-data-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps called three parts of the book's reader: the decoder of the level streams, the split
 of a page's body into levels and values, and the rebuild of records. This section builds them,
@@ -366,6 +382,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin levels_with_a_library
 ```
 
+(nested-data-limits)=
 ## What this cannot tell you
 
 **How several columns become one record.** The reader rebuilds each column's view of a record on
@@ -402,7 +419,15 @@ standard three-level form only.
   validity bitmaps; the `parquet` crate's column reader returns them as stored.
 :::
 
+```checkpoint
+question: If a list slot has no stored value, is that enough information to decide whether the list is null or empty?
+answer: No. Both can have no stored value. The definition level says how much of the path exists: a null list stops before the list, while an empty list has a container but no repeated entry. The repetition level marks record and list boundaries.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/nested_data.py`, or in Rust in
 `exercises/src/nested_data.rs`. The first two have tests. The third has none.

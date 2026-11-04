@@ -35,6 +35,7 @@ echo "== the generated fragments are what the reader computes =="
 # Every number a chapter prints comes from these. A change to the reader or a fixture that moves
 # a number fails here until `make figures` is run and the result committed.
 cargo run --quiet -p pqlab -- figures --check
+python3 -m tools.walkthrough_results --check
 
 echo "== no measured number is typed into prose =="
 python3 scripts/verify-numbers.py

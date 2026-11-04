@@ -15,6 +15,14 @@ encrypted on its own. A reader with the right keys decrypts what it needs. A rea
 sees a file whose shape is still visible and whose protected contents are not. This chapter reads
 two encrypted files without their keys, and reports exactly where the reader stops.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Distinguish visible structure from protected content, and explain the roles of encrypted footers and column keys.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Two files, two footer modes
@@ -23,9 +31,9 @@ two encrypted files without their keys, and reports exactly where the reader sto
 same keys. `email` is encrypted with one key and `amount_cents` with another; `order_id` and
 `country` are not encrypted. The files differ in one choice: whether the footer is encrypted too.
 
-Each step below is a few lines of code. In Python, run them in the page, change them with
-**Edit**, and run them again. In Rust, open them in a Codespace, or run one at a desk with
-`cargo run -p walkthroughs --bin` and its name.
+Each step shows its worked result first. Open **Read or run the code** if you want to inspect
+or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
+[Appendix A](#running-the-lab).
 
 **Footer modes.** A Parquet file starts and ends with its magic, as
 [ch02](#anatomy-of-a-parquet-file) found. Read the first and last four bytes of both files:
@@ -200,6 +208,14 @@ without the footer key.
 
 ## Building it
 
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#modular-encryption-limits),
+then the takeaways and the understanding check.
+:::
+
 The steps read the magic, the key metadata and one module by hand, and stopped where a key would
 be needed. The reader does the same for every module, in both footer modes, and says where it
 stops.
@@ -372,6 +388,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encryption_with_a_library
 ```
 
+(modular-encryption-limits)=
 ## What this cannot tell you
 
 **How to decrypt.** This reader stops where the keys would be needed. Decrypting needs AES, GCM,
@@ -401,7 +418,15 @@ subject, decide which columns to encrypt and hold the keys; the files only carry
 - **Encryption hides values, not shape.** Sizes, page counts and page lengths remain visible.
 :::
 
+```checkpoint
+question: If the footer is readable but one column is encrypted, can a reader use that column's values without its key?
+answer: No. A readable footer can expose structural metadata and allow access to unencrypted columns. It does not remove the encrypted column's key requirement. The teaching reader inspects module boundaries; it does not decrypt or authenticate them.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Three, in `exercises/python/modular_encryption.py`, or in Rust in
 `exercises/src/modular_encryption.rs`. The first two have tests. The third has none.

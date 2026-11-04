@@ -19,15 +19,21 @@ a value takes and in what order. A **logical type**, written beside the physical
 schema, says what those bytes mean to a person. The same four bytes can be a count, a day, or an
 unsigned number, and only the schema says which.
 
+:::{div}
+:class: reading-guide
+
+**What you will learn:** Distinguish how a value is stored from what it means, and follow a leaf through the schema tree.
+
+Read the explanations, worked results and diagrams; the code is optional.
+:::
+
 ## The experiment
 
 ### Read the schema yourself
 
 `types.parquet` holds three orders, with a column for each physical type and the common logical
-types on top of them. [Appendix B](#the-fixtures) says how pyarrow wrote it. Each step below is a
-few lines of code. In Python, run them in the page, change them with **Edit**, and run them again.
-In Rust, open them in a Codespace, or run one at a desk with `cargo run -p walkthroughs --bin` and
-its name. Each step finds the footer as [ch02](#anatomy-of-a-parquet-file) did, and hands its
+types on top of them. [Appendix B](#the-fixtures) says how pyarrow wrote it. Each step shows its worked result before its optional code. You can read the results as they
+stand, or open **Read or run the code** to explore them. Each step finds the footer as [ch02](#anatomy-of-a-parquet-file) did, and hands its
 bytes to the book's reader, which decodes the Thrift fields the way ch02 built it to.
 
 **The schema as stored.** The footer's second field is the schema. Print every element of it:
@@ -190,6 +196,14 @@ Table formats use it to match columns between files written years apart
 column.
 
 ## Building it
+
+:::{div}
+:class: optional-section
+
+**Optional implementation.** Read this section to see how the reader is built.
+For the conceptual path, continue to [What this cannot tell you](#the-type-system-limits),
+then the takeaways and the understanding check.
+:::
 
 The steps above called three parts of the book's reader: the decoding of each schema element, the
 rebuild of the tree, and the reading of a value through its logical type. This section builds
@@ -425,6 +439,7 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin schema_with_a_library
 ```
 
+(the-type-system-limits)=
 ## What this cannot tell you
 
 **How nested values are stored.** The levels tell a reader how deep a value is defined and where
@@ -461,7 +476,15 @@ loses information. [ch11](#writing-parquet-well) looks at those choices from the
   each leaf's levels. Whether they read a value through its logical type depends on the library.
 :::
 
+```checkpoint
+question: Two columns both store INT32 values. Can you decide how to display them from that physical type alone?
+answer: No. The logical annotation may describe a date, an unsigned integer or another meaning. The physical type tells you how to decode the bytes; the logical type tells you how to interpret the result.
+```
+
 ## Problems
+
+The coding exercises are optional. You can also reason through the question about your own data
+without writing a program.
 
 Four, in `exercises/python/the_type_system.py`, or in Rust in
 `exercises/src/the_type_system.rs`. The first three have tests that fail until you solve
