@@ -71,6 +71,7 @@ def test_saved_answers_are_outside_optional_code_and_escaped(monkeypatch):
     output = renderer.render(node)
     assert "&lt;script&gt; &amp; bytes" in output
     assert output.index("example-result") < output.index('<details class="code-disclosure">')
+    assert output.startswith('<section class="worked-example">') and output.endswith("</details></section>")
     assert "Read or run the code" in output
     assert "<details open" not in output
 
