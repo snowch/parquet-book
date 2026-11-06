@@ -457,3 +457,28 @@ td code { font-size: 12.5px; }
 .learning-check .learning-note { color: var(--muted); font-size: 12px; }
 .learning-check .table-wrap { max-width: 100%; overflow-x: auto; }
 .learning-check table { font: 12px/1.6 var(--chrome); }
+
+/* A chapter remains a reference; its short lessons are the default reading route. */
+.nav .module-lessons { padding: 0 0 .6rem 1.3rem; }
+.nav .module-lessons ol { list-style: none; margin: 0; padding: 0; }
+.nav .module-lessons a { font-size: 12px; padding-block: .35rem; }
+.module-card { margin-block: 1.6rem 2.2rem; padding: 1.3rem; border: 1px solid var(--rule);
+  border-top: 3px solid var(--accent); border-radius: 8px; background: var(--panel); }
+.module-card > :first-child, .lesson-intro > :first-child { margin-top: 0; }
+.module-card .eyebrow, .lesson-intro .eyebrow, .lesson-practice .eyebrow {
+  color: var(--accent); font: 600 12px/1.6 var(--chrome); }
+.lesson-list { padding-left: 1.4rem; }
+.lesson-list li { padding: .45rem 0; }
+.lesson-list a { font-weight: 600; }
+.lesson-list p { margin: .25rem 0 0; color: var(--muted); font: 14px/1.6 var(--chrome); }
+.module-resources { padding-top: 1rem; border-top: 1px solid var(--rule); font: 14px/1.9 var(--chrome); }
+.lesson-practice { margin-block: 2rem; padding: 1.2rem; background: var(--panel);
+  border: 1px solid var(--rule); border-left: 3px solid var(--accent); border-radius: 6px; }
+.lesson-practice .table-wrap { max-width: 100%; overflow-x: auto; }
+.lesson-practice table { font: 13px/1.7 var(--chrome); }
+.lesson-practice details p { overflow-wrap: anywhere; }
+.lesson-practice summary { color: var(--accent); cursor: pointer; padding-block: .5rem; }
+.lesson-stop { border-top: 1px solid var(--rule); padding-top: 1rem; color: var(--muted);
+  font: 14px/1.7 var(--chrome); }
+.lesson-reference { font: 14px/1.7 var(--chrome); }
+.lesson-boundary { scroll-margin-top: 5rem; }

@@ -1008,6 +1008,14 @@ def nested_facts() -> dict:
     for row in rows:
         offsets.append(offsets[-1] + len(row["tags"] or []))
     return {
+        ("nested_data", "email_levels"): {
+            language: [
+                f"email  max levels: definition {columns['email'].max_definition_level}, repetition {columns['email'].max_repetition_level}\nr d value\n",
+                *(f"\n{r} {d} {json.dumps(v)}\n" for row in rows for r, d, v in shred(row["email"], [])),
+                *(json.dumps({"email": row["email"]}, separators=separators) for row in rows),
+            ]
+            for language, separators in [("python", None), ("rust", (",", ":"))]
+        },
         ("nested_data", "unpack_the_levels"): [
             unpacked("rep", [r for r, _, _ in discounts], deep.max_repetition_level),
             unpacked("def", [d for _, d, _ in discounts], deep.max_definition_level),

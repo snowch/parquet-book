@@ -36,6 +36,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from tools import render as renderer  # noqa: E402
+from tools.lessons import (  # noqa: E402
+    MODULES,
+    lesson_intro,
+    lesson_nodes,
+    lesson_page,
+    module_card,
+    module_href,
+    reading_pages,
+    reference_links,
+)
 from tools.outline import APPENDICES, CHAPTERS, PARTS, UNWRITTEN  # noqa: E402
 
 CONTENT = ROOT / "_build" / "site" / "content"
@@ -106,6 +116,8 @@ def nav_html(pages: list[dict], here: str) -> str:
     out = ['<nav class="nav" id="nav" aria-label="Chapters"><ol>']
     appendices = False
     for p in pages:
+        if p.get("lesson"):
+            continue
         # The appendices get a heading as the parts do, though they have no page of their own.
         if p["source"].startswith("appendices/") and not appendices:
             appendices = True
@@ -123,6 +135,16 @@ def nav_html(pages: list[dict], here: str) -> str:
                 f'<li><a href="{p["href"]}"{c}{aria}><span class="num">{html.escape(num)}</span>'
                 f"{html.escape(p['title'])}</a></li>"
             )
+            chapter = p.get("chapter")
+            if chapter and chapter.slug in MODULES:
+                out.append('<li class="module-lessons"><ol aria-label="Lessons">')
+                for lesson in MODULES[chapter.slug]:
+                    current = ' class="here" aria-current="page"' if lesson.href == here else ""
+                    prefix = "Optional: " if lesson.optional else ""
+                    out.append(
+                        f'<li><a href="{lesson.href}"{current}>{prefix}{html.escape(lesson.title)}</a></li>'
+                    )
+                out.append("</ol></li>")
         else:
             name = p.get("nav", p["title"])
             out.append(f'<li><a href="{p["href"]}"{c}{aria}>{html.escape(name)}</a></li>')
@@ -683,7 +705,7 @@ def page_html(
     else:
         h1 = f"<h1>{html.escape(p['title'])}</h1>"
     builds = ""
-    if chapter is not None:
+    if chapter is not None and not (p.get("lesson") or p.get("module")):
         # A chapter that explains and builds nothing says what it shows instead.
         what = "Explore" if chapter.explainer else "Optional build"
         builds = f'<p class="builds"><strong>{what}:</strong> {html.escape(chapter.builds)}</p>'
@@ -921,14 +943,22 @@ self.addEventListener("fetch", (e) => {{
 
 def build(out: Path) -> None:
     parse = load_parse()
-    pages = page_list()
-    missing = [p["source"] for p in pages if p["source"] not in parse]
+    canonical = page_list()
+    route = reading_pages(canonical)
+    references = [p for p in canonical if p.get("chapter") and p["chapter"].slug in MODULES]
+    optional = [
+        lesson_page(p, lesson) for p in references for lesson in MODULES[p["chapter"].slug] if lesson.optional
+    ]
+    pages = route + references + optional
+    missing = [p["source"] for p in canonical if p["source"] not in parse]
     if missing:
         sys.exit(f"MyST produced no parse for: {', '.join(missing)}. Is each page in myst.yml's toc?")
     renderer.PAGES.clear()
     renderer.IMAGES.clear()
-    for p in pages:
+    for p in canonical:
         renderer.PAGES[parse[p["source"]]["slug"]] = p["href"]
+
+    groups = {p["source"]: lesson_nodes(parse[p["source"]]["mdast"], p["chapter"].slug) for p in references}
 
     if out.exists():
         shutil.rmtree(out)
@@ -936,10 +966,39 @@ def build(out: Path) -> None:
     (out / "fixtures").mkdir()
 
     stamp = f"Built from commit {commit()}."
-    for i, p in enumerate(pages):
-        mdast = parse[p["source"]]["mdast"]
+    for p in pages:
+        chapter, lesson = p.get("chapter"), p.get("lesson")
+        mdast = groups[p["source"]][lesson.slug] if lesson else parse[p["source"]]["mdast"]
         normalise_headings(mdast)
-        body = renderer.render_page(mdast)
+        if p.get("module"):
+            body = module_card(chapter)
+            toc = '<aside class="toc" id="toc"></aside>'
+        else:
+            body = renderer.render_page(mdast)
+            toc = toc_html(mdast)
+            if lesson:
+                body = lesson_intro(chapter, lesson) + body
+                body = reference_links(body, f"{chapter.anchor}.html")
+                body += (
+                    '<p class="lesson-stop">This is a stopping point. Try the fresh case before continuing.</p>'
+                    if not lesson.optional
+                    else ""
+                )
+                body += f'<p class="lesson-reference"><a href="{chapter.anchor}.html">Full chapter, limitations and coding problems</a></p>'
+            elif p in references:
+                body = module_card(chapter, reference=True) + body
+
+        if p in route:
+            i = route.index(p)
+            prev = route[i - 1] if i else None
+            nxt = route[i + 1] if i + 1 < len(route) else None
+        else:
+            # Reference and optional lab pages return to the module; they do not enter the
+            # core Next route and make code compulsory.
+            prev = next(q for q in route if q["href"] == module_href(chapter))
+            i = canonical.index(next(q for q in canonical if q["source"] == p["source"]))
+            after = canonical[i + 1] if i + 1 < len(canonical) else None
+            nxt = next((q for q in route if after and q["source"] == after["source"]), None)
         # The lab script also puts buttons on the commands a page prints (Run, or Open in Codespaces)
         # and on its walkthrough steps (Run and Edit), so a page with any of those loads it.
         markers = (
@@ -954,10 +1013,10 @@ def build(out: Path) -> None:
         text = page_html(
             p,
             body,
-            nav_html(pages, p["href"]),
-            toc_html(mdast),
-            pages[i - 1] if i > 0 else None,
-            pages[i + 1] if i + 1 < len(pages) else None,
+            nav_html(route, p["href"]),
+            toc,
+            prev,
+            nxt,
             stamp,
             has_lab,
         )

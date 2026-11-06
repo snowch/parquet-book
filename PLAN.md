@@ -200,6 +200,16 @@ ch02 and ch15 are the models for the method; ch03 to ch14 predate it and have be
 The experiment comes before the code on purpose. A reader who has watched the requests happen
 reads the function that made them as an explanation, not as an abstraction.
 
+The anatomy and nested-data chapters also pilot a shorter reading route. A chapter stays a
+module and a complete reference, while its independently useful outcomes become named lessons
+with their own URLs and stopping points. Each core lesson prepares and demonstrates its
+mechanism before a fresh no-code application. Implementation labs remain optional.
+
+Both views come from the canonical chapter's MyST parse, with boundaries defined in
+`tools/lessons.py`. This keeps the quoted implementation, real evidence and technical
+qualifications together without maintaining duplicate prose. Test these boundaries with new
+readers before extending the route to the other chapters; page length alone is not the outcome.
+
 ## 6. Conventions
 
 - British English, active voice, short sentences, no em dashes. STYLE.md.

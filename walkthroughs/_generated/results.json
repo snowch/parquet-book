@@ -233,22 +233,15 @@
     "stdout": "email: bytes 270 to 709, statistics None\na module at byte 270: length 100\n  nonce: 5a 8e be 21 b7 77 c9 2a 11 d4 81 f5\n  ciphertext: 72 bytes\n  tag: b0 cd f2 80 98 58 44 cd 7e 6c 2f fa fc 74 83 03\nthe next module starts at byte 374\n",
     "comparisons": []
   },
+  "walkthroughs/python/nested_data/email_levels.py": {
+    "source_sha256": "6e3672a70affe8ef430edee7efd20ce67419d333719eb3be318b41fb9f92439e",
+    "stdout": "email  max levels: definition 1, repetition 0\nr d value\n0 1 \"ann@example.com\"\n0 0 null\n0 1 \"cat@example.com\"\n0 1 \"dan@example.com\"\n{\"email\": \"ann@example.com\"}\n{\"email\": null}\n{\"email\": \"cat@example.com\"}\n{\"email\": \"dan@example.com\"}\n",
+    "comparisons": []
+  },
   "walkthroughs/python/nested_data/levels_of_a_column.py": {
     "source_sha256": "8dd5bd354a565b6b6f60f45429edd3f2d116dca7fe8cf9f615062207fe03621f",
     "stdout": "tags[]  max levels: definition 3, repetition 1\nr d value\n0 3 \"gift\"\n1 3 \"express\"\n0 1 null\n0 0 null\n0 3 \"sale\"\n1 2 null\n{\"tags\": [\"gift\", \"express\"]}\n{\"tags\": []}\n{\"tags\": null}\n{\"tags\": [\"sale\", null]}\n",
-    "comparisons": [
-      {
-        "title": "An optional scalar: email",
-        "explanation": "There is one slot per record. A null lowers the definition level; without a list, no repetition level is needed on disk.",
-        "changes": [
-          [
-            "name = \"tags\"",
-            "name = \"email\""
-          ]
-        ],
-        "stdout": "email  max levels: definition 1, repetition 0\nr d value\n0 1 \"ann@example.com\"\n0 0 null\n0 1 \"cat@example.com\"\n0 1 \"dan@example.com\"\n{\"email\": \"ann@example.com\"}\n{\"email\": null}\n{\"email\": \"cat@example.com\"}\n{\"email\": \"dan@example.com\"}\n"
-      }
-    ]
+    "comparisons": []
   },
   "walkthroughs/python/nested_data/levels_with_a_library.py": {
     "source_sha256": "37474bbb2b608c59498960fc5edd07e0b60f873c034024333cf22e9a404a15bb",

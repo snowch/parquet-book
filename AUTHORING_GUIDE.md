@@ -265,3 +265,28 @@ Chapter two uses a `learning` fence naming `byte`, `length`, `start`, `chunk` or
 actual traces from that reader, not JavaScript estimates. The page enhances the static questions
 and revealable explanations with answer checks. Keep the essential evidence available without
 JavaScript and keep implementation listings in the existing Python/Rust disclosures.
+
+### Short lessons and the complete chapter
+
+The anatomy and nested-data chapters have a short reading route as well as their complete
+reference pages. Both are generated from the same chapter source and MyST parse. Keep the
+chapter's seven sections; a short lesson uses only the sections needed for its outcome.
+
+`tools/lessons.py` defines each lesson's title, observable outcome and preparation. A `lesson`
+fence in the canonical chapter marks its start. The next marker ends it. The optional build
+has its own marker, and `reference` begins the remaining limitations, takeaways and problems.
+The build refuses missing, duplicate, reordered or empty lesson boundaries. Never duplicate
+the prose or quoted code in a separate lesson file.
+
+Each core lesson ends with a fresh application. A `practice` fence has a `question:` and an
+`answer:` with specific reasoning. A `transfer` fence names evidence computed by
+`tools/lesson_practice.py`: another real fixture or an explicitly labelled schematic case
+reconstructed by the reader. Its native answer disclosure works without JavaScript. Do not
+call the supported checks on the displayed fixture independent mastery evidence.
+
+Core lessons have their own URLs, sidebar entries and Previous/Next route. Implementation labs
+are optional and do not interrupt that route. The full chapter remains at its existing URL;
+keep its old heading anchors. The existing reading-position storage resumes individual lessons.
+Check no-code completion, links back to omitted reference sections, code in both languages,
+and phone/desktop light/dark rendering. See `notes/learning-pilots.md` for the pilot brief,
+review decisions and evidence gaps.
