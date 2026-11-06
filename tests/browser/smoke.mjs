@@ -939,6 +939,52 @@ await explore(base + "writing-parquet-well.html");
   }
 }
 
+// The reading path has real byte/boundary practice and traces from the reader, without
+// requiring a code editor or loading Python. Wrong answers explain how to try again.
+{
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const tab = await context.newPage();
+  await tab.goto(base + "anatomy-of-a-parquet-file.html");
+  await tab.waitForFunction(() => document.querySelectorAll('.learning-check[data-ready="true"]').length === 5);
+  for (const name of ["byte", "length", "start", "chunk"]) {
+    const root = tab.locator(`[data-learning="${name}"]`);
+    const answer = await root.locator(".learning-data").evaluate((e) => JSON.parse(e.textContent).answer);
+    await root.locator("input").fill(String(answer + 1));
+    await root.locator("button[type=submit]").click();
+    check(await root.locator('[data-correct="false"]').count() === 1, `${name}: a wrong answer gets feedback`);
+    await root.locator("input").fill(String(answer));
+    await root.locator("input").press("Enter");
+    check(await root.locator('[data-correct="true"]').count() === 1, `${name}: a correct answer gets an explanation`);
+  }
+  const requests = tab.locator('[data-learning="requests"]');
+  const cases = await requests.locator(".learning-data").evaluate((e) => JSON.parse(e.textContent).cases);
+  for (const c of cases) {
+    await requests.locator('[name=mode]').selectOption(c.mode);
+    await requests.locator('[name=prefetch]').selectOption(String(c.prefetch));
+    const drawn = await requests.locator('.learning-trace tbody tr').evaluateAll((rows) =>
+      rows.map((row) => [...row.cells].map((cell) => cell.textContent)));
+    const expected = c.requests.map((r) => [r.method, r.range, String(r.bytes), r.why]);
+    check(JSON.stringify(drawn) === JSON.stringify(expected),
+      `${c.mode}/${c.prefetch}: the request explorer draws the actual reader trace`);
+  }
+  for (const width of [390, 1440]) {
+    await tab.setViewportSize({ width, height: 1000 });
+    check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      `learning exercises fit at ${width}px`);
+  }
+  await context.close();
+  const plain = await browser.newContext({ javaScriptEnabled: false });
+  const nojs = await plain.newPage();
+  await nojs.goto(base + "anatomy-of-a-parquet-file.html");
+  check(await nojs.locator('.learning-check').count() === 5, 'all five exercises have a static reading path');
+  const explanation = nojs.locator('[data-learning="start"] details');
+  await explanation.locator('summary').focus(); await nojs.keyboard.press('Enter');
+  check(await explanation.locator('p').isVisible(), 'footer arithmetic can be revealed by keyboard without JavaScript');
+  check(await nojs.locator('[data-learning="requests"] .learning-trace tbody tr').count() > 0,
+    'the default trace is readable without JavaScript');
+  await plain.close();
+}
+
 // A worked result and its disclosure form one card. Opening wide code or changing language
 // must widen that whole card, never leave a stepped edge where the two pieces meet.
 {

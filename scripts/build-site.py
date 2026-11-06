@@ -439,7 +439,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const px = (name) => parseFloat(getComputedStyle(root).getPropertyValue(name)) || 0;
   const phone = matchMedia("(max-width: 40rem)");
   // Panels, the workbench and a run's output look after their own widths.
-  const OWN = ".lab, .workbench, .run-result, .results, .example-result";
+  const OWN = ".learning-check, .lab, .workbench, .run-result, .results, .example-result";
   const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted, .code-disclosure, .worked-example";
 
   let scrolled = 0;
@@ -942,7 +942,14 @@ def build(out: Path) -> None:
         body = renderer.render_page(mdast)
         # The lab script also puts buttons on the commands a page prints (Run, or Open in Codespaces)
         # and on its walkthrough steps (Run and Edit), so a page with any of those loads it.
-        markers = ('class="lab"', 'class="workbench"', "python3 -m ", "cargo ", 'class="quoted walkthrough"')
+        markers = (
+            'class="learning-check"',
+            'class="lab"',
+            'class="workbench"',
+            "python3 -m ",
+            "cargo ",
+            'class="quoted walkthrough"',
+        )
         has_lab = any(m in body for m in markers)
         text = page_html(
             p,

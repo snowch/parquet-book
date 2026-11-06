@@ -256,3 +256,12 @@ Then run STYLE.md's two passes.
 - [ ] *What this cannot tell you* names the simulation's and the code's limits
 - [ ] Edited against STYLE.md, both passes
 - [ ] The `[To write` markers gone, and `make check` clean
+
+
+### Concept practice before code
+
+Chapter two uses a `learning` fence naming `byte`, `length`, `start`, `chunk` or `requests`.
+`tools/learning.py` derives answers from the fixture and the Python reader; request choices are
+actual traces from that reader, not JavaScript estimates. The page enhances the static questions
+and revealable explanations with answer checks. Keep the essential evidence available without
+JavaScript and keep implementation listings in the existing Python/Rust disclosures.

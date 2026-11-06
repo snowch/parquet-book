@@ -34,6 +34,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from tools.highlight import highlight
+from tools.learning import render_learning
 from tools.outline import BY_ANCHOR, EXPERIMENTS
 from tools.walkthrough_results import RESULTS, source_digest
 
@@ -381,6 +382,8 @@ def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
     if kind == "comment":
         return ""
     if kind == "code":
+        if node.get("lang") == "learning":
+            return render_learning(str(node.get("value", "")).strip())
         if node.get("lang") == "checkpoint":
             return _checkpoint(str(node.get("value", "")))
         if node.get("lang") == "lab":

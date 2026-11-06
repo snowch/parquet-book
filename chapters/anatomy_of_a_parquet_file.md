@@ -21,12 +21,31 @@ returns. You can inspect or run the code behind them, and build it yourself if y
 :::{div}
 :class: reading-guide
 
-**What you will learn:** Locate the footer from the trailer and explain why a reader can discover the file without reading its values.
+**What you will learn:** Interpret byte notation, locate the footer from the trailer, use a column’s byte range, and explain which storage requests a reader needs.
 
 Read the explanations, worked results and diagrams; the code is optional.
 :::
 
 ## The experiment
+
+### Before reading the bytes
+
+A file is a sequence of **bytes**. A byte is a small stored value; an **offset** is its position
+in the file, counted from zero. The file size counts bytes, so the final byte’s offset is one
+less than the size.
+
+% number-ok: byte range and hexadecimal place values are definitions, not measurements.
+A byte can hold a value from 0 to 255. **Hexadecimal** writes that value with two digits in base
+16: the digits zero through nine, then the letters a through f for ten through fifteen. An
+**ASCII** character is a text interpretation of a byte. The characters you see in a hex viewer
+are a way of displaying stored values; the file format decides what those values mean.
+
+A Parquet file’s **footer** is metadata: information about the table and where its data is stored.
+The **trailer** is the last eight bytes: a four-byte footer length followed by the four-byte
+signature. These are different regions. Finding the trailer tells us where to look for the footer.
+
+```{include} _generated/visual-footer.md
+```
 
 ### Read the bytes yourself
 
@@ -52,7 +71,12 @@ first and last bytes reveal. Open **Read or run the code** to inspect or change 
 :::
 ::::
 
-Four ASCII letters, `PAR1`: Parquet's *magic number*, which says what kind of file this is.
+Four ASCII letters, `PAR1`: Parquet’s *magic number*, which helps identify the format. It is a
+recognition check, not proof that every part of a file is valid.
+
+```learning
+byte
+```
 
 **The last bytes.** Now the other end of the file.
 
@@ -74,8 +98,20 @@ Four ASCII letters, `PAR1`: Parquet's *magic number*, which says what kind of fi
 The same four letters. A Parquet file carries its magic at both ends, and the end is the one a
 reader starts from, as you will see.
 
-**The four bytes before them.** These are not letters. Read them as a number, least significant
-byte first, which is what *little-endian* means:
+% number-ok: 256 possible byte values define the byte-wise integer radix, not a measurement.
+**The four bytes before them.** The format says to interpret these as a length, not as text.
+They form a **little-endian** unsigned integer: the first byte has the smallest place value.
+There are 256 possible byte values, so each position to the right has 256 times the previous
+weight. Unsigned means the length cannot be negative.
+
+The table below separates the displayed hex byte, its decimal value, its weight and its
+contribution. Try adding the contributions before revealing the explanation.
+
+```learning
+length
+```
+
+The optional example reads the same bytes and checks that sum:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -94,25 +130,18 @@ byte first, which is what *little-endian* means:
 
 That number is the length of the footer: the file's map of everything else in it.
 
-:::{note} Why little-endian?
-Some byte order had to be fixed, so that a file written on one machine reads the same on any
-other. The specification states the order and gives no reason, but the likely one is the
-hardware. Parquet was designed in 2013 for Hadoop clusters of x86 servers, and x86 processors are
-little-endian, as nearly every server, laptop and phone processor is today. A number stored in
-the processor's own order can be copied from the file into memory and used as it is: a page of
-plain integers becomes an array in one copy, with no bytes to swap. The other order, big-endian,
-is what network protocols use, and would make every reader on common hardware reverse every
-value it reads. Apache Arrow, which Parquet is often read into, made the same choice.
-:::
+**Where the footer is.** Work backwards from the file size. Subtract the trailer’s length to
+find where the footer ends, then subtract the decoded footer length to find where it starts.
 
-The same trailer sits at the right of this file strip. Follow the arrow backwards to locate the
-footer.
+A byte span here is **half-open**: it includes its start and excludes its end. Its length is
+therefore the end minus the start. An HTTP range includes both endpoints, so its last included
+byte is one less than a half-open span’s end.
 
-```{include} _generated/visual-footer.md
+```learning
+start
 ```
 
-**Where the footer is.** The footer ends where the last eight bytes begin, and it is as long as
-they say, so it starts that many bytes earlier:
+The optional example performs that calculation:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -129,8 +158,20 @@ they say, so it starts that many bytes earlier:
 :::
 ::::
 
-Those bytes are the footer. The rest of this chapter follows a reader to them and decodes their
-Thrift fields. [ch03](#the-type-system) reads the schema out of them.
+### What the trailer says
+
+A Parquet file ends with eight bytes: a four-byte footer length, then the four ASCII bytes `PAR1`.
+These are the last eight bytes of `tiny.parquet`:
+
+```{include} _generated/tiny-trailer.md
+```
+
+The footer ends where the trailer begins, and it is as long as the trailer says. That is all a
+reader needs to find it.
+
+The footer occupies the span we located, immediately before the trailer. Its bytes encode
+fields that a reader decodes. The schema means the column names and types. [ch03](#the-type-system) explores those
+types; the optional implementation below explains the footer’s binary encoding.
 
 **Break it.** Change one byte of the length and do the same arithmetic:
 
@@ -158,8 +199,14 @@ open another fixture, such as `fixtures/multiple-row-groups.parquet`.
 
 ### Open a file with the book's reader
 
-Now let the book's reader do what you have done. It sees the file only through a store that logs
-every request, as an object store would bill them, so it cannot cheat by reading the whole file:
+An **object store** keeps a file as an object addressed by a name. The reader asks it for
+information or bytes. A `HEAD` request returns metadata such as the file size, without the
+file’s contents. A `GET` request returns file bytes; a **range request** asks for only a span of
+them. A **round trip** is sending a request and waiting for its response.
+
+Now let the book’s reader do what you have done, through a simulated store that logs every
+request. The trace counts returned file bytes; HTTP response headers are outside that count.
+A `HEAD` can therefore show no file bytes returned while still costing a round trip:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -178,11 +225,9 @@ every request, as an object store would bill them, so it cannot cheat by reading
 
 Three requests: the size, then the trailer, then the footer, each waiting for the one before.
 Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
-learned the schema, the row count and where every column lives without reading a single value.
-Change the call and run it again. Ask with a suffix range instead of `HEAD`, and the first request
-disappears, because the response to a suffix range says how large the file is. Raise `prefetch`
-until the first read takes in the footer too, and the third request disappears; the trace shows
-what the bigger read cost in bytes.
+learned the schema, the row count and where every column lives without reading the data pages.
+The next sections explain how to interpret that map and shorten the request chain. You can also
+open the code and try the reader’s size-source and prefetch options yourself.
 
 The reader also checks what it reads before it trusts it. Hand it the file you damaged by hand
 above:
@@ -205,16 +250,29 @@ above:
 It stops after the trailer, before asking the store for a byte of a footer that cannot exist, and
 says why. Damage the magic instead, `data[-1]`, and it refuses for a different reason.
 
-### What the trailer says
+### Use the footer as a map
 
-A Parquet file ends with eight bytes: a four-byte footer length, then the four ASCII bytes `PAR1`.
-These are the last eight bytes of `tiny.parquet`:
+The footer records column names and types, row counts, and column locations. It does not contain
+the whole table’s values, although its statistics can contain summaries such as minimum values.
 
-```{include} _generated/tiny-trailer.md
+A **row group** is a slice of rows across all columns. A **column chunk** is one column within
+one row group. A chunk contains **pages**, smaller units used for encoding and compression.
+The same table row has a value in each column’s chunk; these values need not be next to each
+other in the file. The metadata connects the logical table to those physical regions.
+
+Here are the regions decoded by the reader. “Ends before” is the excluded boundary, not the last
+byte to fetch.
+
+```{include} _generated/tiny-regions.md
 ```
 
-The footer ends where the trailer begins, and it is as long as the trailer says. That is all a
-reader needs to find it.
+```learning
+chunk
+```
+
+Knowing a chunk’s location lets a reader fetch it as a contiguous range. A real reader may fetch
+only selected pages, split a range, or combine neighbouring ranges; a chunk does not imply a
+fixed number of requests.
 
 ### Why the reader made the requests it did
 
@@ -232,13 +290,21 @@ Every request waits for the one before it, because each needs a number the previ
 returned. On object storage the wait is the expensive part. A request takes a long time to start
 and then moves bytes quickly, so three small requests cost far more than one large one.
 
-Real readers shorten the chain in two ways, the two changes you made to the call above:
+Real readers shorten the chain in two ways:
 
 - **The size is often known already.** A directory listing or a table format's manifest records
   each file's size ([ch14](#lakehouse-and-beyond)). A suffix range, `Range: bytes=-n`, asks for
   the last `n` bytes without knowing the size, and the response reports it.
 - **Read more than the trailer.** If the first read is large enough to hold the footer too, the
   third request never happens. The cost is bytes the reader may not use.
+
+Try the size-source and prefetch options below. **Prefetching** means reading more of the file’s
+tail than the trailer alone, in case the footer fits inside that first read. A suffix range
+returns the file size with the bytes, so it does not need a preceding `HEAD`.
+
+```learning
+requests
+```
 
 Here is what each combination costs on both fixtures, computed by the same reader:
 
@@ -263,22 +329,17 @@ fixture: tiny.parquet
 fixtures: tiny.parquet, multiple-row-groups.parquet
 ```
 
-The same regions, measured by the reader:
-
-```{include} _generated/tiny-regions.md
-```
-
 Read the structure view from the top, and the file's design appears:
 
 - **The opening magic** is the same four bytes as the closing one. It lets a tool that reads
   from the front recognise the file. A reader working from the end does not need it, and the
   reader in this book does not request it.
 - **A row group** is a horizontal slice of the table: some number of rows, all columns. A writer
-  holds one row group in memory at a time, arranges it by column, and writes it out. Row groups
-  are also the unit a reader can skip or hand to another worker. `tiny.parquet` has one row
+  arranges each group by column before writing it; how much it buffers depends on the writer.
+  Row groups are also the unit a reader can skip or hand to another worker. `tiny.parquet` has one row
   group. Switch the panel to `multiple-row-groups.parquet` to see several.
-- **A column chunk** is one column's data within one row group. It is contiguous, so reading one
-  column of one row group is one range request.
+- **A column chunk** is one column's data within one row group. Its pages occupy a contiguous region,
+  so a reader can fetch the chunk without fetching the other columns.
 - **A page** is the unit a column chunk is divided into for encoding and compression. Each page
   starts with a header that says how long its body is. In `tiny.parquet` each column chunk is a
   single page, and the body holds the four values in plain little-endian form. Select the first
@@ -298,8 +359,9 @@ landed, and write the map when it is finished. Nothing is ever rewritten, which 
 storage, where an object cannot be modified in place. The cost is paid by the reader, who must
 start at the end.
 
-A file whose writer crashed before the footer was written has no map. Its data is all present and
-none of it can be read.
+A file whose writer crashed before completing the footer has no valid map. Ordinary Parquet
+readers cannot open it as a complete table. Some data pages may be present, but specialised
+recovery requires extra information and is outside this chapter.
 
 ## Building it
 
@@ -396,8 +458,8 @@ inside the opening magic, so a length that would put it there means the file is 
 ::::
 
 A span here is half-open: `start` is included and `end` is not. An HTTP range is inclusive at both
-ends. The object store converts one to the other in one place, a span's `http_range`, because
-getting it wrong by one byte is the most common range-request bug there is.
+ends. The object store converts one to the other in one place, a span's `http_range`, so
+converting between them must subtract one from the excluded end.
 
 ### The object store
 
@@ -583,13 +645,13 @@ goes further.
 - **A reader starts at the end.** The last eight bytes are the only part of a file whose position
   is known in advance: a footer length and the closing magic.
 - **The footer is the file's only map.** It is written last so a writer can stream data out in one
-  pass, and without it the data cannot be read.
+  pass. Ordinary readers need a valid footer to open the table.
 - **Opening a file is a chain of dependent requests.** Size, then trailer, then footer. Each needs
   a number the previous one returned, so on object storage the latency adds up.
 - **Readers shorten the chain.** They take the size from a listing or a suffix range, and read
   enough of the tail to hold the footer too.
-- **A file is row groups of column chunks of pages.** Each column chunk is contiguous, so reading
-  one column of one row group is one range request.
+- **A file is row groups of column chunks of pages.** Each chunk is contiguous, so a reader can fetch
+  one column’s chunk without fetching all the others.
 - **A library opens a file the same way.** pyarrow's `read_metadata` and the `parquet` crate read
   the trailer and then the footer, and report the offsets you can find by hand.
 :::

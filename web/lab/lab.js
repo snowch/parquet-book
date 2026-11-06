@@ -1,3 +1,4 @@
+import { mountLearning } from './learning.js';
 // Mount every experiment on the page.
 //
 // A chapter marks an experiment with a fenced block in the language `lab`; tools/render.py turns
@@ -91,3 +92,5 @@ for (const el of document.querySelectorAll(".workbench[data-chapter]")) {
   });
 }
 mountCommands();
+
+mountLearning();
