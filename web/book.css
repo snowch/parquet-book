@@ -235,6 +235,9 @@ pre code { background: none; padding: 0; font-size: inherit; }
 figure.quoted { margin: 1.3rem 0; }
 /* A worked answer is the reading path; opening its source is the reader's choice. Native
    disclosures keep both code and answer reveals available without JavaScript. */
+.worked-example { margin-block: 1.6rem 1.7rem; min-width: 0; }
+.worked-example > .example-result { margin-top: 0; }
+.worked-example > .code-disclosure { margin-bottom: 0; }
 .example-result { margin: 1.6rem 0 0; border: 1px solid var(--rule);
   border-top: 3px solid var(--accent); border-radius: 8px 8px 0 0; overflow: hidden;
   background: var(--bg); }

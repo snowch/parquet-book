@@ -939,6 +939,48 @@ await explore(base + "writing-parquet-well.html");
   }
 }
 
+// A worked result and its disclosure form one card. Opening wide code or changing language
+// must widen that whole card, never leave a stepped edge where the two pieces meet.
+{
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const tab = await context.newPage();
+  const settled = () => tab.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const aligned = async (label) => {
+    const boxes = await tab.locator(".worked-example").evaluateAll((examples) => examples.map((example) => {
+      const parent = example.getBoundingClientRect();
+      const result = example.querySelector(":scope > .example-result").getBoundingClientRect();
+      const code = example.querySelector(":scope > .code-disclosure").getBoundingClientRect();
+      return [parent.left, parent.right, result.left, result.right, code.left, code.right, result.bottom, code.top];
+    }));
+    check(boxes.length > 0 && boxes.every(([left, right, a, b, c, d, bottom, top]) =>
+      [a, c].every((x) => Math.abs(x - left) <= 1)
+      && [b, d].every((x) => Math.abs(x - right) <= 1) && Math.abs(top - bottom) <= 1),
+      `worked examples have continuous borders: ${label}`);
+    check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      `worked examples fit the page: ${label}`);
+  };
+  for (const width of [390, 768, 1024, 1440, 1920]) {
+    await tab.setViewportSize({ width, height: 1000 });
+    await tab.goto(base + "anatomy-of-a-parquet-file.html");
+    await tab.evaluate(() => document.fonts.ready);
+    await settled();
+    const original = await tab.locator(".worked-example").evaluateAll((nodes) => nodes.map((e) => e.getBoundingClientRect().width));
+    await aligned(`${width}px, closed`);
+    await tab.locator(".worked-example > details").evaluateAll((nodes) => nodes.forEach((e) => { e.open = true; }));
+    for (const language of ["python", "rust"]) {
+      await tab.locator(`.worked-example .tab-bar button[data-code="${language}"]`).first().click();
+      await settled();
+      await aligned(`${width}px, ${language} open`);
+    }
+    await tab.locator(".worked-example > details").evaluateAll((nodes) => nodes.forEach((e) => { e.open = false; }));
+    await settled();
+    await aligned(`${width}px, closed again`);
+    const restored = await tab.locator(".worked-example").evaluateAll((nodes) => nodes.map((e) => e.getBoundingClientRect().width));
+    check(original.every((w, i) => Math.abs(w - restored[i]) <= 1), `${width}px: closing code restores the reading width`);
+  }
+  await context.close();
+}
+
 // Reading requires neither opening code nor loading the execution runtime. Check every chapter,
 // including answer reveals by keyboard, under both themes and with JavaScript disabled.
 {

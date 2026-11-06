@@ -440,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const phone = matchMedia("(max-width: 40rem)");
   // Panels, the workbench and a run's output look after their own widths.
   const OWN = ".lab, .workbench, .run-result, .results, .example-result";
-  const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted, .code-disclosure";
+  const PROMOTE = "pre, .runnable, .wide-block, .table-wrap, .generated, .tab-set, figure.quoted, .code-disclosure, .worked-example";
 
   let scrolled = 0;
   const label = (button, open) => {
@@ -596,7 +596,8 @@ document.addEventListener("DOMContentLoaded", () => {
     blocks.forEach((el, i) => {
       const unit = topOf(el);
       if (!unit || !unit.matches(PROMOTE)) return;
-      if (unit.matches("details:not([open])")) return;
+      // A closed disclosure must not widen its shared result-and-code container.
+      if (el.closest("details:not([open])")) return;
       const u = units.get(unit) || { need: 0, tables: true };
       // Every block of code is one width, the code column, so their edges line up down the page;
       // a table is as wide as its content.

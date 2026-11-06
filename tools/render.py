@@ -198,7 +198,13 @@ def _tab_set(node: dict, footnotes: list | None) -> str:
         if len(walkthroughs) != 1:
             raise TabSetError("each walkthrough tab set must quote one Python example")
         result = _worked_result(walkthroughs[0])
-        return result + _optional_code(tabs, "Read or run the code")
+        # The answer and its source share one layout unit, including when the code widens.
+        return (
+            '<section class="worked-example">'
+            + result
+            + _optional_code(tabs, "Read or run the code")
+            + "</section>"
+        )
     return _optional_code(tabs, "Read the implementation code" if sources else "Run the checks")
 
 
