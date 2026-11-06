@@ -28,6 +28,16 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+### Recognise the format
+
+A filename ending in `.parquet` is a hint about its contents. The bytes provide a stronger check:
+many file formats use a fixed pattern called a **magic number**, or **file signature**, to help a
+reader recognise them. The Parquet file we will inspect uses `PAR1`.
+
+Start by looking for that signature. Once we recognise the expected format, we can ask how its
+reader finds the columns. A matching signature alone does not prove that the rest of a file is
+valid; the reader must check its structure too.
+
 ### Before reading the bytes
 
 A file is a sequence of **bytes**. A byte is a small stored value; an **offset** is its position
@@ -39,13 +49,6 @@ A byte can hold a value from 0 to 255. **Hexadecimal** writes that value with tw
 16: the digits zero through nine, then the letters a through f for ten through fifteen. An
 **ASCII** character is a text interpretation of a byte. The characters you see in a hex viewer
 are a way of displaying stored values; the file format decides what those values mean.
-
-A Parquet file’s **footer** is metadata: information about the table and where its data is stored.
-The **trailer** is the last eight bytes: a four-byte footer length followed by the four-byte
-signature. These are different regions. Finding the trailer tells us where to look for the footer.
-
-```{include} _generated/visual-footer.md
-```
 
 ### Read the bytes yourself
 
@@ -71,8 +74,8 @@ first and last bytes reveal. Open **Read or run the code** to inspect or change 
 :::
 ::::
 
-Four ASCII letters, `PAR1`: Parquet’s *magic number*, which helps identify the format. It is a
-recognition check, not proof that every part of a file is valid.
+The first bytes spell `PAR1` in ASCII: the signature we were looking for. The same stored bytes
+can be shown as letters or as hexadecimal numbers; neither representation changes their value.
 
 ```learning
 byte
@@ -95,8 +98,20 @@ byte
 :::
 ::::
 
-The same four letters. A Parquet file carries its magic at both ends, and the end is the one a
-reader starts from, as you will see.
+The same four letters appear at the end. We have recognised the signature; now we need to find
+the file’s map.
+
+A Parquet file’s **footer** is metadata: information about the table and where its data is stored.
+The **trailer** is the last eight bytes: a four-byte footer length followed by the closing
+signature. These are different regions. The closing magic identifies the expected format; the
+length beside it locates the footer.
+
+```{include} _generated/visual-footer.md
+```
+
+We inspected the beginning first to recognise the format. A reader opening a file from storage
+can instead start with the closing signature and length, avoiding a separate read of the opening
+magic. The book’s reader below does that.
 
 % number-ok: 256 possible byte values define the byte-wise integer radix, not a measurement.
 **The four bytes before them.** The format says to interpret these as a length, not as text.
