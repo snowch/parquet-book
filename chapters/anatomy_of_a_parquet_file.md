@@ -28,6 +28,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+recognise-parquet
+```
+
 ### Recognise the format
 
 A filename ending in `.parquet` is a hint about its contents. The bytes provide a stronger check:
@@ -80,6 +84,20 @@ can be shown as letters or as hexadecimal numbers; neither representation change
 ```learning
 byte
 ```
+
+
+Encrypted-footer files use `PARE` as the closing signature. That is a different supported format variant, not a misspelling of `PAR1`. Encryption is covered later.
+
+```practice
+question: A file is named report.parquet and begins with PAR1. Is its table necessarily readable? Explain what the signature does and does not establish.
+answer: No. The name is a hint and the magic recognises the expected format. The trailer, footer bounds and metadata must still be checked. A truncated file can retain its opening magic.
+```
+
+```lesson
+locate-the-footer
+```
+
+### Locate the footer
 
 **The last bytes.** Now the other end of the file.
 
@@ -205,65 +223,20 @@ types; the optional implementation below explains the footer’s binary encoding
 :::
 ::::
 
-The arithmetic cannot tell that anything is wrong: it puts the footer before the start of the
+The subtraction still produces a number, but that number is not a valid offset: it puts the footer before the start of the
 file. A reader has to check what it reads before it trusts it, and the book's reader below
 refuses this very damage.
 
 Try changes of your own with **Edit**: read the first eight bytes, print the whole footer, or
 open another fixture, such as `fixtures/multiple-row-groups.parquet`.
 
-### Open a file with the book's reader
-
-An **object store** keeps a file as an object addressed by a name. The reader asks it for
-information or bytes. A `HEAD` request returns metadata such as the file size, without the
-file’s contents. A `GET` request returns file bytes; a **range request** asks for only a span of
-them. A **round trip** is sending a request and waiting for its response.
-
-Now let the book’s reader do what you have done, through a simulated store that logs every
-request. The trace counts returned file bytes; HTTP response headers are outside that count.
-A `HEAD` can therefore show no file bytes returned while still costing a round trip:
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/open_with_the_reader.py
-:language: python
+```transfer
+footer
 ```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/src/bin/open_with_the_reader.rs
-:language: rust
+
+```lesson
+read-the-footer-map
 ```
-:::
-::::
-
-Three requests: the size, then the trailer, then the footer, each waiting for the one before.
-Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
-learned the schema, the row count and where every column lives without reading the data pages.
-The next sections explain how to interpret that map and shorten the request chain. You can also
-open the code and try the reader’s size-source and prefetch options yourself.
-
-The reader also checks what it reads before it trusts it. Hand it the file you damaged by hand
-above:
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/the_reader_refuses.py
-:language: python
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/src/bin/the_reader_refuses.rs
-:language: rust
-```
-:::
-::::
-
-It stops after the trailer, before asking the store for a byte of a footer that cannot exist, and
-says why. Damage the magic instead, `data[-1]`, and it refuses for a different reason.
 
 ### Use the footer as a map
 
@@ -289,54 +262,12 @@ Knowing a chunk’s location lets a reader fetch it as a contiguous range. A rea
 only selected pages, split a range, or combine neighbouring ranges; a chunk does not imply a
 fixed number of requests.
 
-### Why the reader made the requests it did
-
-With the default settings the reader follows the procedure literally. It does not know how large
-the file is, so it asks. It cannot know how long the footer is until it has read the trailer, so
-it reads the trailer. Only then can it ask for the footer:
-
-```{include} _generated/tiny-trace.md
-```
-
-```{include} _generated/visual-footer-requests.md
-```
-
-Every request waits for the one before it, because each needs a number the previous one
-returned. On object storage the wait is the expensive part. A request takes a long time to start
-and then moves bytes quickly, so three small requests cost far more than one large one.
-
-Real readers shorten the chain in two ways:
-
-- **The size is often known already.** A directory listing or a table format's manifest records
-  each file's size ([ch14](#lakehouse-and-beyond)). A suffix range, `Range: bytes=-n`, asks for
-  the last `n` bytes without knowing the size, and the response reports it.
-- **Read more than the trailer.** If the first read is large enough to hold the footer too, the
-  third request never happens. The cost is bytes the reader may not use.
-
-Try the size-source and prefetch options below. **Prefetching** means reading more of the file’s
-tail than the trailer alone, in case the footer fits inside that first read. A suffix range
-returns the file size with the bytes, so it does not need a preceding `HEAD`.
-
-```learning
-requests
-```
-
-Here is what each combination costs on both fixtures, computed by the same reader:
-
-```{include} _generated/footer-strategies.md
-```
-
-The last row for each file is the pattern most production readers use: one suffix read of a few
-tens of kilobytes, on the bet that the footer fits. For these files it does. A footer grows with
-every row group, and [ch11](#writing-parquet-well) writes one table with small row groups and
-shows its footer many times larger than with one row group.
-
 ### The whole file
 
 The footer is a map. This panel draws what it describes: every region of the file, as the reader
 parsed it. Click a region in the structure view to see its bytes, or click a byte to see which
-structure it belongs to. The dim bytes are the ones the reader never asked for when it opened
-the file above.
+structure it belongs to. The dim bytes are the ones the reader never asked for when it opens
+only the footer.
 
 ```lab
 experiment: anatomy
@@ -377,6 +308,129 @@ start at the end.
 A file whose writer crashed before completing the footer has no valid map. Ordinary Parquet
 readers cannot open it as a complete table. Some data pages may be present, but specialised
 recovery requires extra information and is outside this chapter.
+
+```transfer
+chunk
+```
+
+```lesson
+trace-footer-requests
+```
+
+### Open a file with the book's reader
+
+An **object store** keeps a file as an object addressed by a name. The reader asks it for
+information or bytes. A `HEAD` request returns metadata such as the file size, without the
+file’s contents. A `GET` request returns file bytes; a **range request** asks for only a span of
+them. A **round trip** is sending a request and waiting for its response.
+
+Now let the book’s reader do what you have done, through a simulated store that logs every
+request. The trace counts returned file bytes; HTTP response headers are outside that count.
+A `HEAD` can therefore show no file bytes returned while still costing a round trip:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/open_with_the_reader.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/open_with_the_reader.rs
+:language: rust
+```
+:::
+::::
+
+Three requests: the size, then the trailer, then the footer, each waiting for the one before.
+Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
+learned the schema, the row count and where every column lives without reading the data pages.
+The previous lesson interpreted that map; the next lesson shortens the request chain. You can also
+open the code and try the reader’s size-source and prefetch options yourself.
+
+The reader also checks what it reads before it trusts it. Hand it the damaged-length case from
+the footer-location lesson:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/anatomy_of_a_parquet_file/the_reader_refuses.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/the_reader_refuses.rs
+:language: rust
+```
+:::
+::::
+
+It stops after the trailer, before asking the store for a byte of a footer that cannot exist, and
+says why. Damage the magic instead, `data[-1]`, and it refuses for a different reason.
+
+### Why the reader made the requests it did
+
+With the default settings the reader follows the procedure literally. It does not know how large
+the file is, so it asks. It cannot know how long the footer is until it has read the trailer, so
+it reads the trailer. Only then can it ask for the footer:
+
+```{include} _generated/tiny-trace.md
+```
+
+```{include} _generated/visual-footer-requests.md
+```
+
+Every request waits for the one before it, because each needs a number the previous one
+returned. On object storage the wait is the expensive part. In a high-latency store, starting requests can cost more than transferring these small ranges.
+The simulated trace illustrates that case; a larger request can also return unnecessary bytes.
+
+```practice
+question: A directory listing already supplied the file size, but no file bytes have been read. Can the exact trailer and exact footer GETs start together? Why?
+answer: No. Knowing the size locates the trailer, but the footer length is still unknown until the trailer arrives. A speculative larger tail read can cover both regions; that is a different strategy, introduced next.
+```
+
+```lesson
+choose-a-tail-read
+```
+
+### Choose a tail strategy
+
+Real readers shorten the chain in two ways:
+
+- **The size is often known already.** A directory listing or a table format's manifest records
+  each file's size ([ch14](#lakehouse-and-beyond)). A suffix range, `Range: bytes=-n`, asks for
+  the last `n` bytes without knowing the size, and the response reports it.
+- **Read more than the trailer.** If the first read is large enough to hold the footer too, the
+  third request never happens. The cost is bytes the reader may not use.
+
+Try the size-source and prefetch options below. **Prefetching** means reading more of the file’s
+tail than the trailer alone, in case the footer fits inside that first read. A suffix range
+returns the file size with the bytes, so it does not need a preceding `HEAD`.
+
+```learning
+requests
+```
+
+Here is what each combination costs on both fixtures, computed by the same reader:
+
+```{include} _generated/footer-strategies.md
+```
+
+The last row for each file is the pattern most production readers use: one suffix read of a few
+tens of kilobytes, on the bet that the footer fits. For these files it does. A footer grows with
+every row group, and [ch11](#writing-parquet-well) writes one table with small row groups and
+shows its footer many times larger than with one row group.
+
+```practice
+question: A suffix response contains the closing signature and length, but the decoded footer starts before the returned bytes. Has the suffix request eliminated every later metadata read?
+answer: No. It eliminated a separate size request, but the reader must fetch the missing prefix of the footer before decoding all metadata. The trailer itself is not the metadata map. A larger first read might have avoided that extra GET, at a cost in transferred bytes.
+```
+
+```lesson
+build-footer-reader
+```
 
 ## Building it
 
@@ -630,6 +684,10 @@ a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin footer_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (anatomy-of-a-parquet-file-limits)=

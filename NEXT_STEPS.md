@@ -2,6 +2,18 @@
 
 The working list. PLAN.md §2 has the phases; this is the order to do them in.
 
+## Done: short reading-route pilots
+
+Anatomy now has five core lessons; nested data has four, progressing from a nullable scalar
+through one list and nested lists to physical level storage. Each has a fresh no-code case and
+a native explanation disclosure. Both modules retain a full reference and an optional build
+lab, generated from the same canonical source. Existing code, problems and chapter anchors stay
+available. The sidebar, Next route and reading-position storage support individual lessons.
+
+Independent learner and technical reviews, fixes and evidence gaps are recorded in
+`notes/learning-pilots.md`. Next: observe new readers attempting fresh cases before applying the
+structure to further modules. Keep complete reader traces and writer comparisons together.
+
 ## Done: the first vertical slice
 
 - Reader: byte primitives, trailer, footer range, Thrift compact decoding with spans, the names

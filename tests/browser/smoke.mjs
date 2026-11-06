@@ -985,6 +985,60 @@ await explore(base + "writing-parquet-well.html");
   await plain.close();
 }
 
+// Short reading routes remain complete with JavaScript off. Each lesson has a fresh case,
+// working keyboard feedback and a real Next destination; optional code stays optional.
+{
+  const core = [
+    ["recognise-parquet", "locate-the-footer"],
+    ["locate-the-footer", "read-the-footer-map"],
+    ["read-the-footer-map", "trace-footer-requests"],
+    ["trace-footer-requests", "choose-a-tail-read"],
+    ["choose-a-tail-read", "the-type-system"],
+    ["nullable-values", "one-list"],
+    ["one-list", "nested-lists"],
+    ["nested-lists", "stored-levels"],
+    ["stored-levels", "the-values"],
+  ];
+  for (const [width, theme] of [[1280, "light"], [375, "dark"]]) {
+    const context = await browser.newContext({ javaScriptEnabled: false,
+      viewport: { width, height: 900 }, colorScheme: theme });
+    const tab = await context.newPage();
+    for (const [slug, next] of core) {
+      await tab.goto(base + slug + ".html");
+      const task = tab.locator(".lesson-practice");
+      check(await task.count() === 1, `${slug}: one fresh application at ${width}px`);
+      check(await tab.locator(".code-disclosure[open]").count() === 0,
+        `${slug}: code is optional on arrival`);
+      check(await tab.locator(".prevnext .next").getAttribute("href") === next + ".html",
+        `${slug}: Next follows the short reading route`);
+      await task.locator("summary").focus();
+      await tab.keyboard.press("Enter");
+      check(await task.locator("details p").isVisible(), `${slug}: keyboard reveals reasoning without JavaScript`);
+      check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        `${slug}: no page overflow at ${width}px`);
+    }
+    for (const [slug, count] of [["anatomy-of-a-parquet-file", 5], ["nested-data", 4]]) {
+      await tab.goto(base + slug + "-lessons.html");
+      check(await tab.locator(".module-card .lesson-list > li").count() === count,
+        `${slug}: every core lesson is discoverable on the module page`);
+      check(await tab.locator(`.module-card a[href="${slug}.html"]`).count() === 1,
+        `${slug}: the complete reference is still available`);
+    }
+    await context.close();
+  }
+  // Enhancement still mounts the ordinary code controls on the split scalar lesson.
+  const context = await browser.newContext();
+  const tab = await context.newPage();
+  await tab.goto(base + "nullable-values.html");
+  await tab.locator(".code-disclosure summary").click();
+  await tab.waitForSelector('figure.walkthrough[data-file$="email_levels.py"] button');
+  check(await tab.locator('figure.walkthrough[data-file$="email_levels.py"]').count() === 1,
+    "the scalar lesson retains its executable Python walkthrough");
+  check(await tab.locator('.tab-panel[data-code="rust"] pre').count() === 1,
+    "the scalar lesson retains its Rust twin");
+  await context.close();
+}
+
 // A worked result and its disclosure form one card. Opening wide code or changing language
 // must widen that whole card, never leave a stepped edge where the two pieces meet.
 {

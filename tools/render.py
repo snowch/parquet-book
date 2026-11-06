@@ -35,6 +35,7 @@ from pathlib import Path
 
 from tools.highlight import highlight
 from tools.learning import render_learning
+from tools.lesson_practice import exercise, render_transfer
 from tools.outline import BY_ANCHOR, EXPERIMENTS
 from tools.walkthrough_results import RESULTS, source_digest
 
@@ -382,6 +383,16 @@ def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
     if kind == "comment":
         return ""
     if kind == "code":
+        if node.get("lang") == "lesson":
+            name = str(node.get("value", "")).strip()
+            return f'<span class="lesson-boundary" id="lesson-{html.escape(name, quote=True)}"></span>'
+        if node.get("lang") == "transfer":
+            return render_transfer(str(node.get("value", "")).strip())
+        if node.get("lang") == "practice":
+            fields = parse_key_values(str(node.get("value", "")), "practice")
+            if set(fields) != {"question", "answer"}:
+                raise ValueError("a practice needs a question and an answer")
+            return exercise(fields["question"], fields["answer"])
         if node.get("lang") == "learning":
             return render_learning(str(node.get("value", "")).strip())
         if node.get("lang") == "checkpoint":

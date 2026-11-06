@@ -29,54 +29,98 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
-### Four orders, every way of being missing
+```lesson
+nullable-values
+```
 
-`nested.parquet` holds four orders. Each has an optional `email`, an optional list of `tags`, and
-an optional list of `items`, where each item has a `sku` and its own list of `discounts`. Between
-them the orders contain a null string, a null list, an empty list, a list holding a null, and a
-list inside a list. [Appendix B](#the-fixtures) says how pyarrow wrote it.
+### One nullable value
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
-[ch02](#anatomy-of-a-parquet-file) did and rebuilds the schema as [ch03](#the-type-system) did.
+Start with `email`, one optional string per order in `nested.parquet`. Optional means that a
+record can have a value or a null. Losing a value must not make its record disappear.
 
-**The levels as stored.** A column chunk is a run of pages, each a header and a body.
-[ch06](#pages) reads pages in full; here the reader's `walk_pages` finds the one page of
-`items[].discounts[]`, the discounts of every item of every order. Unpack the start of its body
-by hand:
+A **slot** is one position in the column's sequence. A **definition level**, written `d`, says
+how much of the optional or repeated path exists at that position. For a single optional field,
+`d = 0` means the field is absent and `d = 1` means its value is present. Only a slot at the
+path's maximum definition level stores a value.
+
+A **repetition level**, written `r`, marks record and list boundaries. Zero starts a new record.
+Nothing repeats on the path to `email`, so every slot starts a record. The reader reports zero
+for `r`; the page needs no repetition-level stream for this column.
+
+Here is the complete scalar case, read from the fixture. The reader prints each slot as
+`r d value`, then rebuilds the records. These results are available without opening the code.
 
 ::::{tab-set}
 :::{tab-item} Python
 :sync: python
-```{literalinclude} ../walkthroughs/python/nested_data/unpack_the_levels.py
+```{literalinclude} ../walkthroughs/python/nested_data/email_levels.py
 :language: python
 ```
 :::
 :::{tab-item} Rust
 :sync: rust
-```{literalinclude} ../walkthroughs/src/bin/unpack_the_levels.rs
+```{literalinclude} ../walkthroughs/src/bin/email_levels.rs
 :language: rust
 ```
 :::
 ::::
 
-The body opens with two streams of small integers, one line each. The first holds the
-*repetition levels*, the second the *definition levels*, and the values come after both. pyarrow
-wrote a version-1 data page, so each stream starts with its length in four bytes. Then comes a
-header byte, which says how the levels are packed, and the levels themselves. Each takes as few
-bits as the column's maximum needs. The step takes the maximums from the schema, as
-[ch03](#the-type-system) counted them: 2 for repetition and 6 for definition, so two bits and
-three.
+Follow the null through the output: its slot still starts a record, and the rebuilt record
+still has an `email` field. A null is a missing value, not a missing record.
 
-Count the levels in each stream: one per *slot*. There are more slots than orders, and more than
-discounts. The levels say which slot starts a record, which holds a discount, and which holds
-nothing.
+```transfer
+scalar
+```
 
-Change `column` to 2, which is `tags[]`, and its levels need fewer bits. Change it to 1, which is
-`email`: nothing on its path repeats, so the page stores no repetition levels at all.
+```lesson
+one-list
+```
 
-**The levels, read by the reader.** The book's reader decodes the same streams, pairs each slot's
+### Four orders, every way of being missing
+
+The same fixture holds optional `tags` lists and `items` lists. An item can itself hold a list
+of `discounts`. We will first read `tags`, with only one repeated field on its path.
+
+### What the levels say
+
+A **schema** describes the fields, their types and which can be absent or repeated. Here is
+the fixture’s schema, rebuilt as in [ch03](#the-type-system). Focus on `tags` for now; the
+`items` branch is used in the next lesson:
+
+```{include} _generated/nested-schema-text.md
+```
+
+The standard list layout uses three schema fields, not one. An optional group annotated `LIST` can be null. Inside
+it, a repeated group called `list` makes the repetition. Inside that, an optional `element` can be
+null. That shape is what lets a file tell a null list from an empty list from a list holding a
+null. The book writes these columns the way a reader of the data would, `tags[]` rather than
+`tags.list.element`:
+
+```{include} _generated/nested-columns.md
+```
+
+**The definition level** `d` counts how many optional or repeated fields on the path are present
+for this slot. At the maximum, the value is there. Below it, the first missing field is the one
+whose definition level is `d + 1`. For `tags[]`, the levels mean:
+
+- `d = 0`: `tags` itself is absent. The list is null.
+- `d = 1`: `tags` is present, but its repeated `list` group has no entries. The list is empty.
+- `d = 2`: an entry exists, but its `element` is absent. The element is null.
+- `d = 3`: the value is present.
+
+The containers below show how far each definition level reaches. The null element case comes from
+the final record's list, which also holds `sale`.
+
+```{include} _generated/visual-nested-missing.md
+```
+
+**The repetition level** `r` says where the slot sits in the nesting. Zero starts a new record.
+Any other value names the repeated field that gains a new element: here, `r = 1` adds an element
+to `tags`.
+
+### Rebuild the tags
+
+The book's reader decodes the level streams, pairs each slot's
 two levels with its value, and rebuilds the records from them. Ask it for `tags`:
 
 ::::{tab-set}
@@ -104,8 +148,8 @@ existed. The final record holds `sale` followed by a null element, whose definit
 below the maximum. The records at the
 end are rebuilt from these rows alone.
 
-Change `name` to `"email"`, `"order_id"` or `"items"`, and watch the maximum levels set what a
-row can say. `items` has two columns, and each rebuilds its own view of the same records.
+The optional code can inspect `order_id` or `items` too. `items` has two columns, and each
+rebuilds its own view of the same records. The next lesson follows its nested lists.
 
 Keep the records beside their slots as you read the output. Each new record starts a coloured band;
 the arrows continue its list.
@@ -113,52 +157,27 @@ the arrows continue its list.
 ```{include} _generated/visual-nested-tags.md
 ```
 
-### What the levels say
-
-The file's schema, as [ch03](#the-type-system) rebuilt it:
-
-```{include} _generated/nested-schema-text.md
+```transfer
+list
 ```
 
-A list is three levels of schema, not one. An optional group annotated `LIST` can be null. Inside
-it, a repeated group called `list` makes the repetition. Inside that, an optional `element` can be
-null. That shape is what lets a file tell a null list from an empty list from a list holding a
-null. The book writes these columns the way a reader of the data would, `tags[]` rather than
-`tags.list.element`:
-
-```{include} _generated/nested-columns.md
+```lesson
+nested-lists
 ```
-
-**The definition level** `d` counts how many optional or repeated fields on the path are present
-for this slot. At the maximum, the value is there. Below it, the first missing field is the one
-whose definition level is `d + 1`. For `tags[]`, as the second step printed:
-
-- `d = 0`: `tags` itself is absent. The list is null.
-- `d = 1`: `tags` is present, but its repeated `list` group has no entries. The list is empty.
-- `d = 2`: an entry exists, but its `element` is absent. The element is null.
-- `d = 3`: the value is present.
-
-The containers below show how far each definition level reaches. The null element case comes from
-the final record's list, which also holds `sale`.
-
-```{include} _generated/visual-nested-missing.md
-```
-
-**The repetition level** `r` says where the slot sits in the nesting. Zero starts a new record.
-Any other value names the repeated field that gains a new element: here, `r = 1` adds an element
-to `tags`.
-
-`email` is the simplest case. One optional field is on its path, so its maximum definition level
-is 1: a `d` of 0 is a null and a `d` of 1 is a value. No field on the path is repeated, so the
-page stores no repetition levels, as the first step found, and the reader takes every `r` as
-zero.
 
 ### Two lists deep
 
 Every item has its own list of discounts, so `items[].discounts[]` has two repeated fields on its
 path and a maximum repetition level of 2. Now `r` has three meanings: 0 is a new record, 1 is a
-new item, and 2 is another discount in the same item. These are the levels the first step
-unpacked, with what the reader makes of each:
+new item, and 2 is another discount in the same item.
+
+Count the optional or repeated fields along this leaf's path: optional `items`, repeated `list`,
+optional item `element`, optional `discounts`, repeated `list`, optional discount `element`.
+Each raises the definition level by one, so a present discount reaches six. At `d = 4`, the
+path reaches the discounts container but has no repeated entry: an empty discounts list.
+
+The diagram shows decoded levels and the records they describe. Physical packing comes in
+the next lesson:
 
 ```{include} _generated/visual-nested-discounts.md
 ```
@@ -167,23 +186,97 @@ Follow item `B2` in the diagram. Its `r` of 1 starts a new item. Its `d` of 4 sa
 and its `discounts` list exist, but the list has no entries. The next row belongs to an order
 with no items. Those cases need different definition levels.
 
+The higher repetition level continues the innermost list; the lower non-zero level starts
+another item inside the same order. Only zero begins a new order. The definition level answers
+a separate question: how far the optional/repeated path exists at that slot.
+
+```transfer
+nested
+```
+
+```lesson
+stored-levels
+```
+
+### The levels as stored
+
+A column chunk is a run of **pages**, smaller units with a header and a body. The header
+describes the page; the body holds the levels and values.
+[ch06](#pages) reads pages in full; here the reader's `walk_pages` finds the one page of
+`items[].discounts[]`, the discounts of every item of every order. Unpack the start of its body
+by hand:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/nested_data/unpack_the_levels.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/unpack_the_levels.rs
+:language: rust
+```
+:::
+::::
+
+The body opens with two streams of small integers, one line each. The first holds the
+*repetition levels*, the second the *definition levels*, and the values come after both. pyarrow
+wrote a version-1 data page, so each stream starts with its length in four bytes. Then comes a
+header byte, which says how the levels are packed, and the levels themselves. Each takes as few
+bits as the column's maximum needs. The step uses the maxima from the schema already interpreted in the preceding lessons: 2 for repetition and 6 for definition, so two bits and
+three.
+
+Count the levels in each stream: one per *slot*. There are more slots than orders, and more than
+discounts. The levels say which slot starts a record, which holds a discount, and which holds
+nothing.
+
+Change `column` to 2, which is `tags[]`, and its levels need fewer bits. Change it to 1, which is
+`email`: nothing on its path repeats, so the page stores no repetition levels at all.
+
 ### How the levels are stored
 
-Levels are small integers with a known maximum, so a writer stores them in as few bits as that
-maximum needs, using the RLE / bit-packing hybrid. The stream is a sequence of runs, and each
-starts with a ULEB128 header whose lowest bit gives the run's kind:
+A **bit** is a binary digit, zero or one. Two bits can distinguish the values zero through
+three; three bits can distinguish zero through seven. Those widths are enough for this column's
+maximum repetition and definition levels. **Bit packing** places consecutive values in that
+width without giving each a whole byte. **Run-length encoding**, or **RLE**, stores a repeated
+value once, together with its count.
 
-- **Lowest bit 0: an RLE run.** The rest of the header is a count, and one value follows. A column
-  with no nulls has definition levels that are all the maximum, and a whole page of them is one
-  run of a couple of bytes.
+The hybrid stream mixes both kinds of run. Each run starts with an unsigned variable-length
+integer header, called **ULEB128**. Small headers fit in one byte, as the examples here do;
+larger headers use more bytes. After decoding that integer, its lowest bit, the rightmost
+binary digit, identifies the kind. Remove that bit, or divide the integer by two and discard
+the remainder, to get the count:
+
+- **Lowest bit 0: an RLE run.** The rest of the header is a count, and one value follows. For an
+  optional flat column whose values are all present, every definition level is the maximum.
+  A writer can store that page's levels as one short run. A required flat column needs no level
+  stream; nested empty lists can still have levels below the maximum.
 - **Lowest bit 1: a bit-packed run.** The rest of the header is a number of groups of eight
   values, each packed into the bit width, least significant bit first.
 
+```transfer
+run-example
+```
+
 The discount column's levels are short and varied, so the writer bit-packed both streams. The
-header `03` that the first step printed is binary `11`: bit-packed, one group of eight. The
+header `03` that the walkthrough printed is binary `11`: bit-packed, one group of eight. The
 repetition levels need two bits each, so eight of them take two bytes; the definition levels need
-three bits each and take three. With the header byte, those are the stream lengths the step
+three bits each and take three. With the header byte, those are the stream lengths the walkthrough
 printed. The page has six slots, so the last two values in each group are padding.
+
+A page format affects where the stream lengths are stored, not what a definition or repetition
+level means. This walkthrough uses data page version 1. Version 2 moves the lengths into the
+page header; the pages chapter compares both layouts.
+
+```transfer
+run
+```
+
+```lesson
+build-nested-reader
+```
 
 ## Building it
 
@@ -225,7 +318,7 @@ value, stored in as many whole bytes as the bit width needs:
 ::::
 
 A bit-packed run is the header's count of groups, each eight values of the bit width. The last
-group of a stream can run past the count of values, as it did in the first step, and the padding
+group of a stream can run past the count of values, as it did in the stored-levels walkthrough, and the padding
 is dropped:
 
 ::::{tab-set}
@@ -371,7 +464,7 @@ The two describe the same four records of `tags`. In pyarrow's offsets, the empt
 null list both have length zero, and only the validity bitmap tells them apart: the job a
 definition level of 1 or 0 did in the file. A null element is a null in the values array, where
 the file stored no value at all. The crate prints the repetition and definition levels the
-reader decoded in the second step. Its values hold only the present strings, and it counts
+reader decoded in the tags walkthrough. Its values hold only the present strings, and it counts
 records where the repetition level is zero.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
@@ -380,6 +473,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin levels_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (nested-data-limits)=

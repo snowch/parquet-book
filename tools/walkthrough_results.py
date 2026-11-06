@@ -40,13 +40,6 @@ VARIATIONS = {
             [('int.from_bytes(raw, "big", signed=True)', 'int.from_bytes(raw, "little", signed=True)')],
         ),
     ],
-    "levels_of_a_column": [
-        (
-            "An optional scalar: email",
-            "There is one slot per record. A null lowers the definition level; without a list, no repetition level is needed on disk.",
-            [('name = "tags"', 'name = "email"')],
-        ),
-    ],
     "delta_header": [
         (
             "A counter: order_id",
