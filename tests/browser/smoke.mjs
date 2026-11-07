@@ -1069,6 +1069,8 @@ await explore(base + "writing-parquet-well.html");
   await tab.setViewportSize({ width: 390, height: 844 });
   await tab.goto(base + "nested-data.html");
   await tab.locator("#menu").click();
+  const finalPart = tab.locator("#nav .nav-part > details").nth(4);
+  await finalPart.locator(":scope > summary").focus(); await tab.keyboard.press("Enter");
   const finalModule = tab.locator("#nav .nav-module > details").last();
   await finalModule.locator("summary").focus(); await tab.keyboard.press("Enter");
   check(await finalModule.getAttribute("open") !== null, "the module menu expands by keyboard");
@@ -1081,6 +1083,27 @@ await explore(base + "writing-parquet-well.html");
   check(menuFits, "the actual course menu reaches its final entry on a phone");
   await tab.locator("#menu").click();
   await tab.waitForFunction(() => !document.body.classList.contains("nav-open"));
+  // Title search preserves the course's numbering and restores disclosure state when cleared.
+  await tab.locator("#menu").click();
+  const search = tab.locator("#contents-search");
+  const opened = await tab.locator("#nav details").evaluateAll((items) => items.map((item) => item.open));
+  await search.fill("tail-read");
+  const result = tab.locator('#nav .module-lessons a:visible');
+  check(await result.count() === 1 && await result.getAttribute("href") === "choose-a-tail-read.html",
+    "contents search finds a lesson inside a closed part and chapter");
+  check(await result.locator(".lesson-number").textContent() === "5", "search keeps the lesson's original position");
+  await search.fill("no-such-parquet-topic");
+  check((await tab.locator(".nav-search-status").textContent()).startsWith("No matches"), "empty search gives useful feedback");
+  await search.fill("");
+  check(JSON.stringify(opened) === JSON.stringify(await tab.locator("#nav details").evaluateAll((items) => items.map((item) => item.open))),
+    "clearing search restores the reader's open chapters");
+  check(await tab.locator("#main").evaluate((main) => main.inert), "mobile contents makes the covered lesson inert");
+  await tab.locator("#menu").focus(); await tab.keyboard.press("Shift+Tab");
+  check(await tab.evaluate(() => document.activeElement.closest("#nav") !== null), "keyboard focus stays inside the open contents");
+  await tab.keyboard.press("Escape");
+  await tab.waitForFunction(() => !document.body.classList.contains("nav-open"));
+  check(await tab.locator("#menu").evaluate((menu) => document.activeElement === menu)
+    && !await tab.locator("#main").evaluate((main) => main.inert), "Escape closes contents and returns focus to its button");
   // The cover does not overwrite last-read on pagehide. Seed both channels used by
   // installed/offline readers so this really exercises a legacy long-page position.
   await tab.goto(base + "index.html");

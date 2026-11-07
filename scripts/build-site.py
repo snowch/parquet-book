@@ -117,38 +117,73 @@ def is_unwritten(source: str) -> bool:
 
 
 def nav_html(pages: list[dict], here: str) -> str:
-    out = ['<nav class="nav" id="nav" aria-label="Modules"><ol>']
-    appendices = False
+    """A course map with native part and chapter disclosures, enhanced by title search."""
+    total = sum(not lesson.optional for lessons in MODULES.values() for lesson in lessons)
+    out = [
+        '<nav class="nav" id="nav" aria-label="Contents">',
+        '<div class="nav-heading"><div><p class="nav-title">Contents</p>',
+        f'<p class="nav-description">{len(CHAPTERS)} chapters, {total} short lessons</p></div>',
+        '<button class="nav-close" type="button" aria-label="Close contents" hidden>✕</button></div>',
+        '<div class="nav-search" hidden><label for="contents-search">Find a lesson</label>',
+        '<input id="contents-search" type="search" placeholder="Search lesson titles" '
+        'autocomplete="off" spellcheck="false" aria-controls="contents-list">',
+        '<p class="nav-search-status" role="status" aria-live="polite"></p></div>',
+        '<ol id="contents-list">',
+    ]
+
+    def link(href, title, css="", number=None):
+        current = ' aria-current="page"' if href == here else ""
+        classes = " ".join(filter(None, (css, "here" if href == here else "")))
+        marker = f'<span class="lesson-number" aria-hidden="true">{number}</span>' if number else ""
+        return f'<a href="{href}" class="{classes}"{current}>{marker}{html.escape(title)}</a>'
+
     for p in pages:
-        if p.get("lesson"):
-            continue
-        if p["source"].startswith("appendices/") and not appendices:
-            appendices = True
-            out.append('<li class="part">Appendices</li>')
-        chapter = p.get("chapter")
-        aria = ' aria-current="page"' if p["href"] == here else ""
-        current = ' class="here"' if p["href"] == here else ""
-        if chapter:
+        if p["source"] in ("cover.md", "index.md"):
+            out.append(f'<li class="nav-front">{link(p["href"], p.get("nav", p["title"]))}</li>')
+    for part in PARTS:
+        chapters = [c for c in CHAPTERS if c.part == part.title]
+        href = f"{part.slug.replace('_', '-')}.html"
+        active = here == href or any(
+            here == module_href(c) or any(lesson.href == here for lesson in (*MODULES[c.slug], *resources(c)))
+            for c in chapters
+        )
+        label, title = part.title.split(": ", 1)
+        out.append(
+            f'<li class="nav-part"><details{" open" if active else ""}><summary>'
+            f'<span class="part-number">{html.escape(label)}</span>'
+            f"<span>{html.escape(title)}</span></summary><ol>"
+        )
+        out.append(f'<li class="part-overview">{link(href, "About this part")}</li>')
+        for chapter in chapters:
             lessons = (*MODULES[chapter.slug], *resources(chapter))
-            active = here == p["href"] or any(lesson.href == here for lesson in lessons)
-            out.append(f'<li class="nav-module"><details{" open" if active else ""}><summary>')
+            active = here == module_href(chapter) or any(lesson.href == here for lesson in lessons)
+            count = sum(not lesson.optional for lesson in lessons)
             out.append(
-                f'<a href="{p["href"]}"{current}{aria}><span class="num">{chapter.number:02d}</span>{html.escape(p["title"])}</a></summary>'
+                f'<li class="nav-module{" active-module" if active else ""}">'
+                f"<details{' open' if active else ''}><summary>"
+                f'<span class="num">{chapter.number:02d}</span>'
+                f'<span class="module-name">{html.escape(chapter.title)}'
+                f"<small>{count} lessons</small></span></summary>"
             )
+            out.append(f'<div class="module-overview">{link(module_href(chapter), "Chapter overview")}</div>')
             out.append('<ol class="module-lessons" aria-label="Lessons">')
+            for number, lesson in enumerate((item for item in lessons if not item.optional), 1):
+                out.append(f"<li>{link(lesson.href, lesson.title, number=number)}</li>")
+            out.append('</ol><div class="nav-optional"><p>Optional</p><ul>')
             for lesson in lessons:
-                current = ' class="here" aria-current="page"' if lesson.href == here else ""
-                prefix = "Optional: " if lesson.optional else ""
-                out.append(
-                    f'<li><a href="{lesson.href}"{current}>{prefix}{html.escape(lesson.title)}</a></li>'
-                )
-            out.append("</ol></details></li>")
-        elif p["source"].startswith("parts/"):
-            out.append(f'<li class="part"><a href="{p["href"]}"{aria}>{html.escape(p["title"])}</a></li>')
-        else:
-            name = p.get("nav", p["title"])
-            out.append(f'<li><a href="{p["href"]}"{current}{aria}>{html.escape(name)}</a></li>')
-    out.append("</ol></nav>")
+                if lesson.optional:
+                    out.append(f"<li>{link(lesson.href, lesson.title)}</li>")
+            out.append("</ul></div></details></li>")
+        out.append("</ol></details></li>")
+    appendix_pages = [p for p in pages if p["source"].startswith("appendices/")]
+    active = any(p["href"] == here for p in appendix_pages)
+    out.append(
+        f'<li class="nav-part nav-appendices"><details{" open" if active else ""}>'
+        "<summary><span>Appendices</span></summary><ol>"
+    )
+    for p in appendix_pages:
+        out.append(f"<li>{link(p['href'], p['title'])}</li>")
+    out.append("</ol></details></li></ol></nav>")
     return "".join(out)
 
 
@@ -704,7 +739,8 @@ def page_html(
     repo = yaml.safe_load((ROOT / "myst.yml").read_text())["project"]["github"].rstrip("/")
     chapter = p.get("chapter")
     if p["label"]:
-        h1 = f'<h1><span class="label">{html.escape(p["label"])}</span>{html.escape(p["title"])}</h1>'
+        label = f"Chapter {chapter.number}" if chapter else p["label"]
+        h1 = f'<h1><span class="label">{html.escape(label)}</span>{html.escape(p["title"])}</h1>'
     else:
         h1 = f"<h1>{html.escape(p['title'])}</h1>"
     builds = ""
@@ -751,6 +787,7 @@ def page_html(
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#35648f">
 <link rel="stylesheet" href="book.css">
+<script src="navigation.js" defer></script>
 {lab}
 {HEAD_SCRIPT}
 {RAILS}
@@ -1103,6 +1140,7 @@ def build(out: Path, integration_out: Path | None = None) -> None:
             )
 
     shutil.copy(ROOT / "web" / "book.css", out / "book.css")
+    shutil.copy(ROOT / "web" / "navigation.js", out / "navigation.js")
     # The pictures the pages show, such as the cover's, under the names the pages use.
     for name, source in sorted(renderer.IMAGES.items()):
         shutil.copy(source, out / name)
