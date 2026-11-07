@@ -44,14 +44,14 @@ export async function mountChanges(root, lab, files, initial, config) {
     }
     const t = r.totals;
     root.dataset.requests = String(t.requests);
-    root.dataset.roundTrips = String(t.round_trips);
+    root.dataset.dependencyPhases = String(t.dependency_phases);
     root.dataset.answer = r.row.length ? "found" : r.deleted_by ? "deleted" : "absent";
     const where = r.found ? `<code>${escapeHtml(r.found.path)}</code>, row ${fmt(r.found.position)}` : "";
     const found = r.row.length ? `Order ${fmt(r.key)} is in ${where}.`
       : r.deleted_by ? `Order ${fmt(r.key)} is in ${where}, but <code>${escapeHtml(r.deleted_by)}</code> deletes it.`
         : `No file holds order ${fmt(r.key)}.`;
     $(".c-answer-body").innerHTML = `<p class="note">${found}</p>` +
-      `<dl class="scan-costs"><dt>This table</dt><dd>${ms(t.elapsed_us)} <small>${fmt(t.round_trips)} round trips, ${fmt(t.requests)} requests, ${fmt(t.bytes_fetched)} bytes</small></dd>` +
+      `<dl class="scan-costs"><dt>This table</dt><dd>${ms(t.elapsed_us)} <small>${fmt(t.dependency_phases)} dependency phases, ${fmt(t.requests)} requests, ${fmt(t.bytes_fetched)} bytes</small></dd>` +
       `<dt>A key-value store</dt><dd>${ms(r.key_value.elapsed_us)} <small>1 request, ${fmt(r.key_value.bytes)} bytes</small></dd></dl>`;
     drawTimeline($(".timeline"), r);
   };

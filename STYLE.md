@@ -41,6 +41,17 @@ words where it first appears.
 A term used in an argument must be defined earlier on the same page, in plain words. The glossary
 (Appendix C) is a reference, not a substitute.
 
+Check the published lesson, including headings, generated result labels, questions and feedback.
+An explanation in an unpublished chapter introduction or a later optional lab does not prepare
+the core reader. Give a short local reminder when a term carries a new argument on another page.
+Define notation beside the result that uses it, and distinguish naming a mechanism from showing
+how it works.
+
+Bold the defining term and give its plain meaning in the same sentence or paragraph. Matching
+glossary names receive a dotted lookup link automatically; keep ordinary later occurrences plain.
+The glossary uses one `## Term` section per definition, with a link to the lesson that teaches it.
+The full page and the optional lookup panel are generated from that same definition.
+
 ## 7. Headings name what a section contains
 
 A few words, not a sentence, not a question unless the section answers it: *The trailer*, not

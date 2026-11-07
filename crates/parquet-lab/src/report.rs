@@ -2592,7 +2592,7 @@ pub fn changes(
         phases.dedup();
         obj([
             ("requests", requests.len().into()),
-            ("round_trips", phases.len().into()),
+            ("dependency_phases", phases.len().into()),
             ("bytes_fetched", bytes.into()),
             ("elapsed_us", elapsed.into()),
             ("rows_decoded", rows.into()),

@@ -27,11 +27,11 @@ fn main() {
     let model = NetworkModel::default();
     let result = lookup(store, "", snapshot, key, prefetch, 4, model).expect("a lookup");
 
-    let mut trips = 0;
+    let mut phases = 0;
     for (i, r) in result.requests.iter().enumerate() {
         if i == 0 || r.phase != result.requests[i - 1].phase {
-            trips += 1;
-            println!("round trip {trips}:");
+            phases += 1;
+            println!("phase {phases}:");
         }
         let (ms, method, object) = (r.end_us / 1000, r.method.name(), &r.key);
         let range = r.range.as_deref().unwrap_or("·");

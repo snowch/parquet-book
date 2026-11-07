@@ -35,6 +35,13 @@ dictionary-values
 
 ### Read the encodings yourself
 
+An **encoding** is a rule for representing typed values as bytes. **PLAIN** stores the values
+directly in their physical type’s representation. Other encodings exploit repeated values or
+small differences before a general-purpose compressor processes the resulting bytes.
+
+**Dictionary encoding** writes each distinct value in a list, then represents each occurrence
+by its position in that list. That position is a **dictionary index**, counted from zero.
+
 `encodings.parquet` holds forty orders, and each column was written with the encoding that suits
 its values. `dictionary.parquet` holds twelve orders written with the default, dictionary
 encoding. [Appendix B](#the-fixtures) says how pyarrow wrote each.
@@ -84,8 +91,9 @@ read.
 The run header `05` that the step printed is binary `101`: a bit-packed run of two groups of
 eight. The page has twelve rows, so the run ends with four slots of padding. Dictionary encoding
 also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in the
-dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip the
-whole column chunk. Some readers do both. The reader in this book does neither, as
+dictionary and then compare small integers. If every data page uses that dictionary and `UK`
+is absent, it can skip the whole column chunk. A page that has fallen back to another encoding
+needs separate checking. Some readers do both. The reader in this book does neither, as
 [ch09](#skipping-data) notes.
 
 The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 name it
@@ -109,8 +117,9 @@ to recover the next value. This small complete example uses values decoded from 
 delta-example
 ```
 
-The column below varies more. Its blocks store a minimum delta, then non-negative excesses over
-that minimum. A constant sequence of deltas needs no bits for those excesses.
+A **block** is a group of deltas encoded together; a **miniblock** is a smaller group with its
+own bit width. The column below varies more. Its blocks store a minimum delta, then
+non-negative excesses over that minimum. A constant sequence of deltas needs no bits for those excesses.
 
 ### DELTA_BINARY_PACKED
 
@@ -141,7 +150,8 @@ string-prefixes
 
 ### The delta encodings for strings
 
-Two encodings apply the same idea to byte arrays.
+A **prefix** is the beginning of a value’s bytes; a **suffix** is what remains after that prefix.
+Two encodings apply the delta idea to byte arrays.
 
 **`DELTA_LENGTH_BYTE_ARRAY`** writes every value's length first, as `DELTA_BINARY_PACKED`, then
 all the values' bytes back to back. The `sku` column's values are all the same length, so the
@@ -215,16 +225,17 @@ The labels and colours identify the same positions in both views.
 ```{include} _generated/visual-byte-stream-split.md
 ```
 
-The last stream holds the sign and most of the exponent, and has almost no variety. The stream
-before it, the top of the mantissa, varies most. The two low streams repeat a few bytes, because
-these weights go up in steps of a twentieth, and the mantissa of such a fraction repeats one bit
+These floating-point values have sign, exponent and fraction fields. The sign marks positive or
+negative; the exponent sets the scale; the fraction holds precision bits. The last stream holds
+the sign and most of the exponent, and has almost no variety. The stream before it, the top of
+the fraction, varies most. The two low streams repeat a few bytes, because these weights go up in steps of a twentieth, and the stored fraction often repeats one bit
 pattern. In measured data the low bytes usually vary far more. Written PLAIN, the exponent bytes
 are scattered one in every four. Written split, they sit together, where a compressor can
 find the repetition. [ch07](#compression) measures what that is worth.
 
 ```practice
 question: A writer applies BYTE_STREAM_SPLIT without compression. Should a smaller page be expected? What additional comparison is needed before recommending it?
-answer: No. Splitting rearranges the same bytes. Compare the compressed result on the actual values and codec; a rearrangement may help or hurt their repeated byte patterns.
+answer: No. Splitting rearranges the same bytes. Compare the compressed result on the actual values and compression method; a rearrangement may help or hurt their repeated byte patterns.
 ```
 
 ```lesson
@@ -273,8 +284,10 @@ build-encoding-readers
 ## Building it
 ### Inspect a physical delta header
 
-The conceptual lesson reconstructed values without parsing varints. This optional walkthrough
-examines the physical header, including unsigned variable-length integers and zigzag for signed values.
+The conceptual lesson reconstructed values without parsing headers. A **varint** stores an
+integer in a variable number of bytes. **Zigzag encoding** maps signed values to unsigned ones:
+positive values become even numbers, negative values become odd numbers, and zero stays zero.
+This optional walkthrough reads both from the physical header.
 
 **A run of deltas.** `ordered_at` is a plain `INT64` with no logical type: a count of seconds
 since 1970, with rows about a minute apart. pyarrow wrote it as `DELTA_BINARY_PACKED`. Read the

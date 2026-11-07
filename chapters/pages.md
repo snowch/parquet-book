@@ -33,7 +33,9 @@ walk-page-boundaries
 
 `pages.parquet` and `pages-v2.parquet` hold the same sixty orders. The writer was told to keep
 pages small, so each column chunk holds several. Every seventh country is null. The first file
-uses data page version 1; the second uses version 2 and puts a checksum in every page header.
+uses data page version 1; the second uses version 2 and puts a **checksum** in every page
+header. A checksum is a number calculated from the stored bytes, which a reader can recompute
+to check for accidental changes.
 [Appendix B](#the-fixtures) says how pyarrow wrote both.
 
 Each step shows its worked result first. Open **Read or run the code** if you want to inspect
@@ -158,9 +160,13 @@ check-page-corruption
 
 ### Checksums
 
-A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page
-from one whose values happen to be unusual. Whether a writer includes it depends on the
-implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
+A **checksum** is a number calculated from bytes to help detect accidental changes.
+**CRC-32** is the thirty-two-bit cyclic redundancy check used for Parquet page bodies. A writer
+stores the checksum in the header; a reader recomputes it from the body and compares them.
+A mismatch detects a problem. A match is not proof that the bytes are valid data or unchanged:
+different byte sequences can share a checksum.
+
+Whether a writer includes it depends on the implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
 parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on.
 
 A checksum helps only a reader that checks it, and checking costs a pass over every body. The bit
@@ -199,7 +205,7 @@ instead, and see which page the reader's walk marks.
 
 ```practice
 question: A stored page’s checksum matches its body, but its encoding header is invalid. Has the checksum proved that decoding will succeed?
-answer: No. The checksum is evidence about the stored bytes matching the checksum, not about valid encoding or schema semantics. A missing checksum gives no such integrity check, and a reader must actually verify one for it to help.
+answer: No. The checksum tests whether the stored bytes match a calculated check value. It does not establish that their encoding or types are valid. A missing checksum provides no check, and a reader must verify an available checksum for it to help.
 ```
 
 ```lesson

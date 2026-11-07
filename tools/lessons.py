@@ -419,7 +419,7 @@ MODULES.update(
                 "resolve-table-membership",
                 "Resolve table membership from a log",
                 "Distinguish files present in storage from files active in a table version.",
-                "Use add/remove actions before considering snapshots.",
+                "Use partition paths and file statistics to decide which files might match a query.",
             ),
             Lesson(
                 "build-table-reader",
@@ -452,7 +452,7 @@ MODULES.update(
                 "decide-when-to-compact",
                 "Decide when compaction repays its cost",
                 "Compare immediate rewriting with expected future scan savings.",
-                "Use update amplification and accumulating small files.",
+                "Use the read/write costs and small-file trade-offs from the previous lesson.",
             ),
             Lesson(
                 "build-snapshot-reader",

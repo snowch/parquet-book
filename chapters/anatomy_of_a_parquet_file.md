@@ -44,8 +44,8 @@ valid; the reader must check its structure too.
 
 ### Before reading the bytes
 
-A file is a sequence of **bytes**. A byte is a small stored value; an **offset** is its position
-in the file, counted from zero. The file size counts bytes, so the final byte’s offset is one
+A **bit** is a binary digit, zero or one. A **byte** holds eight bits. A file is a sequence of
+bytes; an **offset** is a byte’s position in the file, counted from zero. The file size counts bytes, so the final byte’s offset is one
 less than the size.
 
 % number-ok: byte range and hexadecimal place values are definitions, not measurements.
@@ -56,7 +56,8 @@ are a way of displaying stored values; the file format decides what those values
 
 ### Read the bytes yourself
 
-`tiny.parquet` is a real Parquet file written by pyarrow: four orders from a sales table, and
+A **fixture** is a known input file used in examples and tests. `tiny.parquet` is a real Parquet
+fixture written by pyarrow: four orders from a sales table, and
 [Appendix B](#the-fixtures) says exactly how it was written. The results below show what its
 first and last bytes reveal. Open **Read or run the code** to inspect or change an example;
 [Appendix A](#running-the-lab) explains how to run Python and Rust.
@@ -90,7 +91,7 @@ Encrypted-footer files use `PARE` as the closing signature. That is a different 
 
 ```practice
 question: A file is named report.parquet and begins with PAR1. Is its table necessarily readable? Explain what the signature does and does not establish.
-answer: No. The name is a hint and the magic recognises the expected format. The trailer, footer bounds and metadata must still be checked. A truncated file can retain its opening magic.
+answer: No. The name is a hint and the signature recognises the expected format. It does not check the rest of the bytes. A file cut short can retain its opening signature while losing the information needed to read its table.
 ```
 
 ```lesson
@@ -167,8 +168,9 @@ That number is the length of the footer: the file's map of everything else in it
 find where the footer ends, then subtract the decoded footer length to find where it starts.
 
 A byte span here is **half-open**: it includes its start and excludes its end. Its length is
-therefore the end minus the start. An HTTP range includes both endpoints, so its last included
-byte is one less than a half-open span’s end.
+therefore the end minus the start. A **range request** asks storage for part of a file. When sent
+over HTTP, the web request protocol, its range includes both endpoints. Its last included byte
+is therefore one less than a half-open span’s end.
 
 ```learning
 start
@@ -203,8 +205,8 @@ The footer ends where the trailer begins, and it is as long as the trailer says.
 reader needs to find it.
 
 The footer occupies the span we located, immediately before the trailer. Its bytes encode
-fields that a reader decodes. The schema means the column names and types. [ch03](#the-type-system) explores those
-types; the optional implementation below explains the footer’s binary encoding.
+fields that a reader decodes. The **schema** describes the column names, types and structure.
+[ch03](#the-type-system) explores those types; the optional implementation below explains the footer’s binary encoding.
 
 **Break it.** Change one byte of the length and do the same arithmetic:
 
@@ -244,7 +246,8 @@ The footer records column names and types, row counts, and column locations. It 
 the whole table’s values, although its statistics can contain summaries such as minimum values.
 
 A **row group** is a slice of rows across all columns. A **column chunk** is one column within
-one row group. A chunk contains **pages**, smaller units used for encoding and compression.
+one row group. A chunk contains **pages**, smaller units in which values are stored. Each page
+has a **header** describing it and a **body** holding its data.
 The same table row has a value in each column’s chunk; these values need not be next to each
 other in the file. The metadata connects the logical table to those physical regions.
 
@@ -301,16 +304,17 @@ expand a chunk into pages.
 
 The footer is at the end because the writer does not know those offsets until it has written the
 data. Putting the map last lets a writer stream row groups out in one pass, remembering where each
-landed, and write the map when it is finished. Nothing is ever rewritten, which matters on object
-storage, where an object cannot be modified in place. The cost is paid by the reader, who must
-start at the end.
+landed, and write the map when it is finished. Nothing is ever rewritten. That matters when
+storage accepts a complete file but cannot modify its bytes in place. The cost is paid by the
+reader, who must start at the end.
 
 A file whose writer crashed before completing the footer has no valid map. Ordinary Parquet
 readers cannot open it as a complete table. Some data pages may be present, but specialised
 recovery requires extra information and is outside this chapter.
 
-The fixtures here have no page indexes or Bloom filters. Other Parquet files can place those
-structures between column data and the footer; the footer need not follow the last chunk directly.
+The fixtures here have no optional lookup structures between their column data and footer.
+Other files can put page indexes and Bloom filters there; [ch09](#skipping-data) explains them.
+The footer need not follow the last chunk directly.
 
 ```transfer
 chunk
@@ -322,9 +326,9 @@ trace-footer-requests
 
 ### Open a file with the book's reader
 
-An **object store** keeps a file as an object addressed by a name. The reader asks it for
-information or bytes. A `HEAD` request returns metadata such as the file size, without the
-file’s contents. A `GET` request returns file bytes; a **range request** asks for only a span of
+An **object store** keeps a file as an object addressed by a name. HTTP is the request protocol
+used to ask this store for information or bytes. A `HEAD` request returns file information, such
+as the size, without the file’s contents. It does not return the Parquet footer. A `GET` request returns file bytes; a **range request** asks for only a span of
 them. A **round trip** is sending a request and waiting for its response.
 
 Now let the book’s reader do what you have done, through a simulated store that logs every
@@ -386,7 +390,8 @@ it reads the trailer. Only then can it ask for the footer:
 ```
 
 Every request waits for the one before it, because each needs a number the previous one
-returned. On object storage the wait is the expensive part. In a high-latency store, starting requests can cost more than transferring these small ranges.
+returned. **Latency** is the wait from sending a request until its response begins. With high
+latency, starting requests can cost more time than transferring these small ranges.
 The simulated trace illustrates that case; a larger request can also return unnecessary bytes.
 
 ```practice
@@ -402,8 +407,8 @@ choose-a-tail-read
 
 Real readers shorten the chain in two ways:
 
-- **The size is often known already.** A directory listing or a table format's manifest records
-  each file's size ([ch14](#lakehouse-and-beyond)). A suffix range, `Range: bytes=-n`, asks for
+- **The size is often known already.** A directory listing or a catalogue of the table's files
+  can record each file's size ([ch14](#lakehouse-and-beyond)). A **suffix range**, `Range: bytes=-n`, asks for
   the last `n` bytes without knowing the size, and the response reports it.
 - **Read more than the trailer.** If the first read is large enough to hold the footer too, the
   third request never happens. The cost is bytes the reader may not use.
@@ -562,7 +567,8 @@ records it.
 `MemoryStore` serves ranges the way S3 does: a range that runs past the end of the object is cut
 short rather than refused, and a suffix range longer than the object returns all of it.
 `TracingStore` wraps any store, records each request, and charges it a simulated cost from a
-`NetworkModel`: a fixed latency per request, plus bytes over bandwidth. The model is simple on
+`NetworkModel`: a fixed latency per request, plus bytes over **bandwidth**, the number of bytes
+the connection can transfer per unit of time. The model is simple on
 purpose. It captures the one property that shapes Parquet readers, that a request is expensive and
 a byte is cheap, and it gives the same numbers every time the book is built.
 
@@ -594,8 +600,9 @@ joins it to the tail it already has. It never requests a byte twice.
 
 ### Reading the footer
 
-The footer is serialised with Apache Thrift's compact protocol. Every field starts with a header
-byte: the high four bits are the difference between this field's id and the previous one, and the
+**Serialisation** turns a structured value into bytes that another reader can decode. The
+footer uses Apache Thrift's compact protocol, which gives each field a numeric identifier and
+a type. Every field starts with a header byte: the high four bits are the difference between this field's id and the previous one, and the
 low four bits are its type.
 
 ::::{tab-set}

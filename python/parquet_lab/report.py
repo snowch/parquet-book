@@ -1615,7 +1615,7 @@ def changes(
         phases = [r.phase for i, r in enumerate(requests) if i == 0 or requests[i - 1].phase != r.phase]
         return {
             "requests": len(requests),
-            "round_trips": len(phases),
+            "dependency_phases": len(phases),
             "bytes_fetched": fetched,
             "elapsed_us": elapsed,
             "rows_decoded": rows,

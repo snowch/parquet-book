@@ -32,13 +32,20 @@ trace-a-complete-scan
 
 ### One query, request by request
 
+A **scan** reads the columns and candidate rows a query needs. Its requests can cost more than
+the bytes themselves: **latency** is the wait from sending a request until its first byte arrives.
+A **connection** carries requests between the reader and the store; several connections can
+have requests in flight at the same time.
+
 The query is [ch09](#skipping-data)'s: `SELECT * WHERE order_id = 431` on
 `pruning-sorted.parquet`. There the reader planned it from a copy of the file on disk. Here its
 `scan` runs the plan against the simulated object store from
 [ch02](#anatomy-of-a-parquet-file), which logs every request, the connection that carried it, and
 when it started and ended. A `Strategy` says how to make the requests: how to find the footer and
 how much of the tail to read first, how close two ranges must be to merge into one request, and
-how many connections to use.
+how many connections to use. **Coalescing** merges nearby byte ranges into one request,
+including any gap between them. **Concurrency** lets independent requests overlap in time.
+Neither can remove a dependency on metadata that has not arrived yet.
 
 The step is a few lines of code. In Python, run it in the page, change it with **Edit**, and run
 it again. In Rust, open it in a Codespace, or run it at a desk with
@@ -128,7 +135,7 @@ This is a deterministic simulated object store. It illustrates dependencies, not
 
 ```practice
 question: Two selected data ranges are already known, but the index needed to locate a third has not arrived. Which reads can overlap, and why can the third not be scheduled at its final offset yet?
-answer: The two known independent ranges can overlap if connections allow. A particular planner may choose a stricter phase barrier. The unknown range depends on the index response; concurrency cannot remove that missing-information dependency.
+answer: The two known independent ranges can overlap if connections allow. A particular planner may wait for a whole phase to finish before starting the next. The unknown range depends on the index response; concurrency cannot remove that missing-information dependency.
 ```
 
 ```lesson
@@ -154,7 +161,7 @@ answer: a reader that knows a file is small can fetch all of it before parsing a
 
 ### Reading everything
 
-A query with no condition must read every column chunk. How long that takes depends on how the
+A `SELECT *` query with no condition must read every column chunk. How long that takes depends on how the
 requests are made:
 
 ```{include} _generated/scan-full.md
@@ -168,7 +175,8 @@ data region is one range.
 
 ### When bytes matter
 
-Latency favours few large requests; bandwidth favours fetching only what is needed. Which wins
+**Bandwidth** is the rate at which bytes can be transferred after a response starts.
+Latency favours few large requests; limited bandwidth favours fetching only what is needed. Which wins
 depends on the network:
 
 ```{include} _generated/scan-networks.md
@@ -402,8 +410,8 @@ stores vary from request to request, throttle busy prefixes, and limit connectio
 keeps the shape of the problem and none of its noise, so its numbers compare strategies; they do
 not predict a real query's time.
 
-**Caching.** A reader that opens the same file twice can keep its footer, and one that runs many
-queries can keep pages. This reader starts empty every time.
+**Caching** keeps previously fetched bytes or decoded metadata for reuse. A reader that opens
+the same file twice can keep its footer, and one that runs many queries can keep pages. This reader starts empty every time.
 
 **Reading many files.** A table is usually many files, and a query engine reads them in parallel.
 [ch14](#lakehouse-and-beyond) turns to tables.

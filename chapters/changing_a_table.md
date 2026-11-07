@@ -34,9 +34,10 @@ follow-snapshots-and-deletes
 
 ### One snapshot, one later delete
 
-A **snapshot** records a table's visible files at a version. In a small schematic history,
-`before` references one data file. `after` references that same immutable data file plus a
-position-delete file naming one of its row positions. Reading `after` omits that row; reading
+A **snapshot** records a table's visible files at a version. A **position delete file** names
+a data file and row positions to omit when reading it. In a small schematic history,
+`before` references one data file. `after` references that same unchanged data file plus a
+position delete file naming one of its row positions. Reading `after` omits that row; reading
 `before` still sees it. A delete file changes the selected snapshot's view without altering
 the old data bytes.
 
@@ -48,16 +49,18 @@ are complete examples of these choices, with measured requests and byte counts.
 `fixtures/changes/` holds the orders from [ch11](#writing-parquet-well), written by pyarrow in
 four files sorted by `order_id`, each with row groups, small pages and a page index. Then the
 table was changed, and every version was recorded as a *snapshot*: the list of data files, and
-of delete files, that make up the table at that moment. Table formats such as Apache Iceberg and
-Delta Lake keep exactly this list. Here it is one JSON file, `_snapshots.json`, beside the data:
+of delete files, that make up the table at that moment. Table formats also track table state,
+but their metadata and delete representations differ. This teaching fixture records its state
+in one JSON file, `_snapshots.json`, beside the data:
+
+**Copy-on-write** deletes an order by writing its data file again without it. **Merge-on-read**
+records the delete separately, leaving readers to omit the row. **Compaction** rewrites selected
+data and delete files into new data files, combining small files and applying recorded deletes.
+The snapshot names below refer to these choices. `after-a-day` also adds new orders in small
+batches, one file per batch.
 
 ```{include} _generated/changes-snapshots.md
 ```
-
-`copy-on-write` deleted an order by writing its file again without it. The `merge-on-read`
-snapshots deleted orders by writing small *position delete files* instead, each naming one row of
-one data file. `after-a-day` adds new orders the way a stream of small batches does, one file per
-batch, and `compacted` is what a compaction job made of it.
 
 Before the reader looks anything up, read the table's metadata yourself: in Python with the
 `json` module, in Rust with the reader's `changes::read_snapshots`, which parses the same file.
@@ -84,7 +87,7 @@ appended ones. Each small file carries its own footer, page headers and magic nu
 handful of rows, so a row in a small file costs several times what it costs in a large one.
 
 Next, the files a lookup of one order has to open. The snapshot records each data file's range of
-`order_id`, as an Iceberg manifest does, so the reader can rule files out before opening them:
+`order_id`, as a file-listing manifest in Apache Iceberg does, so the reader can rule files out before opening them:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -126,7 +129,9 @@ The delete file names a position, not an order: the row's place in its data file
 zero. The data file still holds the order; the delete file says it is gone. Change the path to
 another delete file and run it again.
 
-Position deletes identify a data file and row position, not a global row key. This model does not implement equality deletes or deletion vectors.
+Position deletes identify a data file and row position, not a global row key. This model does
+not implement deletes identified by matching column values, or bitmaps that mark deleted row
+positions. The optional notes name those alternatives.
 
 ```practice
 question: A later snapshot adds a position delete for one row, but an earlier snapshot is still retained. Should reading the earlier snapshot apply the later delete?
@@ -140,8 +145,11 @@ trace-a-table-lookup
 ### Find one order
 
 Now let the book's reader look up order `300` in `after-a-day`, as a query engine would, through
-the simulated object store. The step prints every request, grouped by round trip: the requests
-in one round trip go out together, and each round trip waits for the one before it.
+the simulated object store. The step groups requests into **dependency phases**.
+A phase is a group of requests the reader can plan from the information it already has.
+Independent requests can overlap, up to the available connections; extra requests wait for
+a connection. This reader finishes each phase before starting the next, so a phase can
+contain more than one network round trip.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -158,17 +166,18 @@ in one round trip go out together, and each round trip waits for the one before 
 :::
 ::::
 
-Read the round trips from the top. The snapshots come first, since nothing else can be chosen
+Read the phases from the top. The snapshots come first, since nothing else can be chosen
 without them. Then the delete files that name the one data file the order can be in, alongside
 that file's trailer. Then its footer, which the trailer located; then the page indexes the
 footer located; then the pages the index chose in every column, to put the whole row back
-together. Each round trip needed a number the last one returned, so none could be sent sooner.
+together. The phase boundaries show where this reader waits for metadata it needs to plan
+later reads. They do not mean that every request in a phase starts at the same time.
 
 Change the order to `250`. The reader finds it in its data file, decodes it, and only then finds
 that a delete file removes it: it read the data to learn that the answer is nothing. Then change
 the snapshot to `written`, which has no delete files, and set `prefetch` to `65536`. The first
 read of the data file now asks for that much of its tail, which is the whole file: the chain
-shrinks to two round trips, and the bytes grow to the whole file, for one row.
+shrinks to two dependency phases, and the bytes grow to the whole file, for one row.
 
 The panel draws the same lookup's requests over time, one lane per connection. Change the
 snapshot and the order. Whenever a file can hold the order, the chain has the same steps, and
@@ -183,13 +192,15 @@ fixture: changes.json
 
 ### What one lookup costs
 
-The same lookups, and what a key-value store would pay for the same row:
+A **key-value store** retrieves a stored value by its key. In this comparison the value is
+one complete row, so a lookup can request it directly without walking Parquet metadata.
+The table compares our lookups with that model:
 
 ```{include} _generated/changes-lookup.md
 ```
 
 A Parquet table has no index from a key to a row. Statistics narrow the search to a file, a row
-group and a page, and each narrowing is a round trip that needs the one before it. Then the
+group and a page, with metadata reads needed to plan later requests. Then the
 pages are decoded, and to return the whole row the reader needs the matching page of every
 column, which is [ch01](#why-parquet-exists)'s cost of reconstructing a row, paid in requests.
 
@@ -203,7 +214,7 @@ The model stores snapshot metadata in one file. Real table metadata trees and ca
 
 ```practice
 question: A lookup returns one row. Does that imply one storage request, even if none of its table or file metadata is cached?
-answer: No. It can depend on table membership, delete metadata, the file trailer/footer, page indexes and data. Result cardinality alone does not determine request count.
+answer: No. It can depend on table membership, delete metadata, the file trailer/footer, page indexes and data. The number of returned rows alone does not determine request count.
 ```
 
 ```lesson
@@ -212,8 +223,8 @@ compare-update-costs
 
 ### Delete one order, two ways
 
-A table format can delete a row in two ways. *Copy-on-write* rewrites the row's file without it.
-*Merge-on-read* writes a small delete file that names the row, and leaves the reader to take it
+A table format can delete a row in two ways. **Copy-on-write** rewrites the row's file without it.
+**Merge-on-read** writes a small delete file that names the row, and leaves the reader to take it
 out. Both first find the row, as the preceding lookup lesson traced:
 
 ```{include} _generated/changes-writes.md
@@ -225,12 +236,12 @@ uses and where the work moves.
 ```{include} _generated/visual-table-deletes.md
 ```
 
-Copy-on-write writes a whole file to change one row: its *write amplification* is the file's
-size over the row's. Nothing is left for readers to do afterwards, so every later scan costs what
-it did before. Merge-on-read writes far less, though still many times the row's size, because
+Copy-on-write writes a whole file to change one row. **Write amplification** measures bytes
+written relative to the logical change; here it is the rewritten file's size over the row's.
+Nothing is left for readers to do afterwards, so every later scan costs what it did before. Merge-on-read writes far less, though still many times the row's size, because
 the delete file is a Parquet file with its own footer. It moves the work to every reader: each
-later scan of that data file must fetch the delete file and apply it. That is *read
-amplification*, and it grows with every delete.
+later scan of that data file must fetch the delete file and apply it. That is **read amplification**,
+extra reading relative to the rows requested. It grows with the delete files the reader must consult.
 
 ### What deletes and small files do to every scan
 
@@ -265,8 +276,9 @@ decide-when-to-compact
 
 ### Compaction
 
-Compaction repairs both. It reads the files that have deletes, and runs of small files, and
-writes them back as a few whole files with the deleted rows gone. The reader's planner chooses
+**Compaction** rewrites selected data files together with their delete information. It reads
+files that have deletes, and runs of small files, and writes them back as a few whole files with
+the deleted rows gone. The reader's planner chooses
 the files for `after-a-day`:
 
 ::::{tab-set}
@@ -398,7 +410,7 @@ Then it decodes each data file's rows in order, and skips each position a delete
 ### Finding one row
 
 A lookup reads the snapshots, then the delete files that name the files the key could be in,
-in the same round trip as the first read of the data file:
+in the same dependency phase as the first read of the data file:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -527,7 +539,8 @@ that race has done all its work for nothing.
 
 **What old snapshots cost.** Every snapshot here stays readable, so the files of `written` are
 still stored after `compacted` replaced them. Real tables *expire* old snapshots and delete the
-files no snapshot needs, which ends time travel to those versions.
+files no snapshot needs. That ends **time travel**, reading the table as it was at an older
+version, for those snapshots.
 
 **What a write costs.** The store prices a write like a read of the same size. A real rewrite
 also decodes and re-encodes every row, and a table's compaction usually runs on a cluster whose

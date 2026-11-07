@@ -35,6 +35,10 @@ follow-literals-and-copies
 
 ### One table, six codecs
 
+**Compression** represents bytes more compactly. Parquet uses lossless compression: a reader
+can recover the exact original bytes. A **codec** is the method used to compress and decompress
+them. It works on the bytes produced by an encoding, rather than on the column’s typed values.
+
 The `codec-*.parquet` files hold the same orders, encoded the same way: PLAIN, no dictionary.
 Only the codec differs, so their pages are identical before compression, and any difference in
 size is the codec's. [Appendix B](#the-fixtures) lists how each was written.
@@ -45,18 +49,19 @@ or change it. Python runs in the page; Rust runs in a Codespace or at a desk as 
 [ch02](#anatomy-of-a-parquet-file) did, decodes it with the reader's `decode_file_metadata` from
 [ch03](#the-type-system), and finds a column chunk's page with `walk_pages` from [ch06](#pages).
 
-A **literal** supplies bytes directly. A **copy** supplies a distance back into the bytes already
-produced and a length. Copying is sequential, so the source can include newly produced bytes:
+A **token** is one decoded element shown by the inspector: a literal, a copy, or a field
+describing the compressed stream. A **literal** supplies bytes directly. A **copy** supplies a
+distance back into the bytes already produced and a length. Copying is sequential, so the source can include newly produced bytes:
 
 ```transfer
 overlap-example
 ```
 
-The miniature shows the copy rule, not the complete codec framing. The real Snappy walkthrough
-below adds that framing and reads bytes written by pyarrow.
+The miniature shows the copy rule. The real Snappy walkthrough below also reads the stream
+length and the bytes identifying each kind of element, from a file written by pyarrow.
 
-**Snappy by hand.** A Snappy page starts with a varint, the length of what comes out. Then come
-elements, each opening with a tag byte whose low two bits say what it is. `00` is a literal:
+**Snappy by hand.** A Snappy page starts with a **varint**, an integer stored in a variable
+number of bytes. Here it gives the length of what comes out. Then come elements, each opening with a tag byte whose low two bits say what it is. `00` is a literal:
 bytes to copy from the input as they are. The other three are copies: bytes to repeat from
 earlier in the output, given how far back they start and how many there are. Undo the `country`
 page of `codec-snappy.parquet`:
@@ -127,7 +132,7 @@ The reader also counted what each token wrote:
 
 % number-ok: format constants of Snappy and DEFLATE, fixed by their specifications.
 **Snappy** limits a copy to 64 bytes, so a long repeat is many copies in a row. **LZ4** writes a
-match's length in a nibble and extends it a byte at a time, so one match covers nearly the whole
+match's length in four bits and extends it a byte at a time, so one match covers nearly the whole
 page. **GZIP** wraps DEFLATE, whose copies stop at 258 bytes, but whose tokens are Huffman codes:
 the literals and lengths that occur most get the fewest bits. That second step, **entropy
 coding**, is what the smaller codecs add. ZSTD and Brotli do it too, with more elaborate
@@ -165,6 +170,9 @@ compare-codec-patterns
 ```
 
 ### What each codec saved
+
+A **compression level** is a writer setting that trades compression effort against output size.
+These files use the writer’s configured levels; a codec’s name alone does not fix its result.
 
 The whole file under each codec:
 
@@ -215,8 +223,8 @@ with both float columns split:
 Splitting helped `distance_km` and hurt `weight_kg`. The noisy floats behave as [ch05](#encodings)
 described: the sign and exponent bytes barely change, and once they sit together the compressor
 finds them. The weights are different. Each is a number of kilograms to two decimal places, and a
-decimal fraction has no exact binary form: its mantissa is a repeating bit pattern. Set the
-second step's column to `4`, `weight_kg`, and print the page it decompressed (`out.data.hex(" ")`
+decimal fraction often has a repeating binary expansion. Its finite floating-point
+approximation can contain repeated byte patterns. Set the second step's column to `4`, `weight_kg`, and print the page it decompressed (`out.data.hex(" ")`
 in Python, or `{:02x?}` of `out.bytes` in Rust). The same byte sequences recur, `33 33 33` and
 `14 ae 47 e1 7a` among them. In PLAIN order a compressor matches them as whole runs. Split, each
 run is scattered over eight streams.
@@ -251,8 +259,8 @@ and rarely written.
 Changing encoding can help or hurt a codec. Measure the combined choice on the workload instead of treating one fixture’s winner as a rule.
 
 ```practice
-question: A query needs one value from a large compressed page. Does returning one value mean decompressing only its bytes? Can the size table alone rank end-to-end query latency?
-answer: No. The value may depend on earlier decompressed bytes, so page decompression is required. Latency also depends on network, CPU, skipping and implementation; file size alone cannot rank it.
+question: A query needs one value from a large compressed page. Does returning one value mean decompressing only its bytes? Can the size table alone rank the time until a query returns its answer?
+answer: No. The value may depend on earlier decompressed bytes, so page decompression is required. That time also depends on the network, processing work, bytes the reader can avoid and its implementation; file size alone cannot rank it.
 ```
 
 ```lesson

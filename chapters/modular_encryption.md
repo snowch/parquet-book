@@ -31,6 +31,14 @@ read-encryption-modes
 
 ### Two files, two footer modes
 
+**Encryption** transforms readable bytes, the **plaintext**, into protected bytes, the
+**ciphertext**. An **encryption key** is secret material used by the algorithm; the right key
+lets a reader reverse that transformation. A plaintext footer remains readable even when some
+columns are encrypted.
+
+Parquet protects pieces separately. A **module** is one such piece, for example a footer, page
+header or page body. The later module lesson follows their byte boundaries.
+
 `plaintext-footer.parquet` and `encrypted-footer.parquet` hold the same twelve orders, with the
 same keys. `email` is encrypted with one key and `amount_cents` with another; `order_id` and
 `country` are not encrypted. The files differ in one choice: whether the footer is encrypted too.
@@ -75,9 +83,11 @@ statistics. The full metadata, statistics included, is itself an encrypted modul
 footer. Readers without keys therefore cannot skip by those columns' statistics, and cannot read
 them at all.
 
-The footer ends with a **signature**: a nonce and a GCM tag computed with the footer key. A
-reader with that key can check that nobody changed the footer. A reader without it cannot, and
-has to trust the footer as it is.
+The footer ends with an authentication signature. It contains a **nonce**, a value that must
+not be reused with the same key, and an **authentication tag**, a keyed check of the protected
+content. **Authentication** checks that content against its tag to detect alteration.
+A reader with the footer key can verify this signature; a reader without it cannot.
+This keyed check is different from the `PAR1` or `PARE` file signature, which identifies the format.
 
 ### What an encrypted footer shows
 
@@ -102,8 +112,16 @@ distinguish-key-names-and-keys
 
 ### Keys by name
 
-Neither file holds a key. Each encrypted piece carries **key metadata**, which names a key
-without revealing it. pyarrow writes it as JSON, so a search of the raw bytes finds it.
+Neither file holds a plaintext encryption key. The file's **key metadata** identifies keys and
+can contain protected key material. pyarrow writes it as JSON, so a search of the raw bytes
+finds it.
+
+The scheme is **envelope encryption**: encrypt the data with one key, then protect that key
+with another. A **data key** encrypts column data or the footer. A **key-encryption key**, also
+called a master key here, encrypts or *wraps* the data key. A **key management service** controls
+access to those master keys and the operations that use them. The output below prints the
+master key's name and the wrapped data key. That wrapped value is the encrypted data key,
+not its readable secret value.
 
 **Keys by name.** Find every piece of key metadata in both files, and print the key it names:
 
@@ -128,13 +146,12 @@ still there, inside the footer, and the footer is encrypted. Print all of the JS
 records whether the data key was wrapped once or twice and, for the footer key, which key service
 to ask.
 
-The scheme is envelope encryption. Each column is encrypted with a random data key. That data key
-is wrapped, encrypted, with a master key that stays inside a key management service: the
-`wrappedDEK` the step printed is the wrapped data key. A reader sends it to the service, which
-unwraps it only for a reader allowed to have it. Different columns can use different master
-keys, so one reader may see `amount_cents` and not `email`.
+The JSON field `wrappedDEK` holds the wrapped data key. A reader sends it to the key service,
+which unwraps it only for a reader allowed to have it. Different columns can use different
+master keys, so one reader may see `amount_cents` and not `email`.
 
-The fixtures use a toy key service that wraps by XOR with master keys published in
+The fixtures use a toy key service that combines corresponding bits with exclusive-or (XOR):
+the result bit is set when the input bits differ. This is not secure key wrapping. Its master keys are published in
 `fixtures/generate.py`. It protects nothing, on purpose: the files exist to show what encryption
 hides from a reader without keys, and anyone may regenerate them.
 
@@ -151,7 +168,11 @@ inspect-protected-modules
 
 ### Modules
 
-Parquet encrypts **modules**, not files. Every encrypted piece is laid out the same way:
+A **module** is a separately protected piece, such as a page header or page body.
+Its **length prefix** is an integer before the content that says how many bytes follow.
+For the AES-GCM files inspected here, those bytes contain a nonce, ciphertext and authentication
+tag. The nonce separates uses of a key; the tag lets a reader with the key detect alteration.
+Every inspected module has this layout:
 
 ```text
 [length: u32, little-endian]   the bytes that follow
@@ -190,7 +211,8 @@ still fetch one page from the middle of a file and decrypt it alone, as [ch10](#
 fetched pages. And a reader without the keys can still find every module, by its length prefix,
 the way [ch06](#pages) walked page headers.
 
-The algorithm is **AES-GCM**. It encrypts, and its tag also authenticates: a module changed by a
+The algorithm is **AES-GCM**, Advanced Encryption Standard in Galois/Counter Mode. It provides
+encryption and an authentication tag: a module changed by a
 single bit fails to decrypt instead of decrypting to something wrong. Each module is also bound
 to its place in the file, its row group, column and page number, through the data GCM
 authenticates alongside the ciphertext, so a module cannot be moved from one place to another
@@ -454,8 +476,8 @@ subject, decide which columns to encrypt and hold the keys; the files only carry
   whose values and statistics are hidden.
 - **An encrypted footer hides the whole layout.** Without the footer key even unencrypted columns
   cannot be found.
-- **Files name keys; they never hold them.** Data keys are wrapped by master keys that stay in a
-  key service.
+- **Files carry key names and wrapped data keys.** The data keys are encrypted by master keys
+  that stay in a key service. The file does not contain the plaintext keys.
 - **Encryption hides values, not shape.** Sizes, page counts and page lengths remain visible.
 :::
 

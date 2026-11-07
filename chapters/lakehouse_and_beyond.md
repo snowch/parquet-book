@@ -64,6 +64,7 @@ filter is the whole of what the next section calls ruling out by path.
 
 ### Partitions are in the paths
 
+A **partition** groups rows by a shared value. Here the writer groups by `country`.
 The directory `country=UK` is a **Hive-style partition**: a name, an equals sign and a value. The
 files under it do not hold a `country` column at all. The dataset writer removed it, since every
 row in the directory has the same value, and a reader restores it from the path. Ask the book's
@@ -89,7 +90,7 @@ The reader answers with an error: the file has no column `country`. Ask for `ord
 and it answers.
 
 A condition on a partition column is answered before any file is opened. A `LIST` request returns
-every key under the table's prefix, and `country = 'UK'` keeps the keys whose path says
+object names, or **object keys**, under the table's **prefix**, the shared beginning of those names, and `country = 'UK'` keeps the keys whose path says
 `country=UK`. That is the cheapest skipping in the book: it costs nothing beyond the listing, and
 it never reads a byte of a file it rules out.
 
@@ -222,7 +223,8 @@ Time follows requests. Each file is fetched whole in one request, as [ch10](#how
 found best for small files, and with four connections the table's files arrive in rounds of four.
 Fewer files means fewer rounds.
 
-The model uses one log file, not the full Delta Lake protocol, checkpoint or multi-version implementation.
+The model uses one log file. It does not implement the full Delta Lake protocol, summaries of
+earlier log versions, or reading a history of multiple log files.
 
 ```practice
 question: A country path survives a filter, but the log’s trustworthy order-id range rules the file out. Must a reader fetch its Parquet footer to discover the same range again?
@@ -234,6 +236,10 @@ resolve-table-membership
 ```
 
 ### What the log adds beyond skipping
+
+**Table membership** says which stored files belong to the selected table version. A **commit**
+publishes a complete table change, such as adding replacement files and removing their predecessors
+together. Files can remain in storage without belonging to the latest version.
 
 A listing tells a reader what is in a directory now. A log tells it what is in the table, which is
 not the same:
@@ -286,8 +292,9 @@ and removes, a rule for each condition, and the reader's query engine, which
 
 ### Partition values from a path
 
-Every directory of the form `name=value` is a partition value, and values are percent-encoded
-where a path could not hold them:
+Every directory of the form `name=value` supplies a partition value. **Percent-encoding** writes
+a byte as `%` followed by two hexadecimal digits when it cannot appear directly in a path.
+The reader decodes those escapes before using the value:
 
 ::::{tab-set}
 :::{tab-item} Python

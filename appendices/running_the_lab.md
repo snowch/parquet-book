@@ -12,20 +12,21 @@ running anything. Use this appendix when you want to explore code or build the r
 
 Nothing to install. Open **Read or run the code** to reach an example's controls. Chapters with
 coding problems also have **Try the coding exercises (optional)**, where you edit the Python
-problems and run their tests: pytest runs in the page, under Pyodide, with the same tests a desk
-runs. A Python command in these pages that runs the reader's tests, a problem's tests or the
-reader's command line has a **Run** button, which runs it in the page and shows what it printed;
+problems and run their tests. pytest is the test runner; Pyodide runs Python in the browser.
+They run the same tests as a desk installation. A Python command in these pages that runs the
+reader’s tests, a problem’s tests or the reader’s command line has a **Run** button. It runs the
+command in the page and shows what it printed;
 a problem's tests run on your answers from its chapter's workbench. Every walkthrough step has
 **Edit** and **Run**: change the step and run your version in the page. Your answers and edits
 stay in your browser.
 
 The `cargo run -p pqlab` commands below have a Run button too. The page runs them on the Rust
-reader compiled to WebAssembly, the one that draws the pictures, and they print what they print
-at a desk.
+reader compiled to WebAssembly, a program format browsers can execute. This is the reader
+that draws the pictures, and its commands print what they print at a desk.
 
-Rust cannot compile inside a web page, so editing the Rust reader, and every other Rust command,
-needs a compiler. Their blocks have an **Open in Codespaces** button, and so does every Rust
-walkthrough step: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+The book does not compile edited Rust inside its lesson pages. Editing the Rust reader, and
+running every other Rust command, needs a Rust compiler. Their blocks have an **Open in Codespaces**
+button, and so does every Rust walkthrough step: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
 opens the repository with an editor, the pinned toolchain and every dependency, in the browser.
 Edit a file there and run the command in its terminal; `make && make serve` shows the book with
 every picture drawn by your edited reader. The configuration is in `.devcontainer/`, and works
@@ -79,7 +80,8 @@ make            # build the reader, the WebAssembly module, the figures and the 
 make serve      # serve the book at http://localhost:8000
 ```
 
-`make check` runs everything continuous integration runs.
+`make check` runs the repository’s automated checks. Continuous integration runs the same checks
+when a change is pushed to the repository.
 
 ## Running the reader at a desk
 

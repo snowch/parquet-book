@@ -34,6 +34,11 @@ compare-typed-values
 
 ### Read the statistics yourself
 
+**Statistics** summarise a column chunk, for example with a minimum, a maximum and a null
+count. Its **bounds** give a lower and upper limit on the values it may contain. A **sort order**
+is the rule for comparing those values. Using the wrong rule can make a reader discard data
+that a query needs.
+
 `statistics.parquet` holds twelve orders, four to a row group. Each column was chosen for a way
 statistics are misread. [Appendix B](#the-fixtures) says how pyarrow wrote it.
 
@@ -43,8 +48,8 @@ or change it. Python runs in the page; Rust runs in a Codespace or at a desk as 
 [ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
 `decode_file_metadata` from [ch03](#the-type-system).
 
-**Four bytes, two numbers.** `customer_id` holds customer numbers, and some are above `2^31`. The
-footer stores each row group's smallest and largest in four bytes, least significant first. Read
+**Four bytes, two numbers.** `customer_id` holds customer numbers, and some are above `2^31`
+(two raised to the thirty-first power). The footer stores each row group's smallest and largest in four bytes, least significant first. Read
 the bytes two ways:
 
 ::::{tab-set}
@@ -100,8 +105,19 @@ them.
 
 ### Sort orders
 
-The same bytes sort differently depending on what they hold. The format fixes an order for every
-type:
+**NaN**, short for “not a number”, is a special floating-point value outside ordinary numeric
+ordering. Under `TYPE_ORDER`, the type-defined comparison rules used by this book's fixtures
+and reader, it must be left out of minimum and maximum bounds. Other declared orders have
+their own rules; these bounds rules must not be applied to them automatically.
+
+Byte-stored decimals use **two’s complement**, a way to store signed integers. If the highest
+bit is clear, read the bits as an unsigned integer. If it is set, the value is negative: subtract
+two raised to the stored bit count from that unsigned reading. In code, that power is `2**n`,
+where `n` is the bit count. **Big-endian** puts the
+most significant byte first. Compare the resulting numeric values, not the raw byte sequences.
+
+The same bytes sort differently depending on what they hold. `TYPE_ORDER` specifies these
+comparisons for each type:
 
 | Values | Order |
 |---|---|
@@ -130,11 +146,13 @@ mistaken `city` bounds finds `Aarhus` below their minimum, and skips the row gro
 One comparing customer numbers correctly against the mistaken `customer_id` bounds skips the row
 group holding the largest of them. Nothing in the bytes warns of it; only the column's type does.
 
-String ordering uses UTF-8, not a user-language collation. Bounds and predicates must use compatible ordering.
+A **collation** is a rule for comparing text, for example the ordering used by a language.
+Parquet string bounds compare unsigned bytes in UTF-8 order. A query’s comparison must use a compatible
+order before those bounds can establish that a group has no matching values.
 
 ```practice
 question: A customer identifier uses unsigned INT32 semantics, but a bound looks negative when read as a signed integer. Can it safely be compared with a positive customer number using signed order?
-answer: No. The annotation supplies the order. The same stored bits can represent a large unsigned identifier; mixing signed bounds and unsigned predicates can wrongly skip matching data.
+answer: No. The annotation supplies the order. The same stored bits can represent a large unsigned identifier; mixing signed bounds with an unsigned query comparison can wrongly skip matching data.
 ```
 
 ```lesson
@@ -142,6 +160,12 @@ decide-usable-bounds
 ```
 
 ### What the footer records
+
+A **conservative bound** encloses every relevant value even when the bound itself is not stored
+in the column. For example, a lower bound of `ant` is safe for values `antelope` and `bat`,
+but it is not their exact minimum. An **exact bound** is the actual minimum or maximum.
+A reader may use safe bounds to rule values out; it needs exact bounds to report those extrema
+as answers.
 
 This is which fields of the `Statistics` structure the writer set for each column of the first row
 group:
@@ -158,7 +182,8 @@ group:
 - **`is_min_value_exact` and `is_max_value_exact`** say whether each bound is a value in the
   chunk. A writer may shorten a long string to keep the footer small, and the shortened bound is
   then only a bound.
-- **`distinct_count`** is defined and rarely written. pyarrow does not write it.
+- **`distinct_count`** counts different values, rather than all occurrences. It is defined and
+  rarely written. pyarrow does not write it.
 
 ### The deprecated fields
 
@@ -241,15 +266,18 @@ lack min/max but justify different conclusions. Keep the null count separate fro
 
 ### Floating point
 
-Floats have two traps. NaN is not less than, equal to or greater than anything, so a writer
-leaves it out of the bounds, and a reader looking for NaN cannot use them. And `-0` equals `+0`,
-though their bytes differ. The format asks writers to store a zero minimum as `-0` and a zero
-maximum as `+0`, and asks readers to remember that a chunk with either may hold both. The `-0`
-the bounds walkthrough printed for `temp_c` in row group 1 is the first rule at work.
+Under `TYPE_ORDER`, the type-defined order used by these fixtures and this reader, floats have
+two traps. **NaN** means “not a number”, a special floating-point value. Ordinary floating-point
+comparisons do not make it less than, equal to or greater than anything. A writer using
+`TYPE_ORDER` leaves it out of the bounds, so those bounds cannot establish whether NaN is
+present. And `-0` equals `+0`, though their bytes differ. Under this order, writers should store
+a zero minimum as `-0` and a zero maximum as `+0`; readers must remember that a chunk with
+either may hold both. The `-0` the bounds walkthrough printed for `temp_c` in row group 1 is the
+first rule at work. A different declared order requires its own rules for NaNs and signed zeros.
 
 ```practice
 question: One chunk has a null count equal to its value count; another has no statistics. Are both proven all-null? Can ordinary min/max bounds prove that NaN is absent?
-answer: Only the first is proven all-null. Missing statistics say nothing about values. NaN is excluded from ordinary bounds, so they cannot establish its absence. Either zero sign can coexist with the other.
+answer: Only the first is proven all-null. Missing statistics say nothing about values. NaN is excluded from TYPE_ORDER bounds, so those bounds cannot establish its absence. Either zero sign can coexist with the other.
 ```
 
 ```lesson
@@ -261,7 +289,8 @@ account-for-footer-cost
 Beyond statistics, each row group records its row count and size, and may list the columns its
 rows are sorted by. `sorting_columns` is a claim: a reader may rely on it and cannot check it
 without reading every value. Each column chunk may also carry **size statistics**: the number of
-bytes its strings take once decoded, and a histogram of its definition and repetition levels,
+bytes its strings take once decoded, and a **histogram** of its definition and repetition
+levels. A histogram counts how often each level occurs,
 from which a reader can count nulls and list elements without reading a page. pyarrow's
 metadata does not show them; the `parquet` crate's does, as `unencoded_byte_array_data_bytes`
 and the level histograms.
@@ -280,7 +309,7 @@ sorting_columns records a writer’s claim. Verifying sortedness would require r
 
 ```practice
 question: A writer makes many more row groups in a wide table. If a query ultimately reads one small column range, is opening the file necessarily cheap?
-answer: No. Every reader still needs the metadata map. More row groups and columns can enlarge the footer, so pruning granularity trades against metadata transfer and decoding costs.
+answer: No. Every reader still needs the metadata map. More row groups and columns can enlarge the footer, so splitting the table into smaller groups trades more precise skipping against the cost of transferring and decoding metadata.
 ```
 
 ```lesson
@@ -470,8 +499,8 @@ language does cannot use these bounds directly.
   decimals and floats each have one, and the fixture catches every one.
 - **Use `min_value` and `max_value` when the footer gives their order.** Use the deprecated `min`
   and `max` only where signed comparison was right.
-- **NaN never belongs in a bound, and `-0` equals `+0`.** A reader looking for NaN cannot use the
-  bounds at all.
+- **Under `TYPE_ORDER`, NaN never belongs in a bound, and `-0` equals `+0`.** A reader looking
+  for NaN cannot use those bounds. Other declared comparison orders require their own rules.
 - **The footer is not free.** Every statistic is read by every query before any data.
 :::
 

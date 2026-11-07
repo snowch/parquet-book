@@ -35,12 +35,30 @@ follow-schema-paths
 
 ### Read the schema yourself
 
+A **physical type** describes how a value is stored. A **logical type** gives those stored bytes
+a meaning, such as a date or a decimal. The **schema** records the fields, their types and how
+they nest. We first follow its structure; the next lesson interprets the values.
+
 `types.parquet` holds three orders, with a column for each physical type and the common logical
 types on top of them. [Appendix B](#the-fixtures) says how pyarrow wrote it. Each step shows its worked result before its optional code. You can read the results as they
 stand, or open **Read or run the code** to explore them. Each step finds the footer as [ch02](#anatomy-of-a-parquet-file) did, and hands its
-bytes to the book's reader, which decodes the Thrift fields the way ch02 built it to.
+bytes to the book's reader. It decodes the footer's numbered fields; the optional build lab in
+ch02 explains their binary representation.
 
-**The schema as stored.** The footer's second field is the schema. Print every element of it:
+**The schema as stored.** The footer's second field is the schema. Each printed element names
+a field, its repetition and its types, or a group and its count of children.
+
+**The repetition** says how many values the field has in each record:
+
+- `REQUIRED`: exactly one. It is never null.
+- `OPTIONAL`: zero or one. It may be **null**, meaning that no value is present.
+- `REPEATED`: zero or more. The field is a list.
+
+The type labels will matter in the next lesson. One has two parameters worth distinguishing:
+`DECIMAL(precision, scale)`. **Precision** is the maximum number of decimal digits the value
+may need; **scale** is how many of those digits come after the decimal point.
+
+Print every element:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -59,7 +77,7 @@ bytes to the book's reader, which decodes the Thrift fields the way ch02 built i
 
 One line per element, in the footer's order. The first is the root, `schema`. It has children and
 no type, and it names the whole record. Most of the others have a physical type and no children:
-they are *leaves*, and each leaf is one column of the file. The leaves come in column order, and
+they are **leaves**, the fields at the ends of the tree. Each leaf is one column of the file. The leaves come in column order, and
 the column chunks in every row group follow the same order.
 
 `shipping` is neither a leaf nor the root. It has children and no type: it is a *group*, and the
@@ -70,19 +88,15 @@ a list is a group too, with a `REPEATED` field inside it.
 ### Rebuilt as a tree
 
 The tree you rebuilt is the schema. Parquet tools print it in a textual notation that comes from
-the Dremel paper:
+the Dremel paper. `message schema` names the root; braces enclose its fields and the fields of
+nested groups. Each field starts with a repetition, a type and a name. A logical type, when
+there is one, follows in parentheses.
+
+The repetition labels here are lowercase versions of the ones above. For example, `optional binary country (STRING)` names a field that may be missing. It stores
+bytes (`binary`) interpreted as text (`STRING`). Read the other fields with the same pattern:
 
 ```{include} _generated/types-schema-text.md
 ```
-
-Each line has three parts: a repetition, a type, and a name. The logical type, when there is one,
-follows in brackets.
-
-**The repetition** says how many values the field has in each record:
-
-- `required`: exactly one. It is never null.
-- `optional`: zero or one. It may be null.
-- `repeated`: zero or more. The field is a list.
 
 **A leaf's path** is the names from the root's child down to it: `shipping.city`. A column chunk
 records its path, and the path is how a query names a nested column.
@@ -99,6 +113,9 @@ interpret-logical-types
 ### Stored values and their meaning
 
 A **physical type** describes storage; a **logical type** tells you how to interpret those stored values.
+
+**Statistics** summarise a column chunk, for example by recording its smallest value. We can
+read such a stored value without fetching the column's data pages.
 
 **The same bytes, read two ways.** Each column chunk's statistics hold its smallest value, as
 bytes. Read three of them, first as the physical type stores them and then as the logical type
@@ -122,11 +139,15 @@ says:
 `order_date`'s bytes are a little-endian `INT32`, and as a number they mean little. Its logical
 type, `DATE`, says the number counts days since 1970-01-01, and then it is a date. `paid_at` is
 the same idea at a finer grain: an `INT64` count of microseconds. `amount` is the odd one out. Its
-integer is read most significant byte first, which is *big-endian*, and it counts hundredths.
+integer is read most significant byte first, which is **big-endian**, and it counts hundredths.
 Change `"big"` to `"little"` (`from_be_bytes` to `from_le_bytes` in Rust), and the same bytes are
 a number nobody meant. Only the schema says which reading is right.
 
 ### Every column, read two ways
+
+A **signed integer** can represent negative values as well as zero and positive values. An
+**unsigned integer** represents only zero and positive values. A **floating-point number**
+represents numbers using a sign, a scale and precision bits; some fractions must be rounded.
 
 A physical type is a storage format. There are eight:
 
@@ -152,7 +173,8 @@ value. Where there is one, the physical reading is often a number nobody meant:
 - **`order_date`** is an `INT32` with the logical type `DATE`: a count of days since
   1970-01-01.
 - **`paid_at`** is an `INT64` with `TIMESTAMP`: a count of microseconds since the same moment. The
-  logical type also records the unit, and whether the value is an instant (`UTC`) or a wall-clock
+  logical type also records the unit, and whether the value is an instant (`UTC`, Coordinated
+  Universal Time, the common time reference) or a wall-clock
   reading with no zone (`local`). The two look identical in the bytes and differ in meaning.
 - **`amount`** is a `DECIMAL`: an integer to be divided by a power of ten, here with two digits
   after the point. pyarrow stored it in a `FIXED_LEN_BYTE_ARRAY`, and there the integer is
@@ -163,7 +185,8 @@ value. Where there is one, the physical reading is often a number nobody meant:
   so here the two readings agree. They part for unsigned 32-bit and 64-bit integers, stored in
   `INT32` and `INT64`: a reader that ignored the logical type would read a large value as
   negative.
-- **`country`** is a `BYTE_ARRAY` with `STRING`: the bytes are UTF-8 text. Without the annotation
+- **`country`** is a `BYTE_ARRAY` with `STRING`: the bytes are **UTF-8** text. UTF-8 represents
+  text with bytes, using more than one byte for some characters. Without the annotation
   they are opaque bytes, and a reader should not assume otherwise.
 
 Encoders and decoders only ever handle the eight physical types. Every logical type is an
@@ -181,7 +204,13 @@ answer: No. The physical integer is the same; the logical unit changes its meani
 count-schema-levels
 ```
 
+(schema-level-walkthrough)=
 ### Count levels while rebuilding
+
+A leaf’s **maximum definition level** counts the optional or repeated fields along its path.
+Its **maximum repetition level** counts only the repeated fields. These are limits set by the
+schema. The next module uses each record’s actual levels to describe missing values and list
+boundaries. Here we count the limits from the tree.
 
 **The tree, rebuilt.** A count of children is enough to rebuild the tree. Take an element; if it
 has children, take that many subtrees after it, each the same way:
@@ -246,7 +275,13 @@ them, in both languages, and the tabs switch every excerpt on the page between t
 
 ### Optional schema-damage investigation
 
-Now damage the list. The step writes the root's count of children back to the byte that holds it,
+**Zigzag encoding** maps signed integers to unsigned ones: zero stays zero, positive values
+become even numbers, and negative values become odd numbers. A **varint** stores an integer in
+a variable number of bytes, using fewer bytes for smaller unsigned values. Thrift combines them
+to keep small signed numbers short.
+
+Open the code for [the tree-rebuilding walkthrough](#schema-level-walkthrough) to damage
+the list. That step writes the root's count of children back to the byte that holds it,
 as the zigzag varint `0x14`. Change it to `0x12`, one child fewer, and run the step again. The
 walk prints a shorter tree without complaint: it never looks at the elements after the root's
 last child. `shipping` and its children now belong to no one, and the reader's `build` refuses the
@@ -405,7 +440,10 @@ decimal can be stored in an `INT32`, an `INT64` or bytes, and only the bytes are
 :::
 ::::
 
-The helper for the bytes sign-extends from the top bit of the first byte:
+These signed bytes use **two’s complement**. The highest bit marks a negative value; for
+`n` stored bits, subtract `2**n` from the unsigned reading when that bit is set. **Sign extension**
+keeps that value when widening it by repeating the sign bit into the new high bits. The helper
+uses the top bit of the first byte:
 
 ::::{tab-set}
 :::{tab-item} Python
