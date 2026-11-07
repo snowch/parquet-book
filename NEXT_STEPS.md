@@ -2,6 +2,13 @@
 
 The working list. PLAN.md §2 has the phases; this is the order to do them in.
 
+## Done: direct entry from the contents
+
+All published destinations have been reviewed for missing example context after the chapter
+split. Supporting titles name their subjects, preparation links reach the relevant mechanisms,
+and detached references identify their examples. Conclusions retain their fixture/model scope.
+See `notes/page-entry-learning-review.md` for coverage, independent findings and verification.
+
 ## Done: terminology and glossary review
 
 All core lessons, optional resources and front/reference pages have been reviewed for terms

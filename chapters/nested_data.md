@@ -33,6 +33,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 nullable-values
 ```
 
+(one-nullable-value)=
 ### One nullable value
 
 Start with `email`, one optional string per order in `nested.parquet`. Optional means that a
@@ -77,9 +78,11 @@ scalar
 one-list
 ```
 
+(four-orders-every-way-of-being-missing)=
 ### Four orders, every way of being missing
 
-The same fixture holds optional `tags` lists and `items` lists. An item can itself hold a list
+`nested.parquet` holds orders with optional `tags` lists and `items` lists. The
+[nullable-scalar example](#one-nullable-value) introduces its `email` field; here we follow lists. An item can itself hold a list
 of `discounts`. We will first read `tags`, with only one repeated field on its path.
 
 ### What the levels say
@@ -169,7 +172,12 @@ list
 nested-lists
 ```
 
+(two-lists-deep)=
 ### Two lists deep
+
+In `nested.parquet`, an order can contain `items`, and each item can contain `discounts`.
+The [single-list example](#four-orders-every-way-of-being-missing) explains definition levels (`d`, how far a path
+exists) and repetition levels (`r`, which record or list continues). Here we follow a list inside a list.
 
 Every item has its own list of discounts, so `items[].discounts[]` has two repeated fields on its
 path and a maximum repetition level of 2. Now `r` has three meanings: 0 is a new record, 1 is a
@@ -205,13 +213,14 @@ nested
 stored-levels
 ```
 
+(the-levels-as-stored)=
 ### The levels as stored
 
 A column chunk is a run of **pages**, smaller units with a header and a body. The header
 describes the page; the body holds the levels and values. A **stream** here is a sequence of
 integers written consecutively. Its **bit width** is the number of bits used for each integer.
-[ch06](#pages) reads pages in full; here the reader's `walk_pages` finds the one page of
-`items[].discounts[]`, the discounts of every item of every order. Unpack the start of its body
+[Pages](#pages) reads pages in full; here the reader's `walk_pages` opens `nested.parquet` and
+finds the page of `items[].discounts[]`, the discounts of every item of every order. Unpack the start of its body
 by hand:
 
 ::::{tab-set}
@@ -233,7 +242,8 @@ The body opens with two streams of small integers, one line each. The first hold
 *repetition levels*, the second the *definition levels*, and the values come after both. pyarrow
 wrote a version-1 data page, so each stream starts with its length in four bytes. Then comes a
 header byte, which says how the levels are packed, and the levels themselves. Each takes as few
-bits as the column's maximum needs. The step uses the maxima from the schema already interpreted in the preceding lessons: 2 for repetition and 6 for definition, so two bits and
+bits as the column's maximum needs. The [nested-discounts example](#two-lists-deep)
+counts this path's schema maxima: 2 for repetition and 6 for definition, so two bits and
 three.
 
 Count the levels in each stream: one per *slot*. There are more slots than orders, and more than
@@ -300,9 +310,11 @@ For the conceptual path, continue to [What this cannot tell you](#nested-data-li
 then the takeaways and the understanding check.
 :::
 
-The steps called three parts of the book's reader: the decoder of the level streams, the split
-of a page's body into levels and values, and the rebuild of records. This section builds them,
-in both languages, and the tabs switch every excerpt on the page between them.
+Build the reader that turns `nested.parquet` into records. Preparation is the
+[single-list reconstruction](#four-orders-every-way-of-being-missing) and the [stored-level walkthrough](#the-levels-as-stored):
+levels preserve nulls and list boundaries, while page bytes pack those levels into runs.
+The implementation decodes the runs, separates levels from values and rebuilds records.
+The tabs select Python or Rust.
 
 ### Decoding the hybrid
 
@@ -330,7 +342,7 @@ value, stored in as many whole bytes as the bit width needs:
 ::::
 
 A bit-packed run is the header's count of groups, each eight values of the bit width. The last
-group of a stream can run past the count of values, as it did in the stored-levels walkthrough, and the padding
+group of a stream can run past the count of values, as in the [stored-level walkthrough](#the-levels-as-stored), and the padding
 is dropped:
 
 ::::{tab-set}
@@ -477,7 +489,7 @@ The two describe the same four records of `tags`. In pyarrow's offsets, the empt
 null list both have length zero, and only the validity bitmap tells them apart: the job a
 definition level of 1 or 0 did in the file. A null element is a null in the values array, where
 the file stored no value at all. The crate prints the repetition and definition levels the
-reader decoded in the tags walkthrough. Its values hold only the present strings, and it counts
+reader decoded in the [tags walkthrough](#four-orders-every-way-of-being-missing). Its values hold only the present strings, and it counts
 records where the repetition level is zero.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
@@ -495,17 +507,22 @@ reference
 (nested-data-limits)=
 ## What this cannot tell you
 
+These notes cover `nested.parquet`: a [nullable scalar](#one-nullable-value),
+[optional lists](#four-orders-every-way-of-being-missing), and [lists inside lists](#two-lists-deep).
+The [stored-level example](#the-levels-as-stored) connects their decoded shape to page bytes.
+
 **How several columns become one record.** The reader rebuilds each column's view of a record on
 its own. A query engine that wants whole records runs the same splitting over several columns at
 once, in step. [ch12](#what-a-query-engine-does) describes what an engine does with the columns
 a query needs.
 
-**How pages divide a record.** Each fixture column is one page. When a column spans pages, a
+**How pages divide a record.** Each column in `nested.parquet` fits in one page. When a column spans pages, a
 record can begin in one and continue in the next under data page version 1. A version-2 data page always
 starts a new record, which [ch06](#pages) shows.
 
 **How other formats keep the shape.** Apache Arrow, in memory, stores offsets and validity bitmaps
-per nesting level instead of levels, as pyarrow showed for one list. Converting between the two
+per nesting level instead of levels. The [library comparison](build-nested-reader.html#ask-a-library)
+shows that representation for `tags`. Converting between the two
 is much of a Parquet reader's work in practice; this reader produces JSON instead.
 
 **Legacy list layouts.** Older writers produced two-level lists and other shapes. The
@@ -523,8 +540,8 @@ standard three-level form only.
   and stores no value.
 - **A repetition level names the list that gains an element.** Zero starts a new record.
 - **A required path stores no levels.** Flat, non-null columns pay nothing for Parquet's nesting.
-- **Levels are stored in as few bits as their maximum needs,** as runs of repeats or bit-packed
-  groups, so a column with no nulls pays a few bytes per page.
+- **Levels use runs of repeats or bit-packed groups.** Their maximum sets the bit width.
+  An optional flat column with every value present can use a compact run of identical levels.
 - **A library hides the levels or hands them over.** pyarrow turns them into Arrow's offsets and
   validity bitmaps; the `parquet` crate's column reader returns them as stored.
 :::

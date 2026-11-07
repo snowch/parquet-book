@@ -33,6 +33,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 dictionary-values
 ```
 
+(read-the-encodings-yourself)=
 ### Read the encodings yourself
 
 An **encoding** is a rule for representing typed values as bytes. **PLAIN** stores the values
@@ -108,10 +109,12 @@ answer: The values are blue, red, blue. Distinct values must all appear in the d
 integer-differences
 ```
 
+(a-first-value-then-differences)=
 ### A first value, then differences
 
 A **delta** is the difference from the preceding value. Keep the first value and add each delta
-to recover the next value. This small complete example uses values decoded from a real column:
+to recover the next value. This small complete example uses values decoded from `order_id` in
+`encodings.parquet`, a file whose ordered integers make their differences small:
 
 ```transfer
 delta-example
@@ -128,7 +131,8 @@ cheaper than storing the values. `DELTA_BINARY_PACKED` writes a header, then blo
 subtracts its smallest delta from all of its deltas, so every adjusted delta is zero or more, and
 splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs. The
 block starts with its smallest delta and one byte per miniblock giving that miniblock's width.
-This is `ordered_at`'s page, as the reader decodes it:
+This is the page of `ordered_at`, the timestamp-like integer column in `encodings.parquet`,
+as the reader decodes it:
 
 ```{include} _generated/delta-ordered-at.md
 ```
@@ -148,10 +152,13 @@ answer: The sequence is twelve, ten, fourteen. Deltas can be negative. DELTA_BIN
 string-prefixes
 ```
 
+(the-delta-encodings-for-strings)=
 ### The delta encodings for strings
 
 A **prefix** is the beginning of a value’s bytes; a **suffix** is what remains after that prefix.
-Two encodings apply the delta idea to byte arrays.
+Two encodings apply the [integer-difference method](#a-first-value-then-differences) to byte arrays.
+Here `sku` and `url` come from `encodings.parquet`, where product codes have equal lengths and
+URLs share beginnings. We will reconstruct those strings from their lengths and suffixes.
 
 **`DELTA_LENGTH_BYTE_ARRAY`** writes every value's length first, as `DELTA_BINARY_PACKED`, then
 all the values' bytes back to back. The `sku` column's values are all the same length, so the
@@ -160,7 +167,7 @@ lengths cost almost nothing, and the bytes are stored without a length in front 
 **`DELTA_BYTE_ARRAY`** writes, for each value, how many leading bytes it shares with the value
 before it, then only the rest. Sorted strings with common prefixes, such as URLs, paths and
 hierarchical keys, shrink the most. These are the first of `url`'s prefix lengths and suffixes,
-added up from the deltas the string walkthrough printed:
+decoded from `encodings.parquet`:
 
 ```{include} _generated/delta-urls.md
 ```
@@ -168,10 +175,10 @@ added up from the deltas the string walkthrough printed:
 A URL that carries into a new digit, such as the step from `109` to `110`, shares one byte fewer
 and stores two.
 
+(follow-a-string-decoder)=
 ### Follow a string decoder
 
-**The reader, step by step.** The book's reader decodes every encoding the steps met, and a few
-more. For each page it keeps a record of every step: a label, the bytes it read, and what it read
+**The reader, step by step.** The book's reader decodes dictionary, delta and byte-split encodings. For each page it keeps a record of every step: a label, the bytes it read, and what it read
 from them. Ask it for `url`, which pyarrow wrote as `DELTA_BYTE_ARRAY`:
 
 ::::{tab-set}
@@ -196,10 +203,11 @@ character. The second run is the lengths of what is left of each URL, and the by
 suffixes, back to back. Only the first URL is stored in full.
 
 Change `name` to `"order_id"`, `"sku"` or `"weight_kg"` and run the step again. `order_id` is the
-first step's other column, read by the reader. `sku`'s strings are all the same length, and its
+integer sequence used in the [delta example](#a-first-value-then-differences). `sku`'s strings are all the same length, and its
 lengths take no bytes beyond their header and block. `weight_kg` is a float, split into four
 streams; look at how few different bytes the last stream holds. Then open `dictionary.parquet`
-and ask for `"country"`: the reader finds the same dictionary and indices as the dictionary walkthrough.
+and ask for `"country"`: compare its dictionary and indices with the
+[dictionary walkthrough](#read-the-encodings-yourself).
 
 ```practice
 question: A schematic ASCII value follows /a/cat with prefix length three and suffix dog. What is the new value? Does a prefix length count human-readable characters in general?
@@ -210,11 +218,13 @@ answer: It is /a/dog: keep the first three bytes, /a/, then append dog. Prefix l
 split-byte-positions
 ```
 
+(byte-stream-split)=
 ### BYTE_STREAM_SPLIT
 
 `BYTE_STREAM_SPLIT` does not make anything smaller. It rearranges a column of fixed-width values
 into one stream per byte position: every value's first byte, then every value's second byte, and
-so on. Each byte position varies in its own way:
+so on. The `weight_kg` column of `encodings.parquet` supplies the floating-point values below.
+Each byte position varies in its own way:
 
 ```{include} _generated/split-weights.md
 ```
@@ -242,9 +252,14 @@ answer: No. Splitting rearranges the same bytes. Compare the compressed result o
 choose-an-encoding
 ```
 
+(what-each-encoding-saved)=
 ### What each encoding saved
 
-The same measurement for every column of both files:
+Compare encoded storage with PLAIN for two files. `dictionary.parquet` uses dictionaries;
+`encodings.parquet` uses delta and byte-split encodings chosen to expose patterns in its values.
+The [dictionary](#read-the-encodings-yourself), [integer deltas](#a-first-value-then-differences),
+[string prefixes](#the-delta-encodings-for-strings) and [byte-split](#byte-stream-split) lessons explain those patterns.
+The table counts encoded data, not compression or decoding time:
 
 ```{include} _generated/encodings-sizes.md
 ```
@@ -282,9 +297,15 @@ build-encoding-readers
 ```
 
 ## Building it
+
+Build the decoders behind the [dictionary example](#read-the-encodings-yourself),
+[integer differences](#a-first-value-then-differences) and [shared string prefixes](#the-delta-encodings-for-strings).
+The examples use `dictionary.parquet` and `encodings.parquet`; all their columns are required,
+so their data-page bodies contain values without definition or repetition levels.
+
 ### Inspect a physical delta header
 
-The conceptual lesson reconstructed values without parsing headers. A **varint** stores an
+The [integer-delta lesson](#a-first-value-then-differences) reconstructs values without parsing headers. A **varint** stores an
 integer in a variable number of bytes. **Zigzag encoding** maps signed values to unsigned ones:
 positive values become even numbers, negative values become odd numbers, and zero stays zero.
 This optional walkthrough reads both from the physical header.
@@ -332,9 +353,9 @@ For the conceptual path, continue to [What this cannot tell you](#encodings-limi
 then the takeaways and the understanding check.
 :::
 
-The steps read a delta header and a dictionary by hand, then asked the reader to decode a column.
-This section builds the reader's parts they used: the dictionary page and its indices, the delta
-decoder, and the loop that rebuilds strings from shared prefixes. The tabs switch every excerpt
+The delta-header walkthrough above supplies the first implementation example. The following
+sections add dictionary pages and indices, the delta decoder, and the loop that rebuilds strings
+from shared prefixes. The tabs switch every excerpt
 on the page between the two languages.
 
 ### A dictionary page, then indices
@@ -363,7 +384,9 @@ and keeps its entries with the bytes each came from:
 
 A data page's indices are the hybrid from [ch04](#nested-data), with the bit width in the byte
 before them. Each decoded value keeps two spans: its dictionary entry, and the run that held its
-index. The bit width and each run become a step, which the third step prints for `country`:
+index. The bit width and each run become a trace entry. The
+[column-decoder walkthrough](#follow-a-string-decoder) can print these entries after switching to
+`country` in `dictionary.parquet`:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -386,7 +409,7 @@ index. The bit width and each run become a step, which the third step prints for
 
 ### Deltas
 
-The delta decoder reads the header's four varints, as the first step did, then block after block
+The delta decoder reads the header's four varints, as the delta-header walkthrough above does, then block after block
 until it has the value count. Each block opens with its smallest delta and the miniblocks' bit
 widths:
 
@@ -499,7 +522,8 @@ The `parquet` crate reads a column chunk page by page, and says each page's type
 Both list each column chunk's encodings from its metadata. `RLE` appears beside the encoding of the
 values because a data page's header names an encoding for its levels, and pyarrow records it even
 for a required column that stores none. pyarrow's `read_dictionary` hands back an Arrow
-`DictionaryArray`, whose dictionary and indices are the ones the second step read by hand. The
+`DictionaryArray`, whose dictionary and indices match the
+[dictionary walkthrough](#read-the-encodings-yourself). The
 crate's metadata gives the offset of the dictionary page, and its page reader returns that page
 first, then the data page with its count of values.
 
@@ -518,9 +542,14 @@ reference
 (encodings-limits)=
 ## What this cannot tell you
 
+These notes refer to the [encoding-size comparison](#what-each-encoding-saved), using
+`dictionary.parquet` and `encodings.parquet`. Their deliberately regular columns illustrate
+[dictionaries](#read-the-encodings-yourself), [deltas](#a-first-value-then-differences),
+[shared prefixes](#the-delta-encodings-for-strings) and [byte splitting](#byte-stream-split).
+
 **How much encoding saves on your data.** The fixtures' columns were chosen to suit their
 encodings. Real columns are messier: a sorted id column with gaps, a URL column in random order.
-The savings in the table are what these values gave, and yours will differ.
+The linked size table reports these fixture values; other values can give different savings.
 
 **Which encoding a writer should choose.** That depends on what the values look like, on what the
 compressor adds afterwards, and on which readers must open the file. [ch07](#compression) and
@@ -542,7 +571,8 @@ only data page version 2 uses; [ch06](#pages) returns to that.
 - **Encoding is type-aware and happens before compression.** It exploits repetition, small ranges
   and sortedness that a byte-level compressor would miss or find expensively.
 - **Dictionary encoding stores each distinct value once and indices for the rest.** It is the
-  default, it suits columns with few distinct values, and writers fall back when it stops paying.
+  common default and suits columns with few distinct values. Fallback depends on writer policy;
+  in the comparison, pyarrow keeps an unhelpful dictionary until its size limit is reached.
 - **Delta encodings store differences.** Sorted or slowly changing integers, and strings with
   shared prefixes, shrink the most.
 - **BYTE_STREAM_SPLIT rearranges rather than shrinks.** It puts the similar bytes of fixed-width

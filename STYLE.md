@@ -97,6 +97,12 @@ paragraph is a heading in disguise: write the sentence that says what the three 
 
 If *this*, *that* or *it* points more than one sentence back, name the thing.
 
+Read each published destination as a reader arriving directly from the contents. A source
+chapter is split into several pages: "above", "the same query" and "the previous step" must
+refer to evidence on that page. Otherwise name the example, briefly state the relevant setup,
+and link to its owning lesson. A link alone does not supply the missing subject of a claim.
+Scope conclusions to the named fixture, schematic or reader when they depend on it.
+
 ## 16. An evaluation gives its grounds
 
 *The suffix range is better* is incomplete. *The suffix range saves the `HEAD` request, because
@@ -112,6 +118,7 @@ that shows it. See AUTHORING_GUIDE.md.
 **First pass, the sentences.** Rules 1, 5, 11, 12, 13, 14, 15. A scan: minutes per page.
 
 **Second pass, the idea.** Rules 2, 3, 4, 6, 9, 10, 16. Read the page as a reader arriving from the
-previous chapter. At each paragraph ask: what does this paragraph claim, and could I point at the
+previous chapter, then arriving directly from the contents. At each paragraph ask: what does this
+paragraph claim, and could I point at the
 bytes or the request that shows it? A page can pass the first pass and fail the second: clean
 sentences, nothing to hold on to.

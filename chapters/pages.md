@@ -29,6 +29,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 walk-page-boundaries
 ```
 
+(walk-the-pages-yourself)=
 ### Walk the pages yourself
 
 `pages.parquet` and `pages-v2.parquet` hold the same sixty orders. The writer was told to keep
@@ -76,8 +77,8 @@ which for this column are eight-byte integers, where `country`'s are two-letter 
 
 ### What a page header says
 
-Every page starts with a Thrift `PageHeader`. This is the first data page of `amount_cents`, the
-column the first step walked when you changed it, read field by field:
+Every page starts with a Thrift `PageHeader`. Here is the first data page of `amount_cents` in
+`pages.parquet`, read field by field. The walkthrough above can inspect it by changing the column:
 
 ```{include} _generated/page-header-fields.md
 ```
@@ -101,9 +102,14 @@ answer: At one hundred: use the stored compressed body length, not the size afte
 compare-page-versions
 ```
 
+(data-page-version-1)=
 ### Data page version 1
 
-These are the pages of `country` in version 1, with the rows each holds:
+Compare `country` in `pages.parquet` and `pages-v2.parquet`: the same orders, with some missing
+countries, written using different data-page versions. The [page-boundary walkthrough](#walk-the-pages-yourself)
+explains how headers locate their bodies. Here we compare where levels and values sit inside them.
+
+These are `country`'s pages under version one, with the rows each holds:
 
 ```{include} _generated/pages-country-v1.md
 ```
@@ -126,8 +132,7 @@ Version 2 changes where things are, not what they mean. The same column chunk:
 ```{include} _generated/pages-country-v2.md
 ```
 
-The first step showed the differences in the saved comparison on this file, and the two tables set them
-side by side:
+The tables use identical records and uncompressed bodies. They reveal these differences:
 
 - **The level lengths moved into the header.** The levels have no four-byte prefix in the body,
   which is why every body is smaller than its version 1 counterpart.
@@ -158,6 +163,7 @@ answer: V2 keeps the level streams outside the compressed values, so they can be
 check-page-corruption
 ```
 
+(checksums)=
 ### Checksums
 
 A **checksum** is a number calculated from bytes to help detect accidental changes.
@@ -169,10 +175,10 @@ different byte sequences can share a checksum.
 Whether a writer includes it depends on the implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
 parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on.
 
-A checksum helps only a reader that checks it, and checking costs a pass over every body. The bit
-the damage walkthrough flipped turns one country into another, and the damaged index still points into
-the dictionary. A reader that skips the check reads the wrong country without complaint, as the
-library step at the end of *Building it* shows.
+A checksum helps only a reader that checks it, and checking costs a pass over every body.
+The damage example below changes a dictionary index in `pages-v2.parquet`: one country becomes
+another valid country. The [library comparison](build-page-reader.html#ask-a-library) shows that this change can
+pass decoding without complaint when checksum checking is disabled.
 
 ### Corrupt a separate page
 
@@ -222,14 +228,17 @@ For the conceptual path, continue to [What this cannot tell you](#pages-limits),
 then the takeaways and the understanding check.
 :::
 
-The steps looped the reader's `read_page` over a column chunk and compared a body with its
-checksum. This section builds the reader's parts they used: the walk, the body and its checksum,
-the version 2 level lengths, and CRC-32 itself. The tabs switch every excerpt on the page between
+Build the page walker and checksum check used on `pages.parquet` and `pages-v2.parquet`.
+The [boundary walkthrough](#walk-the-pages-yourself) locates pages;
+[version comparison](#data-page-version-1) separates levels and values; the
+[damage example](#checksums) compares stored and recomputed checksums.
+This implementation connects those operations and implements CRC-32. The tabs switch every excerpt on the page between
 the two languages.
 
 ### Walking the pages
 
-The walker reads a page, then the next, until the column chunk ends. It is the first step's loop:
+The walker reads a page, then the next, until the column chunk ends. It is the loop from the
+[boundary walkthrough](#walk-the-pages-yourself):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -253,7 +262,7 @@ The walker reads a page, then the next, until the column chunk ends. It is the f
 `read_page` decodes the header, finds the sub-header that matches the page type, and then takes
 the body. A body that would run past the end of the chunk is an error: the chunk's size in the
 footer and the sizes in its headers must agree. Then it compares the body with the header's
-checksum, when there is one, as the second step did:
+checksum, when there is one, as the [damage example](#checksums) does:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -300,7 +309,7 @@ The only change the column reader needs for version 2 is where the level lengths
 ### The checksum
 
 CRC-32, computed a bit at a time, which is slow and short enough to read in full. It gives the
-same answer as `zlib.crc32`, which the Python step used:
+same answer as `zlib.crc32`, used in the Python [damage example](#checksums):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -346,7 +355,8 @@ cargo test -p parquet-lab --test fixtures
 pyarrow has no API for pages. Its metadata gives a column chunk's offsets and size, and it checks
 every page's checksum while it reads when you ask it to. The `parquet` crate reads a column chunk
 page by page. It checks each checksum when it is built with its `crc` feature, as the book's copy
-is. Both read the file with the bit the second step flipped:
+is. Both read `pages-v2.parquet` with the same changed bit as the
+[damage example](#checksums):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -363,10 +373,10 @@ is. Both read the file with the bit the second step flipped:
 :::
 ::::
 
-pyarrow finds the column chunk where the first step did. Read without the check, the damaged file
+pyarrow finds the column chunk from the footer, as the [boundary walkthrough](#walk-the-pages-yourself) does. Read without the check, the damaged file
 gives one row a different country, and nothing says so. With `page_checksum_verification`, pyarrow
 refuses the file and names the page. The crate prints each version 2 header's rows, nulls and
-level bytes, which agree with the version 2 table, and refuses the damaged page when it reaches it.
+level bytes, which agree with the [version-2 table](#data-page-version-1), and refuses the damaged page when it reaches it.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
 steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
@@ -379,6 +389,10 @@ cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin pages_with_
 ```lesson
 reference
 ```
+
+These notes cover the [page walk](#walk-the-pages-yourself), [version comparison](#data-page-version-1)
+and [checksum experiment](#checksums). They use `pages.parquet` and `pages-v2.parquet`,
+which store the same orders with deliberately small, uncompressed pages.
 
 ### How big a page should be
 
@@ -394,7 +408,7 @@ trade-off is the same at any size:
 (pages-limits)=
 ## What this cannot tell you
 
-**What compressed pages look like.** Every page here is uncompressed, so a header's two sizes are
+**What compressed pages look like.** Both page fixtures are uncompressed, so a header's two sizes are
 equal. [ch07](#compression) compresses them.
 
 **How a reader finds a page without walking.** Walking is linear: to reach the last page, a reader
@@ -421,8 +435,8 @@ guessing at it.
   decompressing the whole page.
 - **Version 2 keeps the levels uncompressed and counts rows and nulls in the header.** A page
   always starts a new row, so pages can be skipped cleanly.
-- **A header can carry a checksum of its body.** A reader that checks it can tell damage from
-  unusual data.
+- **A header can carry a checksum of its body.** A mismatch detects accidental changes such as
+  the flipped bit in the experiment. A match does not prove that a page contains valid data.
 :::
 
 ```checkpoint

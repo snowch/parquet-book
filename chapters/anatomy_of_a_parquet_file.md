@@ -32,6 +32,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 recognise-parquet
 ```
 
+(recognise-the-format)=
 ### Recognise the format
 
 A filename ending in `.parquet` is a hint about its contents. The bytes provide a stronger check:
@@ -98,9 +99,14 @@ answer: No. The name is a hint and the signature recognises the expected format.
 locate-the-footer
 ```
 
+(locate-the-footer)=
 ### Locate the footer
 
-**The last bytes.** Now the other end of the file.
+The [signature example](#recognise-the-format) recognises `tiny.parquet` by its opening
+`PAR1` bytes. This lesson uses the end of that same sales-table fixture to locate its footer,
+the metadata map of the file. Byte offsets count from zero; the file size counts all its bytes.
+
+**The last bytes.** Read the closing signature:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -117,7 +123,7 @@ locate-the-footer
 :::
 ::::
 
-The same four letters appear at the end. We have recognised the signature; now we need to find
+The closing bytes also spell `PAR1`. We have recognised the signature; now we need to find
 the file’s map.
 
 A Parquet file’s **footer** is metadata: information about the table and where its data is stored.
@@ -128,9 +134,9 @@ length beside it locates the footer.
 ```{include} _generated/visual-footer.md
 ```
 
-We inspected the beginning first to recognise the format. A reader opening a file from storage
+The signature example inspects the beginning first to recognise the format. A reader opening a file from storage
 can instead start with the closing signature and length, avoiding a separate read of the opening
-magic. The book’s reader below does that.
+magic. The [request-trace example](#open-a-file-with-the-books-reader) does that.
 
 % number-ok: 256 possible byte values define the byte-wise integer radix, not a measurement.
 **The four bytes before them.** The format says to interpret these as a length, not as text.
@@ -206,7 +212,7 @@ reader needs to find it.
 
 The footer occupies the span we located, immediately before the trailer. Its bytes encode
 fields that a reader decodes. The **schema** describes the column names, types and structure.
-[ch03](#the-type-system) explores those types; the optional implementation below explains the footer’s binary encoding.
+[The type system](#the-type-system) explores those types; the [footer-reader implementation](anatomy_of_a_parquet_file.md#building-it) explains the footer’s binary encoding.
 
 **Break it.** Change one byte of the length and do the same arithmetic:
 
@@ -226,8 +232,8 @@ fields that a reader decodes. The **schema** describes the column names, types a
 ::::
 
 The subtraction still produces a number, but that number is not a valid offset: it puts the footer before the start of the
-file. A reader has to check what it reads before it trusts it, and the book's reader below
-refuses this very damage.
+file. A reader has to check what it reads before it trusts it. The
+[request-trace example](#open-a-file-with-the-books-reader) shows the book's reader refusing this damage.
 
 Try changes of your own with **Edit**: read the first eight bytes, print the whole footer, or
 open another fixture, such as `fixtures/multiple-row-groups.parquet`.
@@ -240,7 +246,12 @@ footer
 read-the-footer-map
 ```
 
+(use-the-footer-as-a-map)=
 ### Use the footer as a map
+
+Read the metadata map of `tiny.parquet`, the sales-table fixture from the
+[footer-location example](#locate-the-footer). That example locates the footer from the
+file's closing bytes; here the reader decodes the regions it describes.
 
 The footer records column names and types, row counts, and column locations. It does not contain
 the whole table’s values, although its statistics can contain summaries such as minimum values.
@@ -324,6 +335,7 @@ chunk
 trace-footer-requests
 ```
 
+(open-a-file-with-the-books-reader)=
 ### Open a file with the book's reader
 
 An **object store** keeps a file as an object addressed by a name. HTTP is the request protocol
@@ -331,8 +343,9 @@ used to ask this store for information or bytes. A `HEAD` request returns file i
 as the size, without the file’s contents. It does not return the Parquet footer. A `GET` request returns file bytes; a **range request** asks for only a span of
 them. A **round trip** is sending a request and waiting for its response.
 
-Now let the book’s reader do what you have done, through a simulated store that logs every
-request. The trace counts returned file bytes; HTTP response headers are outside that count.
+The book's reader opens `tiny.parquet` through a simulated store that logs every request.
+It locates the footer from the closing bytes, as the [footer-location example](#locate-the-footer)
+shows by hand. The trace counts returned file bytes; HTTP response headers are outside that count.
 A `HEAD` can therefore show no file bytes returned while still costing a round trip:
 
 ::::{tab-set}
@@ -353,11 +366,12 @@ A `HEAD` can therefore show no file bytes returned while still costing a round t
 Three requests: the size, then the trailer, then the footer, each waiting for the one before.
 Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
 learned the schema, the row count and where every column lives without reading the data pages.
-The previous lesson interpreted that map; the next lesson shortens the request chain. You can also
+The [footer-map lesson](#use-the-footer-as-a-map) interprets that map;
+[tail-read strategies](#choose-a-tail-strategy) shorten the request chain. You can also
 open the code and try the reader’s size-source and prefetch options yourself.
 
 The reader also checks what it reads before it trusts it. Hand it the damaged-length case from
-the footer-location lesson:
+the [footer-location example](#locate-the-footer):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -403,9 +417,12 @@ answer: No. Knowing the size locates the trailer, but the footer length is still
 choose-a-tail-read
 ```
 
+(choose-a-tail-strategy)=
 ### Choose a tail strategy
 
-Real readers shorten the chain in two ways:
+Opening a file can require a chain of requests: learn its size, fetch its trailer, then fetch
+the footer whose length the trailer supplies. The [default request trace](#open-a-file-with-the-books-reader)
+shows this chain on `tiny.parquet`. Here we compare ways to shorten it:
 
 - **The size is often known already.** A directory listing or a catalogue of the table's files
   can record each file's size ([ch14](#lakehouse-and-beyond)). A **suffix range**, `Range: bytes=-n`, asks for
@@ -421,7 +438,8 @@ returns the file size with the bytes, so it does not need a preceding `HEAD`.
 requests
 ```
 
-Here is what each combination costs on both fixtures, computed by the same reader:
+Here is what each combination costs on `tiny.parquet` and `multiple-row-groups.parquet`,
+computed by the same simulated reader:
 
 ```{include} _generated/footer-strategies.md
 ```
@@ -450,10 +468,10 @@ For the conceptual path, continue to [What this cannot tell you](#anatomy-of-a-p
 then the takeaways and the understanding check.
 :::
 
-The reader you called above is the book's reader, which exists in Python (`python/parquet_lab`)
-and in Rust (`crates/parquet-lab`), and the tests hold the two to the same answers. This section
-builds the part of it the experiment used, in the order it ran. Each piece is quoted from the source, so what you read here is what ran
-above, and the tabs switch every excerpt on the page between the languages.
+Build the reader used in the [footer request trace](#open-a-file-with-the-books-reader): locate and validate
+the trailer, fetch the footer and decode its fields. Review the [footer calculation](#locate-the-footer)
+and [tail-read strategies](#choose-a-tail-strategy) for the byte ranges and request choices.
+The Python and Rust implementations quote the tested source; the tabs select a language.
 
 ### Little-endian integers
 
@@ -574,7 +592,8 @@ a byte is cheap, and it gives the same numbers every time the book is built.
 
 ### Opening a file
 
-The whole procedure, with both shortcuts:
+The footer-opening procedure accepts a known file size or a suffix range, and can prefetch
+more than the trailer. These are the shortcuts compared in [tail-read strategies](#choose-a-tail-strategy):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -626,8 +645,8 @@ low four bits are its type.
 
 Because every field names itself, the decoder can walk a footer without knowing Parquet's schema,
 and a field it has never heard of still decodes. The `parquet_thrift` module then gives the fields
-their names. Select any byte of the footer in the panel above and the inspector
-reads it as a field header, so you can check the decoder by hand. [ch03](#the-type-system) reads
+their names. Select a field-header byte in the [footer-map inspector](#use-the-footer-as-a-map)
+to check the decoder by hand. [The type system](#the-type-system) reads
 the schema out of this structure.
 
 ### Checking it
@@ -680,8 +699,9 @@ here:
 :::
 ::::
 
-The footer length and the bytes of each column chunk are the ones you found by hand at the start
-of the chapter, and the ones in the table of regions. The test that runs these steps checks both
+The library reads `tiny.parquet`. Compare its footer length with the
+[footer calculation](#locate-the-footer) and its chunk sizes with the
+[table of regions](#use-the-footer-as-a-map). The test that runs these steps checks both
 against pyarrow's manifest. From here on a chapter that builds something ends by asking a library
 the same question, so that you know where each fact lives in the tools you already use.
 
@@ -703,18 +723,22 @@ reference
 (anatomy-of-a-parquet-file-limits)=
 ## What this cannot tell you
 
+These notes cover the [byte map of `tiny.parquet`](#use-the-footer-as-a-map) and the
+[simulated footer requests](#open-a-file-with-the-books-reader). The [tail-read comparison](#choose-a-tail-strategy)
+also uses `multiple-row-groups.parquet`; neither example measures a live storage service.
+
 **How a real network behaves.** The simulated store charges a fixed latency and a fixed
 bandwidth. Real object stores have variable latency, a long tail of slow requests, throttling, and
 connection setup costs. The simulation shows why readers minimise round trips; it cannot tell you
 how long your reads will take.
 
-**Whether a prefetch fits a real footer.** The fixtures have footers smaller than a kilobyte. A
+**Whether a prefetch fits a real footer.** The footer-opening fixtures have small footers. A
 footer grows with the number of row groups times the number of columns, and a wide table's footer
-can be far larger than any sensible prefetch. No fixture in this book has a footer that large.
+can be far larger than any sensible prefetch. The tail-read comparison does not exercise a footer that large.
 [ch11](#writing-parquet-well) shows how fast one grows with the number of row groups.
 
 **What lies between the data and the footer.** Page indexes and Bloom filters, when a writer
-includes them, sit after the row groups and before the footer. The fixtures have neither, so here
+includes them, sit after the row groups and before the footer. The footer-map fixtures have neither, so in those files
 the footer follows the last column chunk directly. [ch09](#skipping-data) adds them.
 
 **What an encrypted file looks like.** The reader stops at `PARE`. [ch13](#modular-encryption)
@@ -808,4 +832,5 @@ cargo test -p exercises --test anatomy_of_a_parquet_file -- --ignored
   [Apache Thrift repository](https://github.com/apache/thrift/blob/master/doc/specs/thrift-compact-protocol.md).
 - Range requests, including suffix ranges, are defined in
   [RFC 9110, section 14](https://www.rfc-editor.org/rfc/rfc9110#section-14).
-- [ch03](#the-type-system) reads the schema out of the footer you decoded here.
+- [The type system](#the-type-system) reads the schema from the footer located in the
+  [tiny-file example](#locate-the-footer).

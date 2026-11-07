@@ -33,6 +33,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 follow-schema-paths
 ```
 
+(read-the-schema-yourself)=
 ### Read the schema yourself
 
 A **physical type** describes how a value is stored. A **logical type** gives those stored bytes
@@ -87,7 +88,7 @@ a list is a group too, with a `REPEATED` field inside it.
 
 ### Rebuilt as a tree
 
-The tree you rebuilt is the schema. Parquet tools print it in a textual notation that comes from
+These fields form the schema tree. Parquet tools print it in a textual notation that comes from
 the Dremel paper. `message schema` names the root; braces enclose its fields and the fields of
 nested groups. Each field starts with a repetition, a type and a name. A logical type, when
 there is one, follows in parentheses.
@@ -110,9 +111,12 @@ answer: No. A column is identified by its complete path, such as shipping.addres
 interpret-logical-types
 ```
 
+(stored-values-and-their-meaning)=
 ### Stored values and their meaning
 
 A **physical type** describes storage; a **logical type** tells you how to interpret those stored values.
+The examples use `types.parquet`, whose [schema walkthrough](#read-the-schema-yourself) identifies
+its columns. Here the date, timestamp and decimal columns show why storage alone is not enough.
 
 **Statistics** summarise a column chunk, for example by recording its smallest value. We can
 read such a stored value without fetching the column's data pages.
@@ -212,6 +216,9 @@ Its **maximum repetition level** counts only the repeated fields. These are limi
 schema. The next module uses each record’s actual levels to describe missing values and list
 boundaries. Here we count the limits from the tree.
 
+The [schema walkthrough](#read-the-schema-yourself) reads `types.parquet` as a list of fields and
+groups. This lesson rebuilds that list into paths, then counts each path's optional and repeated fields.
+
 **The tree, rebuilt.** A count of children is enough to rebuild the tree. Take an element; if it
 has children, take that many subtrees after it, each the same way:
 
@@ -269,9 +276,10 @@ For the conceptual path, continue to [What this cannot tell you](#the-type-syste
 then the takeaways and the understanding check.
 :::
 
-The steps above called three parts of the book's reader: the decoding of each schema element, the
-rebuild of the tree, and the reading of a value through its logical type. This section builds
-them, in both languages, and the tabs switch every excerpt on the page between them.
+Build the schema reader used by the [field walkthrough](#read-the-schema-yourself),
+[tree and level counts](#schema-level-walkthrough), and [stored-value interpretations](#stored-values-and-their-meaning).
+Those examples use `types.parquet`. The implementation decodes fields, rebuilds paths and applies
+logical types; the tabs select Python or Rust.
 
 ### Optional schema-damage investigation
 
@@ -289,8 +297,9 @@ file for that reason.
 
 ### Schema elements
 
-`decode_file_metadata`, which ch02 built, gives the footer's Thrift fields their names. Its field
-2 is the schema: a list of structs, each decoded into a `SchemaElement` by field id:
+`decode_file_metadata` gives the footer's Thrift fields their Parquet names. The
+[footer-reader implementation](anatomy_of_a_parquet_file.md#building-it) explains how the binary fields are decoded.
+Field 2 is the schema: a list of structs, each decoded into a `SchemaElement` by field id:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -316,7 +325,7 @@ type and no children. The logical type is a struct of its own, decoded below.
 
 ### Rebuilding the tree
 
-The rebuild is the walk you ran, with checks. It starts at the root and requires the root's
+The rebuild follows the [tree walkthrough](#schema-level-walkthrough), with checks. It starts at the root and requires the root's
 subtree to use up the whole list:
 
 ::::{tab-set}
@@ -397,7 +406,7 @@ are not zero.
 The logical type arrives from the footer as a Thrift union: a struct with exactly one field set,
 whose id names the type. The `logical` module decodes it into a value naming the type and its
 parameters. Applying it is a match on the pair of physical and logical type. Its first cases
-include the date and the timestamp you read by hand:
+include the date and timestamp from the [stored-value example](#stored-values-and-their-meaning):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -489,7 +498,8 @@ cargo test -p parquet-lab --test fixtures
 
 pyarrow and the `parquet` crate both rebuild the tree when they open a file, and print it in the
 Dremel notation. pyarrow's `schema.column(i)` and the crate's `SchemaDescriptor` give each leaf's
-path, physical type and maximum levels, the ones you counted by hand:
+path, physical type and maximum levels for `types.parquet`, as in the
+[tree walkthrough](#schema-level-walkthrough):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -507,8 +517,8 @@ path, physical type and maximum levels, the ones you counted by hand:
 ::::
 
 The two part over the statistics. pyarrow reads each minimum through its logical type and hands
-you a `datetime.date` and a `Decimal`. The crate, without its Arrow feature, hands you the bytes
-the third step read, and the logical reading is yours to do. The two also name the logical types
+you a `datetime.date` and a `Decimal`. The crate, without its Arrow feature, hands you stored bytes,
+as in the [physical/logical comparison](#stored-values-and-their-meaning), and the logical reading is yours to do. The two also name the logical types
 differently: pyarrow's `Int(bitWidth=8, isSigned=true)` is the crate's `INTEGER(8,true)`. pyarrow
 prints `field_id=-1` for a field with no field id, which is every field of this fixture.
 
@@ -524,6 +534,10 @@ cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin schema_with
 reference
 ```
 
+These notes cover the schema and types of `types.parquet`. The [schema walkthrough](#read-the-schema-yourself)
+shows its fields, the [value comparison](#stored-values-and-their-meaning) applies their annotations, and
+[maximum-level counting](#schema-level-walkthrough) prepares for nested records.
+
 ### Older annotations, and field ids
 
 Files written before logical types existed carry a `converted_type` instead, such as `UTF8` or
@@ -532,16 +546,17 @@ type when both are present.
 
 A schema element can also carry a `field_id`: a number that identifies a column across renames.
 Table formats use it to match columns between files written years apart
-([ch16](#what-iceberg-adds)). This chapter's fixture sets none; ch15's table sets one on every
-column.
+([Iceberg's table metadata](#what-iceberg-adds)). `types.parquet` sets none; the
+[table-change example](#changing-a-table) sets one on every column.
 
 (the-type-system-limits)=
 ## What this cannot tell you
 
 **How nested values are stored.** The levels tell a reader how deep a value is defined and where
-lists begin. This chapter computes their maximums; [ch04](#nested-data) decodes them.
+lists begin. The [level-counting example](#schema-level-walkthrough) computes their maximums;
+[nested-data lessons](#nested-data) decode their actual values.
 
-**Every logical type.** The fixture covers the common ones. `UUID`, `FLOAT16`, `TIME`, `JSON`,
+**Every logical type.** `types.parquet` covers common physical and logical types. `UUID`, `FLOAT16`, `TIME`, `JSON`,
 `ENUM` and the newer `VARIANT` and geospatial types are decoded by name; the reader interprets
 some of them and reports the rest as unrecognised rather than guessing.
 
@@ -636,5 +651,5 @@ cargo test -p exercises --test the_type_system -- --ignored
   [LogicalTypes.md](https://github.com/apache/parquet-format/blob/master/LogicalTypes.md).
 - The textual schema notation and the repetition model come from the
   [Dremel paper](https://research.google/pubs/dremel-interactive-analysis-of-web-scale-datasets-2/).
-- [ch04](#nested-data) decodes the definition and repetition levels whose maximums you computed
-  here.
+- [Nested data](#nested-data) decodes the definition and repetition levels introduced by the
+  [schema-level walkthrough](#schema-level-walkthrough).

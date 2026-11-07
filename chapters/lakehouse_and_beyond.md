@@ -11,7 +11,7 @@ How does one Parquet file become one part of a larger analytical system?
 
 Every chapter so far read one file. A table that grows every day is not one file: it is many,
 written at different times by different writers, in one directory of an object store. Before a
-reader can use anything from [ch09](#skipping-data) or [ch10](#how-readers-read), it has to know
+reader can use anything from [Skipping data](#skipping-data) or [How readers read](#how-readers-read), it has to know
 which files there are, and it would rather not open the ones that cannot hold an answer. This
 chapter queries a table of nine files, and compares three ways of finding them.
 
@@ -31,7 +31,7 @@ read-partition-paths
 
 ### A table of nine files
 
-`fixtures/table/` holds the orders from [ch11](#writing-parquet-well), written by pyarrow's
+`fixtures/table/` holds the orders from [Writing Parquet well](#writing-parquet-well), written by pyarrow's
 dataset writer. The writer split the rows by `country` into one directory per value, and wrote at
 most a hundred rows to a file.
 
@@ -115,8 +115,10 @@ Lake's is a **transaction log**: a directory of numbered JSON files, each a list
 `add` action puts a file in the table, with its partition values, its size, and statistics about
 its columns. A `remove` action takes one out. The table is whatever the actions add up to.
 
-`fixtures/table/_delta_log/` holds one such file, in the shape Delta Lake uses, and the first step
-skipped it: its directory has no equals sign.
+`fixtures/table/` is the country-partitioned orders dataset from
+[Read partition values from paths](read-partition-paths.html). Its `_delta_log/` directory
+holds one log file in the shape Delta Lake uses. The path-only listing skips that directory
+because its name has no equals sign.
 
 **Read the log.** Parse each line, and for each `add`, print the file and the statistics the log
 records for `order_id`:
@@ -137,8 +139,9 @@ records for `order_id`:
 ::::
 
 The first two lines say which version of the protocol the log follows and what the table's schema
-is. Every line after them adds one file, and the files are the ones the first step found. The
-statistics are the same kind [ch08](#metadata-and-statistics) read from footers, a minimum and a
+is. Every line after them adds one of the files shown by the
+[partition-path listing](read-partition-paths.html). The
+statistics are the same kind [Metadata and statistics](#metadata-and-statistics) read from footers, a minimum and a
 maximum for each column, copied into the log when the file was written. A reader of the log knows
 each file's range of `order_id` without opening it.
 
@@ -155,7 +158,7 @@ range:
 ### Querying the table
 
 **Query the table.** The book's reader does both kinds of ruling out, then fetches the files that
-survive through the simulated object store from [ch02](#anatomy-of-a-parquet-file) and queries them
+survive through the simulated object store from [Anatomy of a Parquet file](#anatomy-of-a-parquet-file) and queries them
 together. Put the table's files in a store, and ask it for the `UK` orders below `200`, with the
 files found from the log:
 
@@ -219,7 +222,7 @@ files and the log's statistics rule out two more:
 ```{include} _generated/table-by-both.md
 ```
 
-Time follows requests. Each file is fetched whole in one request, as [ch10](#how-readers-read)
+Time follows requests. Each file is fetched whole in one request, as [How readers read](#how-readers-read)
 found best for small files, and with four connections the table's files arrive in rounds of four.
 Fewer files means fewer rounds.
 
@@ -263,8 +266,9 @@ third it contains only south, even if north's bytes remain in storage. A later a
 `replacement.parquet` makes south and replacement active. Each version is the result of the
 actions through that version, not a fresh listing of all objects.
 
-This history teaches membership semantics; the fixture walkthrough uses one log file containing
-adds, not a complete implementation of versioned Delta Lake history.
+This schematic history teaches membership semantics. The [file-pruning walkthrough](prune-files-before-footers.html)
+uses `fixtures/table/_delta_log/` with one log file containing adds; it does not implement a
+complete versioned Delta Lake history.
 
 ```practice
 question: A fresh history adds east.parquet and west.parquet, then removes east.parquet. Storage still contains both plus an orphan file never added. Which files are active at that version?
@@ -285,10 +289,10 @@ For the conceptual path, continue to [What this cannot tell you](#lakehouse-and-
 then the takeaways and the understanding check.
 :::
 
-The steps read the paths and the log by hand, and then asked the reader for a plan. The reader's
-`table` module writes the same reading once: partition values from a path, the files a log adds
-and removes, a rule for each condition, and the reader's query engine, which
-[ch12](#what-a-query-engine-does) ran on one file, over the files that survive.
+This lab implements the [table-pruning example](prune-files-before-footers.html) over
+`fixtures/table/`, a country-partitioned orders dataset with one Delta-shaped log file.
+The reader's `table` module reads partition paths and log actions, rules out files, and runs
+the [query engine](separate-scan-and-filter.html) over the files that survive.
 
 ### Partition values from a path
 
@@ -319,7 +323,7 @@ The reader decodes those escapes before using the value:
 
 Each line is one action. A `remove` takes out a file an earlier `add` put in, and an `add`
 carries the file's path, partition values and statistics. The statistics are JSON inside a JSON
-string, so they are parsed twice, as the second step did:
+string, so they are parsed twice, as the [log walkthrough](prune-files-before-footers.html) shows:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -369,7 +373,7 @@ compared as text:
 ::::
 
 A column that is not a partition is tried against the statistics the log records for the file,
-with the comparison [ch09](#skipping-data) made against a footer's statistics. There is one more
+with the comparison [Skipping data](#skipping-data) made against a footer's statistics. There is one more
 rule: a JSON number and a JSON string prove nothing about each other, so a comparison across kinds
 rules nothing out.
 
@@ -394,7 +398,7 @@ rules nothing out.
 
 ### Querying the files together
 
-The reader's query engine, from [ch12](#what-a-query-engine-does), reads the files that survive
+The reader's query engine, from [What a query engine does](#what-a-query-engine-does), reads the files that survive
 as one table. A column named in a partition, rather than in the files' schema, takes its value
 from the path, the same value for every row of the file:
 
@@ -484,12 +488,17 @@ reference
 (lakehouse-and-beyond-limits)=
 ## What this cannot tell you
 
+These notes qualify the [partition-path example](read-partition-paths.html) and
+[log-based pruning comparison](prune-files-before-footers.html) over `fixtures/table/`.
+The fixture has country-partitioned orders and one Delta-shaped log file; the reader compares
+listing all files, pruning by path, and pruning with log statistics.
+
 **How a real log grows.** This reader reads one log file. A real Delta log has one file per
 version, and a checkpoint, a Parquet file of its own, that summarises many versions so a reader
 need not replay them all. Apache Iceberg keeps the same information differently: a metadata file
 points to manifest lists, which point to manifests, which list the data files with their
-statistics. Both answer the same question this chapter asked, and [ch16](#what-iceberg-adds)
-describes Iceberg's tree.
+statistics. The [Iceberg metadata lesson](follow-iceberg-metadata.html) describes that
+manifest-list layout. Both approaches locate a table version's files without opening each footer.
 
 **Typed partitions.** Partition values in a path are text. This reader compares them as text,
 which is right for `country` and wrong for a numeric partition such as `year` compared with a
@@ -500,8 +509,8 @@ That needs the object store to refuse the second write, and this simulated store
 and no writers.
 
 **What a real table costs.** Nine small files make the differences between the three ways easy to
-see. A table with millions of files makes `LIST` itself slow, since a `LIST` returns keys a page
-at a time, and makes the log the only practical way to plan a query at all.
+see. A table with millions of files can make listing expensive because `LIST` returns keys a
+page at a time. Table metadata can avoid that listing, but its own size and organisation matter too.
 
 ## Key takeaways
 
@@ -510,10 +519,10 @@ at a time, and makes the log the only practical way to plan a query at all.
 
 - **A table is many Parquet files, and finding them is the first cost of a query.** Listing and
   reading a log each cost a request before any data is read.
-- **Partition values live in paths, not in files.** A condition on a partition column rules files
-  out by name, without opening them.
-- **A log carries each file's statistics, so it can rule out files for any column.** Listing
-  cannot: it knows only names.
+- **This Hive-style dataset stores country in its paths.** A condition on that partition
+  column rules files out by name, without opening them.
+- **Log statistics can rule out files for columns they describe.** The fixture log records
+  bounds for its data columns. A listing provides names, not those bounds.
 - **The log's statistics help only as much as the layout allows.** Files that each hold a narrow
   range of a column can be skipped; files that span the whole range cannot.
 - **Table formats change what a reader trusts, not what the files are.** A log makes a set of
@@ -584,5 +593,5 @@ cargo test -p exercises --test lakehouse_and_beyond -- --ignored
 - pyarrow's
   [dataset documentation](https://arrow.apache.org/docs/python/dataset.html) covers partitioned
   writing and reading, the way the fixture was written.
-- [ch15](#changing-a-table) changes this kind of table: lookups, deletes and compaction.
+- [Changing a table](#changing-a-table) changes this kind of table: lookups, deletes and compaction.
 - The [appendices](#glossary) collect the book's terms.

@@ -9,7 +9,7 @@ title: How readers read
 
 Why does a reader issue exactly the requests it does?
 
-[ch09](#skipping-data) decided which bytes a query needs. Knowing the bytes is not the same as
+[Skipping data](#skipping-data) decided which bytes a query needs. Knowing the bytes is not the same as
 fetching them well. Each request to an object store costs a round trip before the first byte
 arrives, and that cost does not shrink with the request. A reader that needs many small ranges
 can make one request for each, one large request that covers them all, or something between, and
@@ -37,11 +37,10 @@ the bytes themselves: **latency** is the wait from sending a request until its f
 A **connection** carries requests between the reader and the store; several connections can
 have requests in flight at the same time.
 
-The query is [ch09](#skipping-data)'s: `SELECT * WHERE order_id = 431` on
-`pruning-sorted.parquet`. There the reader planned it from a copy of the file on disk. Here its
-`scan` runs the plan against the simulated object store from
-[ch02](#anatomy-of-a-parquet-file), which logs every request, the connection that carried it, and
-when it started and ended. A `Strategy` says how to make the requests: how to find the footer and
+The query is `SELECT * WHERE order_id = 431` on `pruning-sorted.parquet`.
+The [pruning example](compose-a-pruning-plan.html) chooses its byte ranges from a local file.
+Here `scan` fetches those ranges through a simulated object store, which logs every request,
+its connection, and when it started and ended. A `Strategy` says how to make the requests: how to find the footer and
 how much of the tail to read first, how close two ranges must be to merge into one request, and
 how many connections to use. **Coalescing** merges nearby byte ranges into one request,
 including any gap between them. **Concurrency** lets independent requests overlap in time.
@@ -49,8 +48,9 @@ Neither can remove a dependency on metadata that has not arrived yet.
 
 The step is a few lines of code. In Python, run it in the page, change it with **Edit**, and run
 it again. In Rust, open it in a Codespace, or run it at a desk with
-`cargo run -p walkthroughs --bin read_with_a_strategy`. It continues ch02's
-`open_with_the_reader`, which stopped once the footer was read:
+`cargo run -p walkthroughs --bin read_with_a_strategy`. The
+[footer-reading walkthrough](trace-footer-requests.html) stops once the footer arrives;
+this trace continues through the indexes and data:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -67,7 +67,7 @@ it again. In Rust, open it in a Codespace, or run it at a desk with
 :::
 ::::
 
-The first three requests are ch02's: the size, the trailer, the footer. Next come the indexes the
+The first three requests discover the size, then read the trailer and footer. Next come the indexes the
 plan needs, one request each: `order_id`'s ColumnIndex for row group 2, the one row group the
 statistics keep, and an OffsetIndex for each column. Last come the pages, one request each, with
 `country`'s dictionary page apart from its data page. Every request starts when the one before
@@ -93,20 +93,20 @@ A reader cannot ask for everything at once, because it does not know what to ask
 requests fall into phases, each needing the answers to the one before:
 
 1. **The footer.** The trailer says where the footer starts, so finding it takes one or two
-   requests after the size is known: [ch02](#anatomy-of-a-parquet-file)'s strategies.
+   requests after the size is known: [Anatomy of a Parquet file](#anatomy-of-a-parquet-file)'s strategies.
 2. **The indexes.** Which Bloom filters and page indexes to fetch depends on the footer: where
    they are, and which row groups the statistics have already ruled out.
 3. **The data.** Which pages to fetch depends on the indexes.
 
 Within a phase the requests are independent, and a reader with several connections sends them
-together. Between phases it must wait. Latency is paid at least once per phase, however many
-connections there are.
+together. This planner waits for a phase to finish before starting another. Adding
+connections cannot remove a dependency on metadata that has not arrived.
 
 ### The phases on a timeline
 
 The panel runs the same query with the Rust reader and draws each request in the lane of the
 connection that carried it. Pick a strategy from the list; the list is the rows of the table
-in the next lesson, *Choose a read strategy*.
+in [Choose a read strategy](choose-a-read-strategy.html).
 
 ```lab
 experiment: scan
@@ -144,12 +144,14 @@ choose-a-read-strategy
 
 ### What each choice costs
 
-The same query, with each change made in turn:
+Compare `SELECT * WHERE order_id = 431` on `pruning-sorted.parquet` under different request
+strategies. [Trace a complete scan](trace-a-complete-scan.html) shows the starting strategy: find
+the footer, fetch the indexes, then fetch selected pages. This table changes one choice at a time:
 
 ```{include} _generated/scan-strategies.md
 ```
 
-The first rows follow [ch09](#skipping-data): skipping row groups by statistics cuts both bytes
+The first rows follow [Skipping data](#skipping-data): skipping row groups by statistics cuts both bytes
 and requests. Then the page index cuts bytes further but adds requests, one for each index and
 each page, and the query gets slower. Bytes were not the problem. At the latency the table's
 note gives, the number of requests decides the time, and every row below that attacks it: a
@@ -184,7 +186,8 @@ depends on the network:
 
 On a fast network with high latency, reading the whole file wins even though it moves many times
 the bytes. On a slow link with low latency, the careful plan wins, because moving the extra bytes
-takes longer than the round trips it saves. Try it in the step: pass
+takes longer than the round trips it saves. To reproduce this comparison, open the code in
+[Trace a complete scan](trace-a-complete-scan.html) and pass
 `NetworkModel(latency_us=1000, bandwidth_bytes_per_sec=1_000_000)` (the same fields in Rust's
 `NetworkModel { .. }`) and compare `prefetch=8192` with `prefetch=65536`. Real files are far
 larger than this one, which moves the balance toward the careful plan: nobody reads a gigabyte to
@@ -219,8 +222,8 @@ For the conceptual path, continue to [What this cannot tell you](#how-readers-re
 then the takeaways and the understanding check.
 :::
 
-The step called `scan`, which reads the footer with ch02's `read_footer`, plans with ch09's
-`prune.plan`, and fetches in phases. This section builds the fetching: how ranges merge, how one
+The [complete scan trace](trace-a-complete-scan.html) runs `scan` on `pruning-sorted.parquet`.
+It locates metadata with `read_footer`, chooses ranges with `prune.plan`, and fetches in phases. This section builds the fetching: how ranges merge, how one
 phase is sent, how the store's clock prices it, and how the reader decodes only the pages it
 fetched. The tabs switch every excerpt on the page between the two languages.
 
@@ -347,8 +350,8 @@ cargo test -p parquet-lab --test fixtures every_strategy
 ### Ask a library
 
 A library makes the same choices, with its own defaults. Hand pyarrow a file that prints every
-read it is asked for, and ask the `parquet` crate for the footer and the page index from a tail
-of the file:
+read it is asked for, using `pruning-sorted.parquet`. Ask the `parquet` crate for the footer
+and page index from a tail of that file:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -405,6 +408,10 @@ reference
 (how-readers-read-limits)=
 ## What this cannot tell you
 
+These notes qualify the [request-strategy comparison](choose-a-read-strategy.html) on
+`pruning-sorted.parquet`. The [complete scan trace](trace-a-complete-scan.html) shows its requests.
+Their times come from a deterministic object-store model, not a live network.
+
 **How a real store behaves.** The model charges a fixed latency and a fixed bandwidth. Real
 stores vary from request to request, throttle busy prefixes, and limit connections. The model
 keeps the shape of the problem and none of its noise, so its numbers compare strategies; they do
@@ -414,7 +421,7 @@ not predict a real query's time.
 the same file twice can keep its footer, and one that runs many queries can keep pages. This reader starts empty every time.
 
 **Reading many files.** A table is usually many files, and a query engine reads them in parallel.
-[ch14](#lakehouse-and-beyond) turns to tables.
+[Lakehouse and beyond](#lakehouse-and-beyond) turns to tables.
 
 **Decoding time.** Every cost here is the network's. On a fast network, decompressing and decoding
 can take longer than fetching, and a reader that overlaps the two gains most.
@@ -424,13 +431,14 @@ can take longer than fetching, and a reader that overlaps the two gains most.
 :::{div}
 :class: takeaways
 
-- **Requests come in phases.** The footer, then the indexes, then the data: each needs the one
-  before, and latency is paid at least once per phase.
-- **Against object storage, requests cost more than bytes.** Skipping that adds requests can
-  make a query slower.
+- **This planner groups requests by dependency.** It reads the footer, then the selected
+  indexes, then the data. Missing metadata can prevent a later request from being planned.
+- **High request latency can outweigh saved bytes.** In the high-latency model, skipping that
+  adds requests can make the small-file query slower.
 - **Merging ranges trades bytes for requests.** Ranges that touch merge for free; merging across
   a gap reads the gap.
-- **Connections overlap requests within a phase, never across phases.**
+- **This planner overlaps requests within a phase.** It waits for that phase to finish before
+  starting another; a production scheduler can make different choices where dependencies allow.
 - **The network decides the strategy.** High latency favours few large reads; low bandwidth
   favours reading only what is needed.
 :::
@@ -495,5 +503,5 @@ cargo test -p exercises --test how_readers_read -- --ignored
 - Production readers expose these choices as options. The Arrow project's
   [Rust Parquet reader](https://github.com/apache/arrow-rs/tree/main/parquet), for one, takes a
   hint for how much of the tail to read for the footer, and merges nearby ranges.
-- [ch11](#writing-parquet-well) turns from reading to writing: how a writer's choices decide what
+- [Writing Parquet well](#writing-parquet-well) turns from reading to writing: how a writer's choices decide what
   any reader can skip.

@@ -9,7 +9,7 @@ title: Changing a table
 
 What does it cost to find one row, or change one, in a table of Parquet files?
 
-[ch14](#lakehouse-and-beyond) read a table that never changed. Real tables do. An order is
+[Lakehouse and beyond](#lakehouse-and-beyond) read a table that never changed. Real tables do. An order is
 cancelled, a refund corrects an amount, a customer asks to be forgotten, and late data arrives
 in small batches all day. A Parquet file cannot absorb any of that: its column chunks are
 encoded and compressed, and its footer records the offset of every one, so changing a value in
@@ -46,7 +46,7 @@ are complete examples of these choices, with measured requests and byte counts.
 
 ### A table and its history
 
-`fixtures/changes/` holds the orders from [ch11](#writing-parquet-well), written by pyarrow in
+`fixtures/changes/` holds the orders from [Writing Parquet well](#writing-parquet-well), written by pyarrow in
 four files sorted by `order_id`, each with row groups, small pages and a page index. Then the
 table was changed, and every version was recorded as a *snapshot*: the list of data files, and
 of delete files, that make up the table at that moment. Table formats also track table state,
@@ -144,8 +144,10 @@ trace-a-table-lookup
 
 ### Find one order
 
-Now let the book's reader look up order `300` in `after-a-day`, as a query engine would, through
-the simulated object store. The step groups requests into **dependency phases**.
+The `fixtures/changes/` table records snapshots in `_snapshots.json`. Its `after-a-day`
+snapshot contains sorted data files, position deletes and small appended files;
+[Follow a snapshot and its deletes](follow-snapshots-and-deletes.html) shows that history.
+Here the reader looks up order `300` through the simulated object store. The step groups requests into **dependency phases**.
 A phase is a group of requests the reader can plan from the information it already has.
 Independent requests can overlap, up to the available connections; extra requests wait for
 a connection. This reader finishes each phase before starting the next, so a phase can
@@ -199,16 +201,15 @@ The table compares our lookups with that model:
 ```{include} _generated/changes-lookup.md
 ```
 
-A Parquet table has no index from a key to a row. Statistics narrow the search to a file, a row
+This teaching table has no index from a key to a row. Statistics narrow the search to a file, a row
 group and a page, with metadata reads needed to plan later requests. Then the
 pages are decoded, and to return the whole row the reader needs the matching page of every
-column, which is [ch01](#why-parquet-exists)'s cost of reconstructing a row, paid in requests.
+column, which is [Why Parquet exists](#why-parquet-exists)'s cost of reconstructing a row, paid in requests.
 
-This is the best case. The files are sorted by `order_id`, so one file and one page of each
-column hold the answer. On a table written in arrival order, every file's range would span most
-keys, and a lookup would open every file. A key-value store answers the same question in one
-request of about one row's bytes. That gap is the price of a layout built for scans, and no
-reader setting closes it.
+This layout favours the lookup: its non-overlapping `order_id` ranges narrow the answer to
+one file and one page of each column. If shuffled arrivals instead spread keys across every
+file, many more files could survive. The comparison's key-value model retrieves a stored row
+in one request; it does not model a production database's internal reads, caches or indexes.
 
 The model stores snapshot metadata in one file. Real table metadata trees and caches can change the request chain.
 
@@ -225,7 +226,9 @@ compare-update-costs
 
 A table format can delete a row in two ways. **Copy-on-write** rewrites the row's file without it.
 **Merge-on-read** writes a small delete file that names the row, and leaves the reader to take it
-out. Both first find the row, as the preceding lookup lesson traced:
+out. The comparison below deletes an order from the `fixtures/changes/` table.
+Both paths first find the row, as [Trace a complete table lookup](trace-a-table-lookup.html)
+shows; [the snapshot history](follow-snapshots-and-deletes.html) names the resulting versions:
 
 ```{include} _generated/changes-writes.md
 ```
@@ -261,8 +264,8 @@ decoded all the same.
 ### Where the work is paid
 
 **Copy-on-write** replaces affected data with rewritten files. **Merge-on-read** keeps data
-and adds delete information that readers must apply. The earlier delete walkthrough demonstrates
-both. The scan comparison shows the consequence: deferred work and extra files are paid for on
+and adds delete information that readers must apply. The [snapshot and delete walkthrough](follow-snapshots-and-deletes.html)
+shows the files behind those choices. The scan comparison shows the consequence: deferred work and extra files are paid for on
 later reads. Neither policy wins for every read/write mix.
 
 ```practice
@@ -278,8 +281,10 @@ decide-when-to-compact
 
 **Compaction** rewrites selected data files together with their delete information. It reads
 files that have deletes, and runs of small files, and writes them back as a few whole files with
-the deleted rows gone. The reader's planner chooses
-the files for `after-a-day`:
+the deleted rows gone. Here it plans work for `after-a-day` in `fixtures/changes/`, which
+contains position deletes and small appended files. The [snapshot history](follow-snapshots-and-deletes.html)
+names those files; [Compare copy-on-write and merge-on-read](compare-update-costs.html)
+shows their ongoing scan costs. The planner chooses:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -311,8 +316,8 @@ The compaction is one large read and one large write, paid once. Every later sca
 after enough scans the compaction has paid for itself. That arithmetic decides how often a table
 should be compacted: a table scanned all day repays it quickly, and one read once a week may
 never do so. The job also has to run somewhere, at some time, and it competes with the writers:
-if a writer deletes from `data/part-1.parquet` while compaction is rewriting it, one of the two
-commits must fail and retry.
+if a writer deletes from `data/part-1.parquet` while compaction is rewriting it, the later commit
+must validate that concurrent change and may need to retry. The fixture does not simulate that race.
 
 The model omits real decode/re-encode and distributed scheduling costs. Its simulated break-even is conditional, not a production timing promise.
 
@@ -336,8 +341,9 @@ then the takeaways and the understanding check.
 :::
 
 The reader's `changes` module (`python/parquet_lab/changes.py`, or
-`crates/parquet-lab/src/changes.rs`) reads a table through its snapshots, which
-`read_snapshots` parses out of `_snapshots.json`. A snapshot is two lists, and the rows a data
+`crates/parquet-lab/src/changes.rs`) implements the
+[snapshot and delete walkthrough](follow-snapshots-and-deletes.html). It reads
+`fixtures/changes/_snapshots.json`, whose named versions list the data and delete files. A snapshot is two lists, and the rows a data
 file still holds are its rows less the rows its delete files name:
 
 ::::{tab-set}
@@ -362,7 +368,7 @@ file still holds are its rows less the rows its delete files name:
 ### Reading a delete file
 
 A position delete file is read with the reader's query engine
-([ch12](#what-a-query-engine-does)), since it is a Parquet file like any other:
+([What a query engine does](#what-a-query-engine-does)), since it is a Parquet file like any other:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -431,9 +437,10 @@ in the same dependency phase as the first read of the data file:
 :::
 ::::
 
-Then each candidate data file is read the way [ch10](#how-readers-read) reads any file: its size
+Then each candidate data file is read the way [How readers read](#how-readers-read) reads any file: its size
 known from the snapshot, statistics and the page index to find the page, and the matching pages
-of every column. `scan_in` is ch10's scan, sharing the store with the requests before it, so the
+of every column. `scan_in` is the [single-file scan](build-scan-planner.html), sharing the store
+with the requests before it, so the
 trace shows the whole chain. The row is found by its position, and a delete file naming that
 position removes it:
 
@@ -522,8 +529,14 @@ reference
 (changing-a-table-limits)=
 ## What this cannot tell you
 
-**How deep real metadata is.** This table's metadata is one file. Iceberg's is a chain: a
-metadata file points to a manifest list, which points to manifests, which list the files. Each
+These notes qualify the `fixtures/changes/` experiments: [snapshot membership](follow-snapshots-and-deletes.html),
+[a single-row lookup](trace-a-table-lookup.html), [update costs](compare-update-costs.html),
+and [compaction](decide-when-to-compact.html). The teaching table keeps its snapshot lists in
+one JSON file and charges requests through a simulated object store.
+
+**How deep real metadata is.** The fixture's `_snapshots.json` is one file. The
+[Iceberg manifest-list layout](follow-iceberg-metadata.html) uses a chain: a metadata file
+points to a manifest list, which points to manifests listing the files. Each
 link is another round trip before the first data request, unless a reader caches it.
 
 **Other ways to delete.** Iceberg also has *equality deletes*, which name values instead of
@@ -532,10 +545,10 @@ positions (`order_id = 250`), and are cheaper to write and dearer to read. Newer
 apply than a Parquet file of positions. The costs move, and the shape stays: every form of
 merge-on-read is work that each reader repeats until compaction.
 
-**Concurrent writers.** One writer changed this table. Two writers, or a writer and a compaction,
-commit through the table format's optimistic concurrency: each writes its files, then tries to
-make its snapshot current, and one fails if the other got there first. A compaction that loses
-that race has done all its work for nothing.
+**Concurrent writers.** The fixture history has no competing writers. A real table format
+checks conflicts when publishing a change; prepared work may need revalidation, retry or
+replacement. [Commit a table change safely](commit-a-table-change.html) explains why an
+atomic pointer update alone cannot validate a stale plan.
 
 **What old snapshots cost.** Every snapshot here stays readable, so the files of `written` are
 still stored after `compacted` replaced them. Real tables *expire* old snapshots and delete the
@@ -555,7 +568,7 @@ cost is the real bill.
   a new file, and a new snapshot listing it.
 - **Finding one row is a chain of dependent requests.** Snapshots, trailer, footer, index, pages:
   each needs the last one's answer, and the row is reassembled from a page of every column. A
-  key-value store does it in one request.
+  key-value model in the lookup comparison fetches an already stored row in one request.
 - **Copy-on-write pays when it writes.** One changed row costs a whole file, and reads stay cheap.
 - **Merge-on-read pays whenever anyone reads.** A delete file is cheap to write, and every later
   scan fetches and applies it, until the table is compacted.
@@ -630,5 +643,5 @@ cargo test -p exercises --test changing_a_table -- --ignored
   changes aside and merging them later began; compaction is its merge.
 - pyarrow's [compute functions](https://arrow.apache.org/docs/python/compute.html) are what the
   library step used to take out deleted rows.
-- [ch16](#what-iceberg-adds) maps what Apache Iceberg adds above Parquet files to the chapters
+- [What Iceberg adds](#what-iceberg-adds) maps what Apache Iceberg adds above Parquet files to the chapters
   that show it, and reads the field ids by which a table names its columns.

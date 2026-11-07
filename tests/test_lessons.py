@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from html.parser import HTMLParser
@@ -133,6 +134,52 @@ def test_optional_resources_are_bounded_and_not_the_full_chapter():
         assert all(
             lesson.optional and lesson.href != chapter.anchor + ".html" for lesson in resources(chapter)
         )
+
+
+def test_preparation_routes_reach_earlier_reading_lessons_not_optional_code():
+    core = [lesson for chapter in CHAPTERS for lesson in MODULES[chapter.slug] if not lesson.optional]
+    positions = {lesson.slug: i for i, lesson in enumerate(core)}
+    for chapter in CHAPTERS:
+        boundary = max(positions[lesson.slug] for lesson in MODULES[chapter.slug] if not lesson.optional) + 1
+        for lesson in (*MODULES[chapter.slug], *resources(chapter)):
+            if lesson.optional:
+                assert lesson.prerequisites, f"{lesson.href}: name the examples this page builds on"
+            for slug, label in lesson.prerequisites:
+                assert label.strip(), f"{lesson.href}: preparation needs meaningful link text"
+                assert slug in positions, f"{lesson.href}: preparation must be on the reading route"
+                assert positions[slug] < positions.get(lesson.slug, boundary), lesson.href
+
+
+def test_supporting_pages_publish_distinct_subjects_and_working_preparation_links():
+    titles = []
+    for chapter in CHAPTERS:
+        for lesson in resources(chapter):
+            titles.append(lesson.title)
+            body = (ROOT / "_build/html" / lesson.href).read_text()
+            prep = re.search(r'<p class="lesson-preparation">(.*?)</p>', body, re.S)
+            assert prep, f"{lesson.href}: missing direct-entry preparation"
+            links = re.findall(r'href="([^"]+)"', prep[1])
+            assert links, f"{lesson.href}: no route to its examples"
+            for target in links:
+                assert (ROOT / "_build/html" / target.split("#")[0]).is_file(), target
+            assert not re.search(r">ch\d+<", body), f"{lesson.href}: chapter shorthand is not a subject"
+    assert len(titles) == len(set(titles)), "supporting pages need distinguishable contents labels"
+
+
+@pytest.mark.parametrize(
+    ("source", "target"),
+    [
+        ("nested-data-notes", "build-nested-reader"),
+        ("weigh-compression-costs", "build-decompressors"),
+        ("check-page-corruption", "build-page-reader"),
+    ],
+)
+def test_library_comparisons_reach_the_owning_lab_not_a_shared_heading(source, target):
+    body = (ROOT / "_build/html" / f"{source}.html").read_text()
+    assert f'href="{target}.html#ask-a-library"' in body
+    assert 'href="build-footer-reader.html#ask-a-library"' not in body
+    destination = (ROOT / "_build/html" / f"{target}.html").read_text()
+    assert 'id="ask-a-library"' in destination
 
 
 def test_published_chapter_urls_are_indexes_without_combined_content():

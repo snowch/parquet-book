@@ -10,7 +10,7 @@ title: What a query engine does
 What does a query engine do with a Parquet file, and what does each kind of query cost?
 
 The reader can now find a footer, trust its statistics, skip row groups and pages, decode every
-encoding and fetch bytes carefully. [ch11](#writing-parquet-well) showed how a writer's choices
+encoding and fetch bytes carefully. [Writing Parquet well](#writing-parquet-well) showed how a writer's choices
 decide what a reader can skip. At work nobody calls those pieces one at a time. You write SQL or
 a dataframe expression, and a query engine decides which pieces to use. How an engine works
 inside would take a book of its own. This chapter is about its role: what it asks of a Parquet
@@ -38,8 +38,8 @@ a **filter** tests decoded rows against a condition and keeps the matching rows.
 **Projection** selects the columns needed by the query, including columns used only by a condition.
 
 A Parquet file is data and metadata, and nothing more. It holds column chunks, and a footer that
-says where each one is and what range its values span ([ch02](#anatomy-of-a-parquet-file),
-[ch08](#metadata-and-statistics)). It runs nothing, and it cannot tell which of its bytes a query
+says where each one is and what range its values span ([Anatomy of a Parquet file](#anatomy-of-a-parquet-file),
+[Metadata and statistics](#metadata-and-statistics)). It runs nothing, and it cannot tell which of its bytes a query
 needs.
 
 The engine does everything else. **Predicate pushdown** gives a condition to the scan so it
@@ -53,15 +53,15 @@ down does not mean metadata alone can decide which individual rows match.
   plan that reads the file. Told which columns to read and which conditions must hold, it can
   rule out parts of the file from the footer before it fetches them.
 - **It schedules the reads.** It decides which byte ranges to request, merges neighbouring ones,
-  and runs requests side by side ([ch10](#how-readers-read)).
+  and runs requests side by side ([How readers read](#how-readers-read)).
 - **It decodes.** It decompresses pages and turns encoded values back into values
-  ([ch05](#encodings), [ch07](#compression)).
+  ([Encodings](#encodings), [Compression](#compression)).
 - **It runs everything after the scan.** Filtering rows, grouping, sorting, joining and limiting
   work on values already decoded. The file takes no part in them.
 
-The file's part ends at the scan. So a query's cost against Parquet is mostly the cost of its
-scan: the bytes it fetches and the values it decodes. Every later stage sees only what the scan
-passed on.
+The file's part ends at the scan. This experiment measures the bytes that scan fetches and
+the values it decodes. Every later stage sees only what the scan passed on; its own processing
+cost is outside those measurements.
 
 ### What a scan can skip
 
@@ -69,15 +69,15 @@ Earlier chapters showed four ways for a scan to avoid reading, each decided befo
 fetched:
 
 - **Columns the query does not name.** Each column chunk is a separate range of the file
-  ([ch01](#why-parquet-exists)).
+  ([Why Parquet exists](#why-parquet-exists)).
 - **Row groups whose statistics rule a condition out.** Each column chunk's minimum and maximum
-  are in the footer ([ch08](#metadata-and-statistics), [ch09](#skipping-data)).
+  are in the footer ([Metadata and statistics](#metadata-and-statistics), [Skipping data](#skipping-data)).
 - **Pages the page index rules out**, inside the row groups that remain
-  ([ch09](#skipping-data)).
+  ([Skipping data](#skipping-data)).
 - **Row groups whose Bloom filter says a value is absent**, for an equality on a column whose
-  ranges rule nothing out ([ch09](#skipping-data)).
+  ranges rule nothing out ([Skipping data](#skipping-data)).
 
-[ch10](#how-readers-read) turned what remained into requests. None of these changes the answer.
+[How readers read](#how-readers-read) turned what remained into requests. None of these changes the answer.
 They decide only how much of the file the answer costs.
 
 ### The book's engine
@@ -86,9 +86,9 @@ An **aggregate** combines several values into a result, such as a count or a sum
 The following query counts orders for each country.
 
 **Run a query.** The book's reader includes a small engine. It runs a query as a few stages and
-reports what each stage did. It is simple where production engines are clever (see *What this
-cannot tell you*), but it does the same jobs in the same order. Run it on the orders from
-[ch11](#writing-parquet-well), which are sorted by `order_id`:
+reports what each stage did. Its [limitations](what-a-query-engine-does-notes.html) describe
+what production engines do differently. This example uses `writing-baseline.parquet`, sorted
+by `order_id`, and counts orders per country where `order_id < 300`, then sorts the countries:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -136,14 +136,14 @@ group's statistics span a narrow range, and two of the ranges lie wholly above t
 `status = 'refunded'` skipped nothing. Refunds occur in every row group, so every row group's
 range includes the value, and the engine decoded every row to find them. The two conditions have
 the same shape. What differs is how the file is laid out against each one
-([ch11](#writing-parquet-well)).
+([Writing Parquet well](#writing-parquet-well)).
 
 A pushed-down filter skips only what the metadata rules out; the engine still checks every row
 it decodes. The statistics decide which row groups to read, the page index narrows those to
 pages, and a Bloom filter can rule out an equality on a column such as `customer_id`, whose values
-are spread through every row group ([ch09](#skipping-data)). The book's engine stops at row
+are spread through every row group ([Skipping data](#skipping-data)). The book's engine stops at row
 groups. A scan that also uses the page index reads fewer pages of the row groups it keeps, as
-[ch09](#skipping-data) measured.
+[Skipping data](#skipping-data) measured.
 
 This teaching engine judges only comparisons of a stored column with a constant against a
 minimum and a maximum. A function of the column, such as `lower(country) = 'fr'`, needs the function's
@@ -158,7 +158,7 @@ This small engine prunes row groups and decodes retained values. It does not imp
 At work a library or an engine runs the query. pyarrow's dataset module pushes the condition
 down into its scan, keeps the row groups whose statistics allow it, reads only the columns the
 query needs, then filters and groups. The `parquet` crate has no query language. You give it a
-predicate on each row group's statistics, as in [ch09](#skipping-data), and a projection of the
+predicate on each row group's statistics, as in [Skipping data](#skipping-data), and a projection of the
 columns to read, then filter and count the rows yourself:
 
 ::::{tab-set}
@@ -200,6 +200,10 @@ answer-from-metadata
 
 ### Answers from the footer
 
+The [query-cost comparison](what-a-query-engine-does-comparison.html) runs the teaching engine
+on `writing-baseline.parquet`, an orders file sorted by `order_id`. Use its count and minimum
+rows to distinguish metadata-only answers from answers that require decoding values.
+
 `count(*)` read no bytes after the footer. The footer records each row group's row count, and
 the engine added them up. With a condition, `count(*)` needs the condition's column, except in
 row groups whose statistics show that every row passes, or that none does.
@@ -211,7 +215,7 @@ things:
 
 - **Every row group has statistics for the column.** They are optional.
 - **They are exact.** A writer may shorten a long string's bounds, and says so in the exact flags
-  of [ch08](#metadata-and-statistics).
+  of [Metadata and statistics](#metadata-and-statistics).
 - **No condition removes rows.** The statistics describe every row, not the rows a filter keeps.
 
 `count(column)` works the same way: the row count, less the null count from the statistics.
@@ -231,8 +235,9 @@ group-dictionary-values
 An aggregate can then compute one count or sum for each group. The dictionary indices below
 are compact labels for stored values, not shared identities across all chunks.
 
-`GROUP BY country` read one column, and a cheap one, because it is dictionary-encoded
-([ch05](#encodings)). It holds a few distinct values, so each chunk is a small dictionary page and
+In the [query-cost comparison](what-a-query-engine-does-comparison.html), `GROUP BY country`
+on `writing-baseline.parquet` reads one column, and a cheap one, because it is dictionary-encoded
+([Encodings](#encodings)). It holds a few distinct values, so each chunk is a small dictionary page and
 a run of short indices. The same rows of `order_id`, whose values are all distinct, cost several
 times as many bytes.
 
@@ -242,7 +247,7 @@ form, as indices into a dictionary, rather than as strings. `DISTINCT` is a `GRO
 aggregates, and the same holds for it. There are two catches. A dictionary belongs to one column chunk, so the
 same index means different strings in different row groups, and an engine must merge the
 dictionaries. And a writer that fell back to plain encoding, because a dictionary grew too
-large, leaves some pages with no indices at all ([ch05](#encodings)). The book's engine decodes
+large, leaves some pages with no indices at all ([Encodings](#encodings)). The book's engine decodes
 every string and groups by comparing them.
 
 Two schematic chunk dictionaries illustrate the problem. Chunk A has `[UK, FR]` and one
@@ -264,8 +269,9 @@ A **top-k** query asks for the first *k* rows under an ordering, such as the fiv
 Keeping only the best candidates found so far limits memory use. It does not prove that unread
 rows contain no better candidate.
 
-`ORDER BY amount_cents DESC LIMIT 5` returned five rows, and read both of its columns for every
-row. The largest amounts could be in any row group, and without safe bounds or known order, a stage cannot know it has the top five
+The [query-cost comparison](what-a-query-engine-does-comparison.html) uses
+`writing-baseline.parquet`, sorted by `order_id`. Its `ORDER BY amount_cents DESC LIMIT 5` query
+returns order numbers and amounts, and reads both columns for every row. The largest amounts could be in any row group, and without safe bounds or known order, a stage cannot know it has the top five
 until it has examined every candidate row. An engine keeps only the best rows found so far, so its memory stays
 small, but its scan reads everything. It can still skip a row group whose maximum amount is below
 the fifth largest found so far, which the statistics allow and some engines do. The book's engine
@@ -274,7 +280,7 @@ does not.
 `ORDER BY order_id LIMIT 5` cost exactly the same, although the file is sorted by `order_id` and
 the answer lies in its first row group. The book's engine does not know the order. An engine can
 learn it from the footer: a writer may record it in each row group's `sorting_columns`
-([ch08](#metadata-and-statistics)), and the statistics show whether row groups' ranges overlap.
+([Metadata and statistics](#metadata-and-statistics)), and the statistics show whether row groups' ranges overlap.
 An engine that knows the order can read the first row group and stop. So sorting a file on the
 key that queries order by, or filter on, makes both kinds of query cheap.
 
@@ -304,8 +310,9 @@ condition, a Bloom filter of the keys, or the list of keys if it is short. The p
 then skips row groups as any filtered scan does. **Dynamic filtering** uses values learned
 while running one part of a query to restrict another part's scan. Trino uses that name; Spark has
 *runtime filters* and *dynamic partition pruning*. The book's engine has no joins. Its scan can
-run the range condition a join would push down, though, with three small files from later
-chapters' fixtures as build sides:
+run the range condition a join would push down. The comparison uses the sorted and shuffled
+orders fixtures, `writing-baseline.parquet` and `writing-shuffled.parquet`, as probe inputs. Its build keys come from the UK and German partitions in
+`fixtures/table/` and a small append in `fixtures/changes/`, identified in the table:
 
 ```{include} _generated/engine-join.md
 ```
@@ -326,7 +333,7 @@ A **partition** groups rows by a shared key or derived value. Partitions and sor
 a join in a second way. When both inputs are partitioned on the
 key, or sorted by it, an engine can join them piece by piece. It joins each partition of one side
 with the matching partition of the other, or merges the two sorted inputs in step. No hash table
-then holds a whole side. The partitioned table of [ch14](#lakehouse-and-beyond) is one such
+then holds a whole side. The partitioned table of [Lakehouse and beyond](#lakehouse-and-beyond) is one such
 layout.
 
 The figure runs a probe-side scan with a join-derived range. The book’s engine does not execute a join.
@@ -342,31 +349,44 @@ reference
 
 ### Wide tables and many small files
 
-A table with hundreds of columns makes projection matter more, not less: a query still reads only
-the columns it names. The cost moves to the footer. It describes every column chunk of every row
-group, so a wide table's footer is large, and every query fetches and decodes it before anything
-else ([ch08](#metadata-and-statistics)). `SELECT *` on a wide table pays for every column.
+This comparison brings together the [scan and filter example](separate-scan-and-filter.html)
+and the lessons on metadata-only answers, grouping and sorted limits. The cost table below
+uses the teaching engine on `writing-baseline.parquet`, an orders file sorted by `order_id`.
+The discussion of wide tables and many files describes how the trade-offs can change at scale.
 
-A table split into many small files makes an engine open each of them. Each file costs a footer
-and a few requests before any data, and each holds too few rows to repay them
-([ch01](#why-parquet-exists), [ch15](#changing-a-table)). An engine opens files in parallel, but
-the cost stays a cost per file. Statistics in a table's log can rule out whole files before
-they are opened ([ch14](#lakehouse-and-beyond)). Compacting small files into larger ones
-removes the cost ([ch15](#changing-a-table)).
+A table with hundreds of columns makes projection matter more, not less: a query still reads only
+the columns it names. The footer still describes every column chunk of every row group, so a
+wide file can have a large footer. Opening an uncached file requires fetching and decoding that
+metadata before planning its data reads ([Metadata and statistics](#metadata-and-statistics)).
+`SELECT *` on a wide table also reads every column.
+
+A query over many small files pays opening costs for each file it needs. Each uncached file
+requires metadata work before its data can be read, with fewer rows over which to spread that
+cost ([Why Parquet exists](#why-parquet-exists), [Changing a table](#changing-a-table)). Engines
+can overlap requests, and table statistics can rule out files before opening them
+([Lakehouse and beyond](#lakehouse-and-beyond)). Compacting small files into larger ones reduces
+this per-file overhead; it does not eliminate metadata or reading costs
+([Changing a table](#changing-a-table)).
 
 
 
 ### What each query read
 
-The engine ran one query of each kind this section goes through, on the same file:
+The teaching engine ran each query below on `writing-baseline.parquet`. The table counts
+bytes and decoded values, not execution time:
 
 ```{include} _generated/engine-costs.md
 ```
 
-The core lessons examine the table’s mechanisms separately. For each kind of query it says
-what the scan read, and what an engine can do that the book's engine does not.
+The core lessons explain [metadata-only answers](answer-from-metadata.html),
+[grouping](group-dictionary-values.html) and [sorted limits](limit-a-sorted-query.html).
+They distinguish the work shown here from optimisations that the teaching engine does not implement.
 
 ## What this cannot tell you
+
+These notes qualify the teaching engine's [scan and filter walkthrough](separate-scan-and-filter.html)
+and [query-cost comparison](what-a-query-engine-does-comparison.html) on `writing-baseline.parquet`.
+The separate [join-filter comparison](use-join-derived-filters.html) models only a probe-side scan.
 
 **How engines work inside.** The book's engine handles one row at a time, keeps every decoded row
 in memory, and groups by searching a list. Production engines can process batches of values
@@ -374,20 +394,20 @@ with vectorised code, decode only the rows a filter keeps, and write temporary d
 memory runs out. They can run stages in parallel and choose plans by estimated cost. Each of those is a subject
 of its own.
 
-**Time.** The table counts bytes and values, not time. The engine reads from memory. Against an
+**Time.** The [query-cost table](what-a-query-engine-does-comparison.html) counts bytes and values, not time. The engine reads from memory. Against an
 object store, the number of requests can matter more than the bytes they fetch, as
-[ch10](#how-readers-read) measured.
+[How readers read](#how-readers-read) measured.
 
 **Pages and Bloom filters in the engine.** The book's engine skips row groups on their statistics
-alone. The page index and Bloom filters of [ch09](#skipping-data) skip more, and
-[ch10](#how-readers-read)'s scan uses both. Whether a given engine uses them, and whether by
+alone. The page index and Bloom filters of [Skipping data](#skipping-data) skip more, and
+[How readers read](#how-readers-read)'s scan uses both. Whether a given engine uses them, and whether by
 default, differs between engines and versions.
 
-**A join.** The join table runs only the probe side's scan, with the build side's key range as
+**A join.** The [join-filter table](use-join-derived-filters.html) runs only the probe side's scan, with the build side's key range as
 its condition. It builds no hash table and measures no join.
 
-**Other files.** Every number here comes from one small file of a few row groups, sorted by one
-key. The proportions depend on the file. On a table with hundreds of columns and many row
+**Other files.** The query-cost table uses one small orders file sorted by `order_id`; the
+join-filter table compares sorted and shuffled probe inputs. The proportions depend on the file. On a table with hundreds of columns and many row
 groups, projection and skipping save far more.
 
 ## Key takeaways
@@ -398,8 +418,8 @@ groups, projection and skipping save far more.
 - **The file holds data and metadata; the engine does the rest.** It plans, pushes the
   projection and the filter down, schedules the reads, decodes, and runs every stage after the
   scan.
-- **A query's cost against Parquet is mostly its scan.** The columns it names and the row groups
-  its conditions rule out decide the bytes read and the values decoded.
+- **The scan determines which file bytes are read.** The required columns and retained row
+  groups decide the bytes read and values decoded in this model; later stages also cost work.
 - **Projection is only as good as the query.** `SELECT *` reads every column, because nothing
   tells the engine which ones you need.
 - **A filter skips only what the layout lets it.** A condition on the sort key skips row groups;
@@ -419,7 +439,11 @@ answer: No. Overlap means the scan cannot rule the group out. The filter must ch
 
 ## Problems
 
-Four, all for reasoning. No test grades them: the chapter builds nothing.
+These questions apply the [query-cost comparison](what-a-query-engine-does-comparison.html)
+to new cases. Unless a question gives another table, use its `writing-baseline.parquet` fixture:
+orders sorted by `order_id`, with dictionary-encoded countries. The [metadata-answer lesson](answer-from-metadata.html)
+and [join-filter example](use-join-derived-filters.html) provide preparation. These are reasoning
+questions; no code or automated grading is required.
 
 **12.1 From the footer alone.** No test. Say whether an engine could answer each of these queries
 on the orders file with no data page read, and why: `SELECT count(*) FROM orders`;
@@ -445,7 +469,8 @@ can skip a row group whose minimum is above the fifth smallest amount found so f
 groups of about a million rows, is joined on `order_id` with a table of a few thousand refunds,
 all of orders placed last week. Say which side to build, what the probe side's scan reads, and
 what changes if the refunds span the whole history, or if the orders are sorted by
-`customer_id` instead. Check the shape of your answer against the join table. A good answer
+`customer_id` instead. Check the shape of your answer against the
+[join-filter comparison](use-join-derived-filters.html). A good answer
 builds the refunds, the smaller side, so the hash table is small. It says their keys span a
 narrow range at the end of the orders, so the probe side's scan skips every row group but the
 last few. It says refunds spanning the whole history give a range that rules nothing out, like
@@ -460,8 +485,8 @@ row groups or files skipped. You can also run a query on one of your files with 
 engine, `cargo run -p pqlab -- query FILE "SQL"`, and read its Scan stage. A good answer lists,
 for each query, the columns read against the columns named, and the conditions pushed down
 against those applied after the scan, with a reason for each condition that was not pushed
-down. A condition you expected to be pushed down and was not means the engine did not see a
-column compared with a constant. Rewrite it, and look at the plan again.
+down. If an expected condition was not pushed down, inspect that engine's supported conditions
+and the expression's form. A comparison against a stored column may help; check the plan again.
 
 ## Where to go next
 
@@ -474,5 +499,5 @@ column compared with a constant. Rewrite it, and look at the plan again.
   an Extensible and Parallel Query Evaluation System* describes the row-at-a-time model the
   book's engine uses. Boncz, Zukowski and Nes, *MonetDB/X100: Hyper-Pipelining Query Execution*,
   describes the batch-at-a-time alternative.
-- [ch13](#modular-encryption) asks what a reader can still see when parts of a file are
+- [Modular encryption](#modular-encryption) asks what a reader can still see when parts of a file are
   encrypted.
