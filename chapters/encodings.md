@@ -29,6 +29,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+dictionary-values
+```
+
 ### Read the encodings yourself
 
 `encodings.parquet` holds forty orders, and each column was written with the encoding that suits
@@ -41,6 +45,236 @@ or change it. Python runs in the page; Rust runs in a Codespace or at a desk as 
 [ch02](#anatomy-of-a-parquet-file) did, and the reader's `walk_pages` finds a column chunk's
 pages as it did in [ch04](#nested-data). Every column in both files is required, so a data page's
 body holds values and no levels.
+
+**A dictionary.** `country` in `dictionary.parquet` repeats a handful of strings. Its column
+chunk holds two pages. Read both:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/dictionary_by_hand.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/dictionary_by_hand.rs
+:language: rust
+```
+:::
+::::
+
+The first page is a *dictionary page*: each distinct country once, written PLAIN, in the order
+the writer first met it. The data page after it holds no strings at all. It holds one byte giving
+a bit width, then a run of the RLE / bit-packing hybrid from [ch04](#nested-data), with the
+position of each row's country in the dictionary. Four entries need two bits each, so the whole
+column's values fit in the few bytes the step printed.
+
+Change `slots` to `8 * (header >> 1)`, the number of slots the run's groups hold, and look at the
+indices after the page's own.
+
+### Dictionary encoding
+
+Dictionary encoding replaces each value with a small integer: its position in a list of the
+column chunk's distinct values. The list is written once, as PLAIN, in a dictionary page at the
+start of the column chunk. The data page then holds the indices, packed with the RLE /
+bit-packing hybrid, after one byte giving their bit width. That is the layout the dictionary walkthrough
+read.
+
+The run header `05` that the step printed is binary `101`: a bit-packed run of two groups of
+eight. The page has twelve rows, so the run ends with four slots of padding. Dictionary encoding
+also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in the
+dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip the
+whole column chunk. Some readers do both. The reader in this book does neither, as
+[ch09](#skipping-data) notes.
+
+The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 name it
+`PLAIN_DICTIONARY`, which is decoded the same way.
+
+```practice
+question: A separate dictionary is [red, blue], with zero-based indices [1, 0, 1]. Rebuild the values. Would keeping a dictionary necessarily save space if every value were distinct?
+answer: The values are blue, red, blue. Distinct values must all appear in the dictionary and also need indices, so dictionary encoding can cost more than PLAIN. Dictionary order is local to a column chunk.
+```
+
+```lesson
+integer-differences
+```
+
+### A first value, then differences
+
+A **delta** is the difference from the preceding value. Keep the first value and add each delta
+to recover the next value. This small complete example uses values decoded from a real column:
+
+```transfer
+delta-example
+```
+
+The column below varies more. Its blocks store a minimum delta, then non-negative excesses over
+that minimum. A constant sequence of deltas needs no bits for those excesses.
+
+### DELTA_BINARY_PACKED
+
+For integers that are sorted or change slowly, storing the differences between values is far
+cheaper than storing the values. `DELTA_BINARY_PACKED` writes a header, then blocks. Each block
+subtracts its smallest delta from all of its deltas, so every adjusted delta is zero or more, and
+splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs. The
+block starts with its smallest delta and one byte per miniblock giving that miniblock's width.
+This is `ordered_at`'s page, as the reader decodes it:
+
+```{include} _generated/delta-ordered-at.md
+```
+
+The values are about a minute apart, so the smallest delta is large, but the adjusted deltas
+are all small and fit in two bits. Deltas that never vary, like `order_id`'s, adjust to zero and
+pack into a width of zero: a miniblock with no bytes at all.
+
+This lesson interprets decoded values and blocks. The optional build lab inspects variable-length headers and zigzag decoding.
+
+```practice
+question: A schematic sequence starts at twelve and has deltas minus two, then plus four. Rebuild it. Must the deltas themselves be positive?
+answer: The sequence is twelve, ten, fourteen. Deltas can be negative. DELTA_BINARY_PACKED subtracts the block’s minimum delta so the adjusted deltas it bit-packs are non-negative.
+```
+
+```lesson
+string-prefixes
+```
+
+### The delta encodings for strings
+
+Two encodings apply the same idea to byte arrays.
+
+**`DELTA_LENGTH_BYTE_ARRAY`** writes every value's length first, as `DELTA_BINARY_PACKED`, then
+all the values' bytes back to back. The `sku` column's values are all the same length, so the
+lengths cost almost nothing, and the bytes are stored without a length in front of each.
+
+**`DELTA_BYTE_ARRAY`** writes, for each value, how many leading bytes it shares with the value
+before it, then only the rest. Sorted strings with common prefixes, such as URLs, paths and
+hierarchical keys, shrink the most. These are the first of `url`'s prefix lengths and suffixes,
+added up from the deltas the string walkthrough printed:
+
+```{include} _generated/delta-urls.md
+```
+
+A URL that carries into a new digit, such as the step from `109` to `110`, shares one byte fewer
+and stores two.
+
+### Follow a string decoder
+
+**The reader, step by step.** The book's reader decodes every encoding the steps met, and a few
+more. For each page it keeps a record of every step: a label, the bytes it read, and what it read
+from them. Ask it for `url`, which pyarrow wrote as `DELTA_BYTE_ARRAY`:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/encodings/decode_a_column.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/decode_a_column.rs
+:language: rust
+```
+:::
+::::
+
+The page holds two runs of `DELTA_BINARY_PACKED` integers and then some bytes. The first run is
+the *prefix lengths*: how many leading bytes each URL shares with the URL before it. The first
+URL shares none, and the deltas after it say that most of the others share all but their last
+character. The second run is the lengths of what is left of each URL, and the bytes are those
+suffixes, back to back. Only the first URL is stored in full.
+
+Change `name` to `"order_id"`, `"sku"` or `"weight_kg"` and run the step again. `order_id` is the
+first step's other column, read by the reader. `sku`'s strings are all the same length, and its
+lengths take no bytes beyond their header and block. `weight_kg` is a float, split into four
+streams; look at how few different bytes the last stream holds. Then open `dictionary.parquet`
+and ask for `"country"`: the reader finds the same dictionary and indices as the dictionary walkthrough.
+
+```practice
+question: A schematic ASCII value follows /a/cat with prefix length three and suffix dog. What is the new value? Does a prefix length count human-readable characters in general?
+answer: It is /a/dog: keep the first three bytes, /a/, then append dog. Prefix lengths count bytes, not arbitrary Unicode characters. Byte boundaries matter when text is not ASCII.
+```
+
+```lesson
+split-byte-positions
+```
+
+### BYTE_STREAM_SPLIT
+
+`BYTE_STREAM_SPLIT` does not make anything smaller. It rearranges a column of fixed-width values
+into one stream per byte position: every value's first byte, then every value's second byte, and
+so on. Each byte position varies in its own way:
+
+```{include} _generated/split-weights.md
+```
+
+Read each value across on the left, then follow its byte positions into the streams on the right.
+The labels and colours identify the same positions in both views.
+
+```{include} _generated/visual-byte-stream-split.md
+```
+
+The last stream holds the sign and most of the exponent, and has almost no variety. The stream
+before it, the top of the mantissa, varies most. The two low streams repeat a few bytes, because
+these weights go up in steps of a twentieth, and the mantissa of such a fraction repeats one bit
+pattern. In measured data the low bytes usually vary far more. Written PLAIN, the exponent bytes
+are scattered one in every four. Written split, they sit together, where a compressor can
+find the repetition. [ch07](#compression) measures what that is worth.
+
+```practice
+question: A writer applies BYTE_STREAM_SPLIT without compression. Should a smaller page be expected? What additional comparison is needed before recommending it?
+answer: No. Splitting rearranges the same bytes. Compare the compressed result on the actual values and codec; a rearrangement may help or hurt their repeated byte patterns.
+```
+
+```lesson
+choose-an-encoding
+```
+
+### What each encoding saved
+
+The same measurement for every column of both files:
+
+```{include} _generated/encodings-sizes.md
+```
+
+Every saving in the table comes from a pattern in the values, and so does the one loss. The
+dictionary made `order_id` larger than PLAIN: every value is distinct, so the dictionary holds
+all of them, and the indices come on top.
+
+pyarrow falls back from a dictionary on its size, not on what it saves. It caps the dictionary's
+size, and when a column chunk's dictionary outgrows the cap it writes the remaining pages with
+another encoding. `order_id`'s dictionary is far below the default cap, so pyarrow kept it, and
+the loss stands. A column of distinct values escapes its dictionary only once there are enough of
+them to fill the cap. parquet-java also checks what the dictionary saves: after the first
+page, it drops the dictionary if the dictionary and its indices are not smaller than the
+plain values would be.
+
+### Which encodings writers use
+
+Most writers try dictionary encoding first for every column, and fall back when a dictionary
+grows too large. Repetition and definition levels always use the RLE / bit-packing hybrid. The
+delta encodings and `BYTE_STREAM_SPLIT` are usually opt-in, set per column; pyarrow wrote
+`encodings.parquet` only because the generator asked, and only with dictionary encoding turned
+off. The encodings a column chunk used are recorded in its metadata, so a reader never has to
+guess.
+
+These fixtures deliberately expose useful patterns. The tables measure sizes, not decoding speed; reader compatibility and writer policy also constrain a choice.
+
+```practice
+question: One column has repeated status codes; another has distinct identifiers. Would forcing dictionary encoding on both be a safe universal policy?
+answer: No. Repeated codes are a plausible dictionary candidate; distinct identifiers may pay for the dictionary plus indices. Writer fallback policy, encoding support and actual measurements determine the result.
+```
+
+```lesson
+build-encoding-readers
+```
+
+## Building it
+### Inspect a physical delta header
+
+The conceptual lesson reconstructed values without parsing varints. This optional walkthrough
+examines the physical header, including unsigned variable-length integers and zigzag for signed values.
 
 **A run of deltas.** `ordered_at` is a plain `INT64` with no logical type: a count of seconds
 since 1970, with rows about a minute apart. pyarrow wrote it as `DELTA_BINARY_PACKED`. Read the
@@ -76,168 +310,6 @@ others hold none: their width bytes are zero.
 Change `column` to 0, which is `order_id`. Its values go up by one, so every delta equals the
 smallest. Look at the bit widths, and at how many bytes the page body takes.
 
-**A dictionary.** `country` in `dictionary.parquet` repeats a handful of strings. Its column
-chunk holds two pages. Read both:
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/encodings/dictionary_by_hand.py
-:language: python
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/src/bin/dictionary_by_hand.rs
-:language: rust
-```
-:::
-::::
-
-The first page is a *dictionary page*: each distinct country once, written PLAIN, in the order
-the writer first met it. The data page after it holds no strings at all. It holds one byte giving
-a bit width, then a run of the RLE / bit-packing hybrid from [ch04](#nested-data), with the
-position of each row's country in the dictionary. Four entries need two bits each, so the whole
-column's values fit in the few bytes the step printed.
-
-Change `slots` to `8 * (header >> 1)`, the number of slots the run's groups hold, and look at the
-indices after the page's own.
-
-**The reader, step by step.** The book's reader decodes every encoding the steps met, and a few
-more. For each page it keeps a record of every step: a label, the bytes it read, and what it read
-from them. Ask it for `url`, which pyarrow wrote as `DELTA_BYTE_ARRAY`:
-
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/encodings/decode_a_column.py
-:language: python
-```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/src/bin/decode_a_column.rs
-:language: rust
-```
-:::
-::::
-
-The page holds two runs of `DELTA_BINARY_PACKED` integers and then some bytes. The first run is
-the *prefix lengths*: how many leading bytes each URL shares with the URL before it. The first
-URL shares none, and the deltas after it say that most of the others share all but their last
-character. The second run is the lengths of what is left of each URL, and the bytes are those
-suffixes, back to back. Only the first URL is stored in full.
-
-Change `name` to `"order_id"`, `"sku"` or `"weight_kg"` and run the step again. `order_id` is the
-first step's other column, read by the reader. `sku`'s strings are all the same length, and its
-lengths take no bytes beyond their header and block. `weight_kg` is a float, split into four
-streams; look at how few different bytes the last stream holds. Then open `dictionary.parquet`
-and ask for `"country"`: the reader finds the same dictionary and indices as the second step.
-
-### What each encoding saved
-
-The same measurement for every column of both files:
-
-```{include} _generated/encodings-sizes.md
-```
-
-Every saving in the table comes from a pattern in the values, and so does the one loss. The
-dictionary made `order_id` larger than PLAIN: every value is distinct, so the dictionary holds
-all of them, and the indices come on top.
-
-pyarrow falls back from a dictionary on its size, not on what it saves. It caps the dictionary's
-size, and when a column chunk's dictionary outgrows the cap it writes the remaining pages with
-another encoding. `order_id`'s dictionary is far below the default cap, so pyarrow kept it, and
-the loss stands. A column of distinct values escapes its dictionary only once there are enough of
-them to fill the cap. parquet-java also checks what the dictionary saves: after the first
-page, it drops the dictionary if the dictionary and its indices are not smaller than the
-plain values would be.
-
-### Dictionary encoding
-
-Dictionary encoding replaces each value with a small integer: its position in a list of the
-column chunk's distinct values. The list is written once, as PLAIN, in a dictionary page at the
-start of the column chunk. The data page then holds the indices, packed with the RLE /
-bit-packing hybrid, after one byte giving their bit width. That is the layout the second step
-read.
-
-The run header `05` that the step printed is binary `101`: a bit-packed run of two groups of
-eight. The page has twelve rows, so the run ends with four slots of padding. Dictionary encoding
-also helps a reader: to find rows where `country` is `UK`, it can look `UK` up once in the
-dictionary and then compare small integers, and if `UK` is not in the dictionary it can skip the
-whole column chunk. Some readers do both. The reader in this book does neither, as
-[ch09](#skipping-data) notes.
-
-The data page's encoding is named `RLE_DICTIONARY`. Files from format version 1 name it
-`PLAIN_DICTIONARY`, which is decoded the same way.
-
-### DELTA_BINARY_PACKED
-
-For integers that are sorted or change slowly, storing the differences between values is far
-cheaper than storing the values. `DELTA_BINARY_PACKED` writes a header, then blocks. Each block
-subtracts its smallest delta from all of its deltas, so every adjusted delta is zero or more, and
-splits them into miniblocks, each bit-packed at the width its largest adjusted delta needs. The
-block starts with its smallest delta and one byte per miniblock giving that miniblock's width.
-This is `ordered_at`'s page, as the reader decodes it:
-
-```{include} _generated/delta-ordered-at.md
-```
-
-The values are about a minute apart, so the smallest delta is large, but the adjusted deltas
-are all small and fit in two bits. Deltas that never vary, like `order_id`'s, adjust to zero and
-pack into a width of zero: a miniblock with no bytes at all.
-
-### The delta encodings for strings
-
-Two encodings apply the same idea to byte arrays.
-
-**`DELTA_LENGTH_BYTE_ARRAY`** writes every value's length first, as `DELTA_BINARY_PACKED`, then
-all the values' bytes back to back. The `sku` column's values are all the same length, so the
-lengths cost almost nothing, and the bytes are stored without a length in front of each.
-
-**`DELTA_BYTE_ARRAY`** writes, for each value, how many leading bytes it shares with the value
-before it, then only the rest. Sorted strings with common prefixes, such as URLs, paths and
-hierarchical keys, shrink the most. These are the first of `url`'s prefix lengths and suffixes,
-added up from the deltas the third step printed:
-
-```{include} _generated/delta-urls.md
-```
-
-A URL that carries into a new digit, such as the step from `109` to `110`, shares one byte fewer
-and stores two.
-
-### BYTE_STREAM_SPLIT
-
-`BYTE_STREAM_SPLIT` does not make anything smaller. It rearranges a column of fixed-width values
-into one stream per byte position: every value's first byte, then every value's second byte, and
-so on. Each byte position varies in its own way:
-
-```{include} _generated/split-weights.md
-```
-
-Read each value across on the left, then follow its byte positions into the streams on the right.
-The labels and colours identify the same positions in both views.
-
-```{include} _generated/visual-byte-stream-split.md
-```
-
-The last stream holds the sign and most of the exponent, and has almost no variety. The stream
-before it, the top of the mantissa, varies most. The two low streams repeat a few bytes, because
-these weights go up in steps of a twentieth, and the mantissa of such a fraction repeats one bit
-pattern. In measured data the low bytes usually vary far more. Written PLAIN, the exponent bytes
-are scattered one in every four. Written split, they sit together, where a compressor can
-find the repetition. [ch07](#compression) measures what that is worth.
-
-### Which encodings writers use
-
-Most writers try dictionary encoding first for every column, and fall back when a dictionary
-grows too large. Repetition and definition levels always use the RLE / bit-packing hybrid. The
-delta encodings and `BYTE_STREAM_SPLIT` are usually opt-in, set per column; pyarrow wrote
-`encodings.parquet` only because the generator asked, and only with dictionary encoding turned
-off. The encodings a column chunk used are recorded in its metadata, so a reader never has to
-guess.
-
-## Building it
 
 :::{div}
 :class: optional-section
@@ -424,6 +496,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encodings_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (encodings-limits)=

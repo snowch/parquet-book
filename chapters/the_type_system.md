@@ -29,6 +29,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+follow-schema-paths
+```
+
 ### Read the schema yourself
 
 `types.parquet` holds three orders, with a column for each physical type and the common logical
@@ -63,36 +67,38 @@ elements after it are its children. Nothing in the list says where a group ends.
 children is the only clue. Change the path to `fixtures/nested.parquet` and run the step again:
 a list is a group too, with a `REPEATED` field inside it.
 
-**The tree, rebuilt.** A count of children is enough to rebuild the tree. Take an element; if it
-has children, take that many subtrees after it, each the same way:
+### Rebuilt as a tree
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/the_type_system/rebuild_the_tree.py
-:language: python
+The tree you rebuilt is the schema. Parquet tools print it in a textual notation that comes from
+the Dremel paper:
+
+```{include} _generated/types-schema-text.md
 ```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/src/bin/rebuild_the_tree.rs
-:language: rust
+
+Each line has three parts: a repetition, a type, and a name. The logical type, when there is one,
+follows in brackets.
+
+**The repetition** says how many values the field has in each record:
+
+- `required`: exactly one. It is never null.
+- `optional`: zero or one. It may be null.
+- `repeated`: zero or more. The field is a list.
+
+**A leaf's path** is the names from the root's child down to it: `shipping.city`. A column chunk
+records its path, and the path is how a query names a nested column.
+
+```practice
+question: A schema group contains another group with a leaf called city, while a separate top-level leaf is also called city. Are those the same column?
+answer: No. A column is identified by its complete path, such as shipping.address.city versus city. A group describes structure and is not itself a physical leaf column.
 ```
-:::
-::::
 
-The walk consumes the list from the front, and the indentation is its depth. On the way down it
-counts the fields that may be absent. `country` is optional, so each of its values needs a level
-saying whether it is there. `shipping.city` is optional inside an optional group, so it needs a
-level that can say which of the two is missing. These counts are each leaf's *maximum levels*,
-and [ch04](#nested-data) needs them to decode the values. The book's reader then rebuilds the same
-tree with `schema.build`, and finds the same columns.
+```lesson
+interpret-logical-types
+```
 
-Now damage the list. The step writes the root's count of children back to the byte that holds it,
-as the zigzag varint `0x14`. Change it to `0x12`, one child fewer, and run the step again. The
-walk prints a shorter tree without complaint: it never looks at the elements after the root's
-last child. `shipping` and its children now belong to no one, and the reader's `build` refuses the
-file for that reason.
+### Stored values and their meaning
+
+A **physical type** describes storage; a **logical type** tells you how to interpret those stored values.
 
 **The same bytes, read two ways.** Each column chunk's statistics hold its smallest value, as
 bytes. Read three of them, first as the physical type stores them and then as the logical type
@@ -119,26 +125,6 @@ the same idea at a finer grain: an `INT64` count of microseconds. `amount` is th
 integer is read most significant byte first, which is *big-endian*, and it counts hundredths.
 Change `"big"` to `"little"` (`from_be_bytes` to `from_le_bytes` in Rust), and the same bytes are
 a number nobody meant. Only the schema says which reading is right.
-
-### Rebuilt as a tree
-
-The tree you rebuilt is the schema. Parquet tools print it in a textual notation that comes from
-the Dremel paper:
-
-```{include} _generated/types-schema-text.md
-```
-
-Each line has three parts: a repetition, a type, and a name. The logical type, when there is one,
-follows in brackets.
-
-**The repetition** says how many values the field has in each record:
-
-- `required`: exactly one. It is never null.
-- `optional`: zero or one. It may be null.
-- `repeated`: zero or more. The field is a list.
-
-**A leaf's path** is the names from the root's child down to it: `shipping.city`. A column chunk
-records its path, and the path is how a query names a nested column.
 
 ### Every column, read two ways
 
@@ -184,16 +170,65 @@ Encoders and decoders only ever handle the eight physical types. Every logical t
 interpretation applied after decoding. That keeps the part of a reader that touches bytes small,
 and lets the format add logical types without changing how anything is stored.
 
-### Older annotations, and field ids
+INT96 is deprecated and its timezone interpretation is ambiguous. This reader displays it rather than guessing a conversion; unknown logical annotations need explicit handling.
 
-Files written before logical types existed carry a `converted_type` instead, such as `UTF8` or
-`TIMESTAMP_MILLIS`. Writers still set both for older readers. A reader should prefer the logical
-type when both are present.
+```practice
+question: Two UTC timestamp columns store the same non-zero integer, but one annotation says milliseconds and the other says microseconds. Do the bytes represent the same instant?
+answer: No. The physical integer is the same; the logical unit changes its meaning. Also check whether a timestamp is a UTC instant or a local wall-clock value before interpreting it.
+```
 
-A schema element can also carry a `field_id`: a number that identifies a column across renames.
-Table formats use it to match columns between files written years apart
-([ch16](#what-iceberg-adds)). This chapter's fixture sets none; ch15's table sets one on every
-column.
+```lesson
+count-schema-levels
+```
+
+### Count levels while rebuilding
+
+**The tree, rebuilt.** A count of children is enough to rebuild the tree. Take an element; if it
+has children, take that many subtrees after it, each the same way:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/the_type_system/rebuild_the_tree.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/src/bin/rebuild_the_tree.rs
+:language: rust
+```
+:::
+::::
+
+The walk consumes the list from the front, and the indentation is its depth. On the way down it
+counts the fields that may be absent. `country` is optional, so each of its values needs a level
+saying whether it is there. `shipping.city` is optional inside an optional group, so it needs a
+level that can say which of the two is missing. These counts are each leaf's *maximum levels*,
+and [ch04](#nested-data) needs them to decode the values. The book's reader then rebuilds the same
+tree with `schema.build`, and finds the same columns.
+
+### One path, counted completely
+
+For `shipping.city`, the optional `shipping` group contributes one definition level and the
+optional `city` leaf contributes another. A present city therefore reaches two; a missing
+shipping group reaches zero, and a present group with a missing city reaches one. No field
+on this path repeats, so its maximum repetition level is zero.
+
+Each optional or repeated field on the path, including the leaf, raises the definition maximum.
+Only a repeated field raises the repetition maximum. Required fields raise neither. The tree output shows these
+schema maxima, not the actual level of every record.
+
+Counting maxima prepares the next module. It does not yet reconstruct records from their actual level streams.
+
+```practice
+question: A required address group contains an optional street leaf, and nothing repeats. What are that leaf’s maximum levels? Does the maximum say that every record has a street?
+answer: Maximum definition is one, maximum repetition is zero. The required parent contributes neither; the optional leaf contributes one definition level. A maximum describes what the schema permits, not what each record contains.
+```
+
+```lesson
+build-schema-reader
+```
 
 ## Building it
 
@@ -208,6 +243,14 @@ then the takeaways and the understanding check.
 The steps above called three parts of the book's reader: the decoding of each schema element, the
 rebuild of the tree, and the reading of a value through its logical type. This section builds
 them, in both languages, and the tabs switch every excerpt on the page between them.
+
+### Optional schema-damage investigation
+
+Now damage the list. The step writes the root's count of children back to the byte that holds it,
+as the zigzag varint `0x14`. Change it to `0x12`, one child fewer, and run the step again. The
+walk prints a shorter tree without complaint: it never looks at the elements after the root's
+last child. `shipping` and its children now belong to no one, and the reader's `build` refuses the
+file for that reason.
 
 ### Schema elements
 
@@ -438,6 +481,21 @@ Codespace or at a desk:
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin schema_with_a_library
 ```
+
+```lesson
+reference
+```
+
+### Older annotations, and field ids
+
+Files written before logical types existed carry a `converted_type` instead, such as `UTF8` or
+`TIMESTAMP_MILLIS`. Writers still set both for older readers. A reader should prefer the logical
+type when both are present.
+
+A schema element can also carry a `field_id`: a number that identifies a column across renames.
+Table formats use it to match columns between files written years apart
+([ch16](#what-iceberg-adds)). This chapter's fixture sets none; ch15's table sets one on every
+column.
 
 (the-type-system-limits)=
 ## What this cannot tell you

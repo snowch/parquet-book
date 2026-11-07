@@ -49,7 +49,7 @@ echo "== MyST parses every page and resolves every reference =="
 echo "== the site renders =="
 # The renderer raises on a node type it does not handle, so rendering every page on every push is
 # what stops new markup from silently disappearing.
-python3 scripts/build-site.py --out _build/html
+python3 scripts/build-site.py --out _build/html --integration-out _build/integration
 
 echo "== every link in the built site resolves =="
 python3 scripts/check-built-links.py _build/html

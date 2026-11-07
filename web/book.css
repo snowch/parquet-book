@@ -482,3 +482,10 @@ td code { font-size: 12.5px; }
   font: 14px/1.7 var(--chrome); }
 .lesson-reference { font: 14px/1.7 var(--chrome); }
 .lesson-boundary { scroll-margin-top: 5rem; }
+.nav-module > details > summary { display: flex; align-items: baseline; cursor: pointer; }
+.nav-module > details > summary::before { content: "▸"; color: var(--faint); font-size: 12px; }
+.nav-module > details[open] > summary::before { content: "▾"; }
+.nav-module > details > summary::-webkit-details-marker { display: none; }
+.nav-module > details > summary > a { flex: 1; }
+.nav-module > details > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.legacy-anchor { scroll-margin-top: 6rem; }

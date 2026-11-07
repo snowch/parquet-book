@@ -38,13 +38,17 @@ sys.path.insert(0, str(ROOT))
 from tools import render as renderer  # noqa: E402
 from tools.lessons import (  # noqa: E402
     MODULES,
+    legacy_navigation,
     lesson_intro,
     lesson_nodes,
     lesson_page,
+    migrate_links,
     module_card,
     module_href,
     reading_pages,
     reference_links,
+    resources,
+    supporting_nodes,
 )
 from tools.outline import APPENDICES, CHAPTERS, PARTS, UNWRITTEN  # noqa: E402
 
@@ -113,41 +117,37 @@ def is_unwritten(source: str) -> bool:
 
 
 def nav_html(pages: list[dict], here: str) -> str:
-    out = ['<nav class="nav" id="nav" aria-label="Chapters"><ol>']
+    out = ['<nav class="nav" id="nav" aria-label="Modules"><ol>']
     appendices = False
     for p in pages:
         if p.get("lesson"):
             continue
-        # The appendices get a heading as the parts do, though they have no page of their own.
         if p["source"].startswith("appendices/") and not appendices:
             appendices = True
             out.append('<li class="part">Appendices</li>')
-        cls = ["here"] if p["href"] == here else []
-        if p.get("chapter") is not None and is_unwritten(p["source"]):
-            cls.append("unwritten")
-        c = f' class="{" ".join(cls)}"' if cls else ""
+        chapter = p.get("chapter")
         aria = ' aria-current="page"' if p["href"] == here else ""
-        if p["source"].startswith("parts/"):
-            out.append(f'<li class="part"><a href="{p["href"]}"{aria}>{html.escape(p["title"])}</a></li>')
-        elif p["label"]:
-            num = p["label"].replace("Appendix ", "").replace("ch", "")
+        current = ' class="here"' if p["href"] == here else ""
+        if chapter:
+            lessons = (*MODULES[chapter.slug], *resources(chapter))
+            active = here == p["href"] or any(lesson.href == here for lesson in lessons)
+            out.append(f'<li class="nav-module"><details{" open" if active else ""}><summary>')
             out.append(
-                f'<li><a href="{p["href"]}"{c}{aria}><span class="num">{html.escape(num)}</span>'
-                f"{html.escape(p['title'])}</a></li>"
+                f'<a href="{p["href"]}"{current}{aria}><span class="num">{chapter.number:02d}</span>{html.escape(p["title"])}</a></summary>'
             )
-            chapter = p.get("chapter")
-            if chapter and chapter.slug in MODULES:
-                out.append('<li class="module-lessons"><ol aria-label="Lessons">')
-                for lesson in MODULES[chapter.slug]:
-                    current = ' class="here" aria-current="page"' if lesson.href == here else ""
-                    prefix = "Optional: " if lesson.optional else ""
-                    out.append(
-                        f'<li><a href="{lesson.href}"{current}>{prefix}{html.escape(lesson.title)}</a></li>'
-                    )
-                out.append("</ol></li>")
+            out.append('<ol class="module-lessons" aria-label="Lessons">')
+            for lesson in lessons:
+                current = ' class="here" aria-current="page"' if lesson.href == here else ""
+                prefix = "Optional: " if lesson.optional else ""
+                out.append(
+                    f'<li><a href="{lesson.href}"{current}>{prefix}{html.escape(lesson.title)}</a></li>'
+                )
+            out.append("</ol></details></li>")
+        elif p["source"].startswith("parts/"):
+            out.append(f'<li class="part"><a href="{p["href"]}"{aria}>{html.escape(p["title"])}</a></li>')
         else:
             name = p.get("nav", p["title"])
-            out.append(f'<li><a href="{p["href"]}"{c}{aria}>{html.escape(name)}</a></li>')
+            out.append(f'<li><a href="{p["href"]}"{current}{aria}>{html.escape(name)}</a></li>')
     out.append("</ol></nav>")
     return "".join(out)
 
@@ -204,6 +204,7 @@ def commit() -> str:
 HEAD_SCRIPT = r"""<script>
 (() => {
   const root = document.documentElement;
+  const moduleIndex = root.classList.contains("module-index");
   let theme = "system";
   try { const kept = localStorage.getItem("theme"); if (kept === "light" || kept === "dark") theme = kept; } catch (e) {}
   const apply = () => {
@@ -272,7 +273,7 @@ HEAD_SCRIPT = r"""<script>
   // preface is read like any other page, so it is.
   const remember = () => {
     if (page === "index.html") return;
-    const now = { page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: Math.round(scrollY) };
+    const now = { page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: moduleIndex ? 0 : Math.round(scrollY) };
     try { localStorage.setItem("last-read", JSON.stringify(now)); } catch (e) {}
     // The service worker cannot read localStorage, so the place is also kept where it can, for a
     // launch to go straight to it (service_worker, STATE).
@@ -289,7 +290,9 @@ HEAD_SCRIPT = r"""<script>
     if (y === null) return remember();
     // Labs draw after load and push the page down, so the place is kept while the page settles:
     // for a few seconds, or until the reader scrolls for themselves.
-    const target = Number(y);
+    // Old chapter bookmarks can have scroll offsets far beyond the new module index.
+    // Start an index at its lesson choices; preserve exact positions on actual lessons.
+    const target = moduleIndex ? 0 : Number(y);
     const until = Date.now() + 3000;
     let moved = false;
     for (const kind of ["wheel", "touchstart", "keydown"]) addEventListener(kind, () => { moved = true; }, { once: true, passive: true });
@@ -727,7 +730,15 @@ def page_html(
     title = TITLE if p.get("cover") else f"{title} · {TITLE}"
     # What the rails' script needs to know before the page has a body: whether this page has
     # sections for an outline to list, and whether it shows code, which asks more of the column.
-    classes = [c for c, on in (("toc-none", "<ol>" not in toc), ("has-code", "<pre" in body)) if on]
+    classes = [
+        c
+        for c, on in (
+            ("toc-none", "<ol>" not in toc),
+            ("has-code", "<pre" in body),
+            ("module-index", p.get("module")),
+        )
+        if on
+    ]
     attrs = f' class="{" ".join(classes)}"' if classes else ""
     return f"""<!doctype html>
 <html lang="en-GB"{attrs}>
@@ -941,15 +952,19 @@ self.addEventListener("fetch", (e) => {{
 """
 
 
-def build(out: Path) -> None:
+def build(out: Path, integration_out: Path | None = None) -> None:
     parse = load_parse()
     canonical = page_list()
     route = reading_pages(canonical)
-    references = [p for p in canonical if p.get("chapter") and p["chapter"].slug in MODULES]
+    modules = [p for p in canonical if p.get("chapter")]
     optional = [
-        lesson_page(p, lesson) for p in references for lesson in MODULES[p["chapter"].slug] if lesson.optional
+        lesson_page(p, lesson)
+        for p in modules
+        for lesson in (*MODULES[p["chapter"].slug], *resources(p["chapter"]))
+        if lesson.optional
     ]
-    pages = route + references + optional
+    appendices = [p for p in canonical if p["source"].startswith("appendices/")]
+    pages = route + optional + appendices
     missing = [p["source"] for p in canonical if p["source"] not in parse]
     if missing:
         sys.exit(f"MyST produced no parse for: {', '.join(missing)}. Is each page in myst.yml's toc?")
@@ -957,50 +972,77 @@ def build(out: Path) -> None:
     renderer.IMAGES.clear()
     for p in canonical:
         renderer.PAGES[parse[p["source"]]["slug"]] = p["href"]
-
-    groups = {p["source"]: lesson_nodes(parse[p["source"]]["mdast"], p["chapter"].slug) for p in references}
-
+    groups = {p["source"]: lesson_nodes(parse[p["source"]]["mdast"], p["chapter"].slug) for p in modules}
+    support = {p["source"]: supporting_nodes(groups[p["source"]], p["chapter"]) for p in modules}
     if out.exists():
         shutil.rmtree(out)
     (out / "lab").mkdir(parents=True)
     (out / "fixtures").mkdir()
-
     stamp = f"Built from commit {commit()}."
+    bodies, outlines, anchors = {}, {}, {}
     for p in pages:
         chapter, lesson = p.get("chapter"), p.get("lesson")
-        mdast = groups[p["source"]][lesson.slug] if lesson else parse[p["source"]]["mdast"]
-        normalise_headings(mdast)
         if p.get("module"):
-            body = module_card(chapter)
+            # Start at the choices, rather than repeating the old chapter-length introduction.
+            heading = next(
+                n
+                for n in groups[p["source"]]["overview"]["children"]
+                if n.get("type") == "heading" and renderer.text_of(n) == "The question"
+            )
+            question_id = html.escape(renderer.heading_id(heading), quote=True)
+            body = (
+                f'<p class="module-question" id="{question_id}">{html.escape(chapter.question)}</p>'
+                + module_card(chapter)
+            )
             toc = '<aside class="toc" id="toc"></aside>'
         else:
-            body = renderer.render_page(mdast)
-            toc = toc_html(mdast)
+            mdast = (
+                support[p["source"]][lesson.kind]
+                if lesson and lesson.kind != "core"
+                else groups[p["source"]][lesson.slug]
+                if lesson
+                else parse[p["source"]]["mdast"]
+            )
+            normalise_headings(mdast)
+            body, toc = renderer.render_page(mdast), toc_html(mdast)
             if lesson:
                 body = lesson_intro(chapter, lesson) + body
-                body = reference_links(body, f"{chapter.anchor}.html")
-                body += (
-                    '<p class="lesson-stop">This is a stopping point. Try the fresh case before continuing.</p>'
-                    if not lesson.optional
-                    else ""
-                )
-                body += f'<p class="lesson-reference"><a href="{chapter.anchor}.html">Full chapter, limitations and coding problems</a></p>'
-            elif p in references:
-                body = module_card(chapter, reference=True) + body
-
+                body = reference_links(body, module_href(chapter))
+                if not lesson.optional:
+                    body += '<p class="lesson-stop">This is a stopping point. Try the fresh case before continuing.</p>'
+                body += f'<p class="lesson-reference"><a href="{module_href(chapter)}">All lessons and optional labs in this module</a></p>'
+        bodies[p["href"]], outlines[p["href"]] = body, toc
+        if chapter:
+            for ident in re.findall(r'\bid="([^"]+)"', body):
+                key = module_href(chapter) + "#" + ident
+                target = p["href"] + "#" + ident
+                if key in anchors and anchors[key] != target:
+                    raise ValueError(f"ambiguous source anchor {key}: {anchors[key]} and {target}")
+                anchors[key] = target
+            if lesson:
+                anchors[module_href(chapter) + "#lesson-" + lesson.slug] = lesson.href
+    for p in modules:
+        chapter = p["chapter"]
+        anchors[module_href(chapter) + "#the-experiment"] = MODULES[chapter.slug][0].href
+        anchors[module_href(chapter) + "#lesson-reference"] = resources(chapter)[0].href
+    next_links = {}
+    for p in pages:
+        chapter, lesson = p.get("chapter"), p.get("lesson")
+        body = migrate_links(bodies[p["href"]], anchors)
+        if p.get("module"):
+            body = legacy_navigation(body, chapter, anchors)
         if p in route:
             i = route.index(p)
-            prev = route[i - 1] if i else None
-            nxt = route[i + 1] if i + 1 < len(route) else None
-        else:
-            # Reference and optional lab pages return to the module; they do not enter the
-            # core Next route and make code compulsory.
+            prev, nxt = (route[i - 1] if i else None), (route[i + 1] if i + 1 < len(route) else None)
+        elif chapter:
             prev = next(q for q in route if q["href"] == module_href(chapter))
-            i = canonical.index(next(q for q in canonical if q["source"] == p["source"]))
-            after = canonical[i + 1] if i + 1 < len(canonical) else None
-            nxt = next((q for q in route if after and q["source"] == after["source"]), None)
-        # The lab script also puts buttons on the commands a page prints (Run, or Open in Codespaces)
-        # and on its walkthrough steps (Run and Edit), so a page with any of those loads it.
+            after = canonical[canonical.index(next(q for q in canonical if q["source"] == p["source"])) + 1 :]
+            nxt = next((q for q in route if after and q["source"] == after[0]["source"]), None)
+        else:
+            i = appendices.index(p)
+            prev = appendices[i - 1] if i else route[-1]
+            nxt = appendices[i + 1] if i + 1 < len(appendices) else None
+        next_links[p["href"]] = nxt["href"] if nxt else None
         markers = (
             'class="learning-check"',
             'class="lab"',
@@ -1009,18 +1051,56 @@ def build(out: Path) -> None:
             "cargo ",
             'class="quoted walkthrough"',
         )
-        has_lab = any(m in body for m in markers)
         text = page_html(
             p,
             body,
-            nav_html(route, p["href"]),
-            toc,
+            nav_html(route + appendices, p["href"]),
+            outlines[p["href"]],
             prev,
             nxt,
             stamp,
-            has_lab,
+            any(m in body for m in markers),
         )
         (out / p["href"]).write_text(text)
+    # Preserve the two pilot landing URLs as redirects. No combined chapters are published.
+    for slug in ("anatomy_of_a_parquet_file", "nested_data"):
+        chapter = next(p["chapter"] for p in modules if p["chapter"].slug == slug)
+        href = module_href(chapter)
+        (out / f"{chapter.anchor}-lessons.html").write_text(
+            f'<!doctype html><html lang="en-GB"><meta charset="utf-8"><meta http-equiv="refresh" content="0;url={href}">'
+            f'<title>{html.escape(chapter.title)}</title><a href="{href}">Open the module</a>'
+            f"<script>location.replace({json.dumps(href)} + location.hash);</script></html>"
+        )
+    manifest_pages = [
+        {
+            "href": p["href"],
+            "title": p["title"],
+            "module": p["chapter"].slug if p.get("chapter") else None,
+            "kind": "module"
+            if p.get("module")
+            else ("build" if p["lesson"].optional and p["lesson"].kind == "core" else p["lesson"].kind)
+            if p.get("lesson")
+            else "page",
+            "optional": p["lesson"].optional if p.get("lesson") else p in appendices,
+            "next": next_links[p["href"]],
+        }
+        for p in pages
+    ]
+    (out / "course.json").write_text(json.dumps(manifest_pages, indent=2) + "\n")
+    # Existing component integration tests exercise full sets of labs in one worker context.
+    # Their harness stays outside the publish directory and is never cached or deployed.
+    if integration_out:
+        integration_out.mkdir(parents=True, exist_ok=True)
+        for p in modules:
+            mdast = parse[p["source"]]["mdast"]
+            normalise_headings(mdast)
+            body = renderer.render_page(mdast)
+            body = re.sub(r'<a class="anchor"[^>]*>.*?</a>', "", body)
+            (integration_out / p["href"]).write_text(
+                page_html(
+                    p, body, nav_html(route + appendices, p["href"]), toc_html(mdast), None, None, stamp, True
+                )
+            )
 
     shutil.copy(ROOT / "web" / "book.css", out / "book.css")
     # The pictures the pages show, such as the cover's, under the names the pages use.
@@ -1131,8 +1211,14 @@ def rust_trial(out: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default=str(ROOT / "_build" / "html"))
+    parser.add_argument(
+        "--integration-out", help="Private component-test harness directory, never inside --out"
+    )
     args = parser.parse_args()
-    build(Path(args.out).resolve())
+    integration = Path(args.integration_out).resolve() if args.integration_out else None
+    if integration and integration.is_relative_to(Path(args.out).resolve()):
+        parser.error("integration harnesses must be outside the published site")
+    build(Path(args.out).resolve(), integration)
 
 
 if __name__ == "__main__":

@@ -29,6 +29,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+rule-out-row-groups
+```
+
 ### The same orders, sorted and shuffled
 
 `pruning-sorted.parquet` and `pruning-shuffled.parquet` hold the same orders, written the same
@@ -86,26 +90,14 @@ comparison is ruled out by a different fact about them:
 Null satisfies no comparison. A chunk whose values are all null is skipped for any condition but
 `is null`, and it has no minimum or maximum to consult.
 
-### Sorted data
-
-The reader planned `SELECT *` on both files with each of the conditions below, using every
-mechanism this chapter describes:
-
-```{include} _generated/skipping-compare.md
+```practice
+question: A schematic integer chunk has values bounded by ten and twenty, inclusive. Can x = fifteen be skipped? Can x > twenty be skipped?
+answer: Equality to fifteen remains possible, even if no stored value is actually fifteen. Values greater than twenty are ruled out. Bounds prove absence outside a range, not presence inside it.
 ```
 
-The line below marks the same lookup in both layouts. A range crossing it must be kept, even when it
-contains no matching row.
-
-```{include} _generated/visual-pruning.md
+```lesson
+map-pages-to-rows
 ```
-
-Sorting is what makes statistics work. In the sorted file each row group covers a narrow band of
-order numbers, and a condition on `order_id` rules out all but a few. In the shuffled file the
-same statistics are true and useless: every band is almost the whole range. Columns nobody sorted
-by, such as `customer_id` and `amount_cents`, behave alike in both files. This is why writers are
-told to sort by the column queries filter on most, and why [ch11](#writing-parquet-well) returns
-to it.
 
 ### The page index
 
@@ -143,6 +135,21 @@ The reader turns the kept pages into row ranges using their first rows, then ask
 column's OffsetIndex which of its pages hold those rows. The fixtures cut every column's pages at
 the same row counts, so the pages line up. Writers that cut pages by size give each column
 different boundaries, and the row ranges are what connects them.
+
+This reader’s page pruning supports non-repeated columns. For repeated data, a value count is not a row count; the simplified planner does not implement that case.
+
+A small schematic overlap makes this concrete. If kept rows are `[2, 4)`, projected pages
+covering `[0, 3)` and `[3, 6)` are both needed: the first supplies row two and the second row
+three. A page's number is local to its column; row ranges connect the columns.
+
+```practice
+question: A fresh schematic predicate keeps rows [3, 5). Projected-column pages cover [0, 2), [2, 6) and [6, 8). Which projected page is needed? May its number differ from the predicate column’s kept page number?
+answer: Only the page covering [2, 6) overlaps the kept rows. Its page number may differ: pages in different columns need not line up. Fetch by overlapping row ranges rather than matching page numbers.
+```
+
+```lesson
+test-bloom-membership
+```
 
 ### Bloom filters
 
@@ -194,8 +201,17 @@ thousands of customer numbers its row group does not hold:
 The writer sized each filter for the false-positive rate the table's note gives, and the
 measured rate is lower, because the filter's size is rounded up. False positives cost a read and
 nothing else: the sorted file's false positive makes the reader read a row group with no match in
-it. That is why, in the table under *Sorted data*, the sorted file reads bytes for
+it. That is why, in the table in *Compose a safe skipping plan*, the sorted file reads bytes for
 `customer_id = 424242` and the shuffled one reads none. A filter never produces a false negative, so it never costs a row.
+
+```practice
+question: All tested Bloom bits are set for a new key. Can a reader return a matching row without decoding data? What changes if one tested bit is clear?
+answer: All set means the key may be present: a collision can be a false positive. One clear bit proves absence for that filter’s column chunk, so it can be skipped for that equality.
+```
+
+```lesson
+compose-a-pruning-plan
+```
 
 ### What each mechanism adds
 
@@ -239,6 +255,38 @@ and in an object store each fetch is a request. Row group statistics are free, b
 with the footer. Whether the others pay depends on how much they let the reader skip, and on how
 many requests they add, which [ch10](#how-readers-read) measures.
 
+### Sorted data
+
+The reader planned `SELECT *` on both files with each of the conditions below, using every
+mechanism this chapter describes:
+
+```{include} _generated/skipping-compare.md
+```
+
+The line below marks the same lookup in both layouts. A range crossing it must be kept, even when it
+contains no matching row.
+
+```{include} _generated/visual-pruning.md
+```
+
+Sorting often makes statistics selective. The combined comparison also uses page indexes and Bloom filters; it does not isolate the saving from statistics alone. In the sorted file each row group covers a narrow band of
+order numbers, and a condition on `order_id` rules out all but a few. In the shuffled file the
+same statistics are true and useless: every band is almost the whole range. Columns nobody sorted
+by, such as `customer_id` and `amount_cents`, behave alike in both files. This is why writers are
+told to sort by the column queries filter on most, and why [ch11](#writing-parquet-well) returns
+to it.
+
+The sorted/shuffled comparison combines these mechanisms. The planner models one condition at a time, and byte counts are not a complete runtime prediction.
+
+```practice
+question: A Bloom filter rejects a candidate row group that statistics retained. Does that prove the statistics were wrong? Would fewer transferred bytes always mean lower latency?
+answer: No. A broad bound can safely retain a group without proving the key is present. Bloom adds a different absence proof. Extra metadata requests can cost latency even when they save data bytes.
+```
+
+```lesson
+build-pruning-planner
+```
+
 ## Building it
 
 :::{div}
@@ -280,7 +328,7 @@ whose values are all null for any comparison:
 
 For a comparison, `against_bounds` needs a usable minimum and maximum, which
 [ch08](#metadata-and-statistics)'s `bounds` decided. It places the value against each, and rules
-the comparison out by the fact in the table above:
+the comparison out by the fact in the core range-rules lesson:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -441,6 +489,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin skipping_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (skipping-data-limits)=

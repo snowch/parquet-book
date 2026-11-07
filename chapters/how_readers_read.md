@@ -26,6 +26,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+trace-a-complete-scan
+```
+
 ### One query, request by request
 
 The query is [ch09](#skipping-data)'s: `SELECT * WHERE order_id = 431` on
@@ -95,7 +99,7 @@ connections there are.
 
 The panel runs the same query with the Rust reader and draws each request in the lane of the
 connection that carried it. Pick a strategy from the list; the list is the rows of the table
-under *What each choice costs*, below.
+in the next lesson, *Choose a read strategy*.
 
 ```lab
 experiment: scan
@@ -119,6 +123,17 @@ Try these:
 5. **… on four connections, without merging.** The blue bars stack in four lanes, and the phase
    takes the time of the longest lane. The grey bar still comes first, alone.
 6. **One suffix read of 64 KiB: the whole file.** One bar, and nothing after it.
+
+This is a deterministic simulated object store. It illustrates dependencies, not observed network timing.
+
+```practice
+question: Two selected data ranges are already known, but the index needed to locate a third has not arrived. Which reads can overlap, and why can the third not be scheduled at its final offset yet?
+answer: The two known independent ranges can overlap if connections allow. A particular planner may choose a stricter phase barrier. The unknown range depends on the index response; concurrency cannot remove that missing-information dependency.
+```
+
+```lesson
+choose-a-read-strategy
+```
 
 ### What each choice costs
 
@@ -174,6 +189,17 @@ The reader keeps a copy of the file that starts empty, and fills in each respons
 that copy and decodes from it. A range it forgot to request reads as zeros, which fails to decode.
 The tests run every query under every strategy and compare the rows with a plain read of the
 whole file, so a missed range cannot pass unnoticed.
+
+Latency and bandwidth are fixed model inputs. Decode time, caches, throttling and real network variability are not modelled.
+
+```practice
+question: A workload moves from a high-latency store to a bandwidth-limited connection. Must merging distant ranges remain the best choice?
+answer: No. Merging saves request starts but fetches the gap. When those extra bytes are expensive, separate requests or more precise reads can win. Re-evaluate the stated network model and workload.
+```
+
+```lesson
+build-scan-planner
+```
 
 ## Building it
 
@@ -362,6 +388,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin reads_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (how-readers-read-limits)=

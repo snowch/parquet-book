@@ -157,6 +157,9 @@ the arrows continue its list.
 ```{include} _generated/visual-nested-tags.md
 ```
 
+This is the standard three-field LIST layout. Older files can use legacy layouts; the teaching
+reader supports the standard shape rather than every backward-compatibility rule.
+
 ```transfer
 list
 ```
@@ -189,6 +192,9 @@ with no items. Those cases need different definition levels.
 The higher repetition level continues the innermost list; the lower non-zero level starts
 another item inside the same order. Only zero begins a new order. The definition level answers
 a separate question: how far the optional/repeated path exists at that slot.
+
+This is one column's view of each record. Reconstructing several sibling columns together is
+additional reader work; the discounts stream alone cannot supply an item's sku.
 
 ```transfer
 nested
@@ -269,6 +275,9 @@ printed. The page has six slots, so the last two values in each group are paddin
 A page format affects where the stream lengths are stored, not what a definition or repetition
 level means. This walkthrough uses data page version 1. Version 2 moves the lengths into the
 page header; the pages chapter compares both layouts.
+
+Each fixture column fits in one page. Across multiple V1 pages, a repeated record may continue
+into the next page; V2 pages start a new record. The Pages module compares their layouts.
 
 ```transfer
 run

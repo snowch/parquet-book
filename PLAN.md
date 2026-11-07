@@ -168,7 +168,7 @@ and an editor in the browser; at a desk the problems run with `cargo test -- --i
 
 ## 5. The chapter shape
 
-Every chapter has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
+Every canonical chapter source has seven sections, in `tools/outline.CHAPTER_SHAPE`, enforced by
 `tests/test_book.py`:
 
 1. **The question**: one question, and why the previous chapter leaves it open.
@@ -200,15 +200,19 @@ ch02 and ch15 are the models for the method; ch03 to ch14 predate it and have be
 The experiment comes before the code on purpose. A reader who has watched the requests happen
 reads the function that made them as an explanation, not as an abstraction.
 
-The anatomy and nested-data chapters also pilot a shorter reading route. A chapter stays a
-module and a complete reference, while its independently useful outcomes become named lessons
-with their own URLs and stopping points. Each core lesson prepares and demonstrates its
-mechanism before a fresh no-code application. Implementation labs remain optional.
+Each chapter is now a module of short lessons with independently useful outcomes. A lesson
+prepares and demonstrates its mechanism before a fresh no-code application. Optional build
+labs retain the implementation and coding problems. Module notes hold limitations, takeaways
+and primary sources; essential qualifications also stay beside the core explanation.
 
-Both views come from the canonical chapter's MyST parse, with boundaries defined in
-`tools/lessons.py`. This keeps the quoted implementation, real evidence and technical
-qualifications together without maintaining duplicate prose. Test these boundaries with new
-readers before extending the route to the other chapters; page length alone is not the outcome.
+The canonical chapter Markdown still supplies the MyST parse. It is an authoring source, not a
+published combined page. Chapter URLs are module indexes, and old subsection links route to the
+owning lesson. All code and generated evidence have one maintained source and one published
+owner. The complete reader trace and controlled writer comparison remain coherent investigations.
+
+The course-wide extension is authorised by the reader’s preference for smaller learning steps.
+It remains a design hypothesis: formative sessions with new readers should test the progression,
+fresh tasks and remaining gaps. A short page or a completion tick does not establish learning.
 
 ## 6. Conventions
 

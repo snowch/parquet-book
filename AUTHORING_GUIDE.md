@@ -266,27 +266,37 @@ actual traces from that reader, not JavaScript estimates. The page enhances the 
 and revealable explanations with answer checks. Keep the essential evidence available without
 JavaScript and keep implementation listings in the existing Python/Rust disclosures.
 
-### Short lessons and the complete chapter
+### Modules and short lessons
 
-The anatomy and nested-data chapters have a short reading route as well as their complete
-reference pages. Both are generated from the same chapter source and MyST parse. Keep the
-chapter's seven sections; a short lesson uses only the sections needed for its outcome.
+Every chapter is a module of independently named lessons. The canonical chapter Markdown keeps
+its seven sections for authoring and validation; it is not published as a combined reading page.
+The chapter URL publishes a compact module index. Existing subsection links route to the lesson
+that owns the content, and the two original pilot landing URLs redirect to their module indexes.
 
-`tools/lessons.py` defines each lesson's title, observable outcome and preparation. A `lesson`
-fence in the canonical chapter marks its start. The next marker ends it. The optional build
-has its own marker, and `reference` begins the remaining limitations, takeaways and problems.
-The build refuses missing, duplicate, reordered or empty lesson boundaries. Never duplicate
-the prose or quoted code in a separate lesson file.
+`tools/lessons.py` defines each lesson’s observable outcome and preparation. A `lesson` fence
+marks its start; the next marker ends it. The optional build has its own marker, and `reference`
+contains supporting material. The renderer publishes limitations/takeaways/sources as module
+notes, appends coding problems to the build lab, and gives explainer questions their own further
+practice page. Large feature/query comparisons have separate optional destinations. Never copy
+prose or source code into a second lesson file.
 
-Each core lesson ends with a fresh application. A `practice` fence has a `question:` and an
-`answer:` with specific reasoning. A `transfer` fence names evidence computed by
-`tools/lesson_practice.py`: another real fixture or an explicitly labelled schematic case
-reconstructed by the reader. Its native answer disclosure works without JavaScript. Do not
-call the supported checks on the displayed fixture independent mastery evidence.
+Each core lesson ends with a fresh application: a `practice` fence with `question:` and `answer:`,
+or a `transfer` case from `tools/lesson_practice.py`. Use specific reasoning, not a completion
+score. Worked miniatures are explicitly labelled and bridge to the real format or fixture.
+Native answer disclosures work without JavaScript. Keep essential qualifications beside the
+mechanism, not solely in optional notes. The build refuses missing/reordered/empty boundaries;
+checks verify exact ownership of literal and generated includes.
 
-Core lessons have their own URLs, sidebar entries and Previous/Next route. Implementation labs
-are optional and do not interrupt that route. The full chapter remains at its existing URL;
-keep its old heading anchors. The existing reading-position storage resumes individual lessons.
-Check no-code completion, links back to omitted reference sections, code in both languages,
-and phone/desktop light/dark rendering. See `notes/learning-pilots.md` for the pilot brief,
-review decisions and evidence gaps.
+Core lessons have their own URLs, navigation and resumable reading positions. The sidebar lists
+all modules and expands the current one. Optional labs do not interrupt Next. Preserve old
+heading anchors in the canonical source; the ownership map sends old links to the proper page.
+Returning readers whose saved chapter offset exceeds a module index start at its lesson choices.
+
+`make check` also creates component integration harnesses in `_build/integration`, outside the
+published site. These let existing stateful worker/lab tests run against full sets of actual
+components. They are never deployed or offline-cached. Separate browser checks visit every real
+core lesson and module index, exercise real lesson runtimes, native feedback, deep links and
+resume. Do not describe a component-harness pass as testing a public combined page.
+
+See `notes/course-learning-design.md` for the course brief and review evidence. Agent reviews,
+checks and prototypes are not a novice learning study.

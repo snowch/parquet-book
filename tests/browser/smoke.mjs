@@ -14,6 +14,15 @@ import { createRequire } from "node:module";
 import path from "node:path";
 
 const root = path.resolve(process.argv[2] || "_build/html");
+const integrationRoot = path.resolve(root, "../integration");
+const course = JSON.parse(await readFile(path.join(root, "course.json"), "utf8"));
+const modules = course.filter((page) => page.kind === "module");
+const chapterFiles = new Set(modules.map((page) => page.href));
+const integrationUrl = (url) => {
+  const parsed = new URL(url);
+  if (chapterFiles.has(parsed.pathname.split("/").pop())) parsed.searchParams.set("integration", "1");
+  return parsed.href;
+};
 const shotsAt = process.argv.indexOf("--screenshots");
 const shots = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
 
@@ -33,11 +42,13 @@ const TYPES = { ".html": "text/html", ".js": "text/javascript", ".css": "text/cs
   ".wasm": "application/wasm", ".svg": "image/svg+xml", ".parquet": "application/octet-stream" };
 
 const server = createServer(async (req, res) => {
-  let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  const request = new URL(req.url, "http://x");
+  let p = decodeURIComponent(request.pathname);
   if (p.endsWith("/")) p += "index.html";
-  const file = path.join(root, p);
+  const directory = request.searchParams.has("integration") && chapterFiles.has(p.slice(1)) ? integrationRoot : root;
+  const file = path.join(directory, p);
   try {
-    if (!file.startsWith(root) || !(await stat(file)).isFile()) throw new Error("no");
+    if (!file.startsWith(directory) || !(await stat(file)).isFile()) throw new Error("no");
     res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream" });
     res.end(await readFile(file));
   } catch {
@@ -100,10 +111,13 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
 if (shots) await mkdir(shots, { recursive: true });
 
+// Component integration harnesses combine a module’s actual examples so the existing
+// stateful worker/lab regression tests stay intact. They live outside the published site.
+// Real course routes are tested separately below, with no combined public pages.
 // These existing checks exercise the optional code path. The reading-path checks below use
 // fresh contexts and leave the native disclosures in their default, closed state.
 async function explore(url) {
-  await page.goto(url);
+  await page.goto(integrationUrl(url));
   await page.locator("details.code-disclosure").evaluateAll((els) => els.forEach((e) => { e.open = true; }));
   await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
 }
@@ -736,7 +750,7 @@ await explore(base + "writing-parquet-well.html");
     await button.click();
     await page.goBack();
     await page.waitForFunction(() => !document.querySelector("#main .expanded"));
-    check(page.url().endsWith("anatomy-of-a-parquet-file.html") && Math.abs(await page.evaluate(() => scrollY) - y) < 2,
+    check(new URL(page.url()).pathname.endsWith("anatomy-of-a-parquet-file.html") && Math.abs(await page.evaluate(() => scrollY) - y) < 2,
       "and Back closes it without leaving the chapter");
   }
 
@@ -794,7 +808,7 @@ await explore(base + "writing-parquet-well.html");
   check(first.text === "Cover" && first.top >= first.bar,
     `and its first entry, ${first.text}, shows below the top bar (${Math.round(first.top)}px, bar ends at ${Math.round(first.bar)}px)`);
   const end = await page.evaluate(() => {
-    const nav = document.querySelector("#nav"), links = nav.querySelectorAll("a");
+    const nav = document.querySelector("#nav"), links = [...nav.querySelectorAll("a")].filter((a) => a.checkVisibility());
     nav.scrollTop = nav.scrollHeight;
     return { fits: nav.getBoundingClientRect().bottom <= innerHeight + 1,
              last: links[links.length - 1].getBoundingClientRect().bottom <= innerHeight + 1 };
@@ -835,7 +849,7 @@ await explore(base + "writing-parquet-well.html");
 // page the reader was on, as far down as they were; the cover offers the same way back. The
 // preface is a page like any other, so it is remembered too; the cover never is.
 {
-  await explore(base + "encodings.html");
+  await explore(base + "integer-differences.html");
   await page.mouse.wheel(0, 2000);
   await page.waitForTimeout(1000);
   const y = await page.evaluate(() => scrollY);
@@ -844,14 +858,14 @@ await explore(base + "writing-parquet-well.html");
   await page.evaluate(() => sessionStorage.clear());
   const launched = page;
   await launched.goto(base + "index.html?resume");
-  await launched.waitForURL(/encodings\.html$/);
+  await launched.waitForURL(/integer-differences\.html$/);
   const back = await launched.waitForFunction((want) => Math.abs(scrollY - want) < 5, y, { timeout: 10000 }).then(() => true, () => false);
   check(back, `the home-screen start goes back to the last page, scrolled to ${y}`);
   await launched.goBack();
   await launched.waitForTimeout(500);
   check(launched.url().endsWith("index.html"), `and the launch leaves no page of its own behind: Back goes to ${launched.url().split("/").pop()}`);
   await explore(base + "index.html");
-  check((await page.locator(".resume a").getAttribute("href")) === "encodings.html", "the cover links back to the last page");
+  check((await page.locator(".resume a").getAttribute("href")) === "integer-differences.html", "the cover links back to the last page");
   await explore(base + "preface.html");
   await page.waitForTimeout(500);
   await page.evaluate(() => sessionStorage.clear());
@@ -914,7 +928,7 @@ await explore(base + "writing-parquet-well.html");
     const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 } });
     const tab = await context.newPage();
     for (const [slug, count] of chapters) {
-      await tab.goto(base + slug + ".html");
+      await tab.goto(integrationUrl(base + slug + ".html"));
       const regions = tab.locator(".diagram-scroll");
       const usable = await regions.evaluateAll((els) => els.every((e) => {
         const img = e.querySelector("img");
@@ -944,7 +958,7 @@ await explore(base + "writing-parquet-well.html");
 {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const tab = await context.newPage();
-  await tab.goto(base + "anatomy-of-a-parquet-file.html");
+  await tab.goto(integrationUrl(base + "anatomy-of-a-parquet-file.html"));
   await tab.waitForFunction(() => document.querySelectorAll('.learning-check[data-ready="true"]').length === 5);
   for (const name of ["byte", "length", "start", "chunk"]) {
     const root = tab.locator(`[data-learning="${name}"]`);
@@ -975,7 +989,7 @@ await explore(base + "writing-parquet-well.html");
   await context.close();
   const plain = await browser.newContext({ javaScriptEnabled: false });
   const nojs = await plain.newPage();
-  await nojs.goto(base + "anatomy-of-a-parquet-file.html");
+  await nojs.goto(integrationUrl(base + "anatomy-of-a-parquet-file.html"));
   check(await nojs.locator('.learning-check').count() === 5, 'all five exercises have a static reading path');
   const explanation = nojs.locator('[data-learning="start"] details');
   await explanation.locator('summary').focus(); await nojs.keyboard.press('Enter');
@@ -985,57 +999,102 @@ await explore(base + "writing-parquet-well.html");
   await plain.close();
 }
 
-// Short reading routes remain complete with JavaScript off. Each lesson has a fresh case,
-// working keyboard feedback and a real Next destination; optional code stays optional.
+// The actual published course has complete no-code routes and no combined chapter views.
 {
-  const core = [
-    ["recognise-parquet", "locate-the-footer"],
-    ["locate-the-footer", "read-the-footer-map"],
-    ["read-the-footer-map", "trace-footer-requests"],
-    ["trace-footer-requests", "choose-a-tail-read"],
-    ["choose-a-tail-read", "the-type-system"],
-    ["nullable-values", "one-list"],
-    ["one-list", "nested-lists"],
-    ["nested-lists", "stored-levels"],
-    ["stored-levels", "the-values"],
-  ];
+  const core = course.filter((p) => p.kind === "core" && !p.optional);
+  check(core.length === 56 && modules.length === 16, "the complete course has all modules and core lessons");
   for (const [width, theme] of [[1280, "light"], [375, "dark"]]) {
     const context = await browser.newContext({ javaScriptEnabled: false,
       viewport: { width, height: 900 }, colorScheme: theme });
     const tab = await context.newPage();
-    for (const [slug, next] of core) {
-      await tab.goto(base + slug + ".html");
+    for (const lesson of core) {
+      await tab.goto(base + lesson.href);
       const task = tab.locator(".lesson-practice");
-      check(await task.count() === 1, `${slug}: one fresh application at ${width}px`);
-      check(await tab.locator(".code-disclosure[open]").count() === 0,
-        `${slug}: code is optional on arrival`);
-      check(await tab.locator(".prevnext .next").getAttribute("href") === next + ".html",
-        `${slug}: Next follows the short reading route`);
-      await task.locator("summary").focus();
-      await tab.keyboard.press("Enter");
-      check(await task.locator("details p").isVisible(), `${slug}: keyboard reveals reasoning without JavaScript`);
+      check(await task.count() === 1, `${lesson.href}: a fresh application at ${width}px`);
+      check(await tab.locator(".code-disclosure[open]").count() === 0, `${lesson.href}: code starts closed`);
+      check(lesson.next
+        ? await tab.locator(".prevnext .next").getAttribute("href") === lesson.next
+        : await tab.locator(".prevnext .next").count() === 0,
+        `${lesson.href}: Next follows the actual core course and ends before optional appendices`);
+      await task.locator("summary").focus(); await tab.keyboard.press("Enter");
+      check(await task.locator("details p").isVisible(), `${lesson.href}: native keyboard reasoning reveal`);
       check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        `${slug}: no page overflow at ${width}px`);
+        `${lesson.href}: no document overflow at ${width}px`);
     }
-    for (const [slug, count] of [["anatomy-of-a-parquet-file", 5], ["nested-data", 4]]) {
-      await tab.goto(base + slug + "-lessons.html");
-      check(await tab.locator(".module-card .lesson-list > li").count() === count,
-        `${slug}: every core lesson is discoverable on the module page`);
-      check(await tab.locator(`.module-card a[href="${slug}.html"]`).count() === 1,
-        `${slug}: the complete reference is still available`);
+    for (const module of modules) {
+      await tab.goto(base + module.href);
+      const expected = core.filter((p) => p.module === module.module).length;
+      check(await tab.locator(".module-card .lesson-list > li").count() === expected,
+        `${module.href}: all core lessons are discoverable`);
+      check(await tab.locator(".worked-example, .code-disclosure, .lab, .workbench").count() === 0,
+        `${module.href}: the chapter URL is a compact module index`);
+      check(!/full chapter/i.test(await tab.locator("article.page").innerText()),
+        `${module.href}: no full-page reading option remains`);
     }
     await context.close();
   }
-  // Enhancement still mounts the ordinary code controls on the split scalar lesson.
-  const context = await browser.newContext();
-  const tab = await context.newPage();
-  await tab.goto(base + "nullable-values.html");
-  await tab.locator(".code-disclosure summary").click();
-  await tab.waitForSelector('figure.walkthrough[data-file$="email_levels.py"] button');
-  check(await tab.locator('figure.walkthrough[data-file$="email_levels.py"]').count() === 1,
-    "the scalar lesson retains its executable Python walkthrough");
-  check(await tab.locator('.tab-panel[data-code="rust"] pre').count() === 1,
-    "the scalar lesson retains its Rust twin");
+  // Real lesson runtime checks, one retained walkthrough in every module. No harness URL.
+  for (const module of modules) {
+    const owned = course.filter((p) => p.module === module.module && p.kind === "core" && !p.optional);
+    let chosen = null;
+    for (const lesson of owned) {
+      const source = await readFile(path.join(root, lesson.href), "utf8");
+      if (source.includes('class="quoted walkthrough"')) { chosen = lesson; break; }
+    }
+    check(chosen !== null, `${module.href}: a real lesson retains its walkthrough`);
+    if (!chosen) continue;
+    await page.goto(base + chosen.href);
+    const step = page.locator('figure.walkthrough[data-file^="walkthroughs/python/"]').first();
+    await step.locator("xpath=ancestor::details").evaluate((e) => { e.open = true; });
+    const button = step.locator(".run-button:not(.edit-button)");
+    const expected = await step.locator("xpath=ancestor::section[contains(@class,'worked-example')]")
+      .locator('.example-result > pre').textContent();
+    const source = await step.getAttribute("data-file");
+    await button.click();
+    await page.waitForFunction(({ source, expected }) => {
+      const output = document.querySelector(`figure[data-file="${source}"] .run-output`);
+      return output && output.textContent.trim() === expected.trim();
+    }, { source, expected }, { timeout: 300000 });
+    const actual = await step.locator(".run-output").innerText();
+    check(actual.trim() === expected.trim(), `${chosen.href}: actual Python execution matches its saved result`);
+  }
+  // Old external section links migrate to their owner; no-JS links still find its index entry.
+  const context = await browser.newContext(); const tab = await context.newPage();
+  await tab.goto(base + "anatomy-of-a-parquet-file.html#what-the-trailer-says");
+  await tab.waitForURL(/locate-the-footer\.html#what-the-trailer-says$/);
+  check(await tab.locator('#what-the-trailer-says').count() === 1, "an old deep link reaches its actual lesson");
+  await tab.goto(base + "anatomy-of-a-parquet-file-lessons.html");
+  await tab.waitForURL(/anatomy-of-a-parquet-file\.html$/);
+  check(await tab.locator('.module-card .lesson-list > li').count() === 5, "the pilot landing URL redirects to its module");
+  await tab.setViewportSize({ width: 390, height: 844 });
+  await tab.goto(base + "nested-data.html");
+  await tab.locator("#menu").click();
+  const finalModule = tab.locator("#nav .nav-module > details").last();
+  await finalModule.locator("summary").focus(); await tab.keyboard.press("Enter");
+  check(await finalModule.getAttribute("open") !== null, "the module menu expands by keyboard");
+  const menuFits = await tab.locator("#nav").evaluate((nav) => {
+    nav.scrollTop = nav.scrollHeight;
+    const links = [...nav.querySelectorAll("a")].filter((a) => a.checkVisibility());
+    return nav.getBoundingClientRect().bottom <= innerHeight + 1
+      && links.at(-1).getBoundingClientRect().bottom <= innerHeight + 1;
+  });
+  check(menuFits, "the actual course menu reaches its final entry on a phone");
+  await tab.locator("#menu").click();
+  await tab.waitForFunction(() => !document.body.classList.contains("nav-open"));
+  // The cover does not overwrite last-read on pagehide. Seed both channels used by
+  // installed/offline readers so this really exercises a legacy long-page position.
+  await tab.goto(base + "index.html");
+  await tab.evaluate(async () => {
+    const state = JSON.stringify({page:"anatomy-of-a-parquet-file.html", title:"Anatomy", y:90000});
+    localStorage.setItem("last-read", state);
+    const cache = await caches.open("parquet-book-state");
+    await cache.put("last-read", new Response(state));
+    sessionStorage.clear();
+  });
+  await tab.goto(base + "index.html?resume");
+  await tab.waitForURL(/anatomy-of-a-parquet-file\.html$/);
+  await tab.waitForTimeout(500);
+  check(await tab.evaluate(() => scrollY === 0), "legacy long-page resume starts at the module choices");
   await context.close();
 }
 
@@ -1061,7 +1120,7 @@ await explore(base + "writing-parquet-well.html");
   };
   for (const width of [390, 768, 1024, 1440, 1920]) {
     await tab.setViewportSize({ width, height: 1000 });
-    await tab.goto(base + "anatomy-of-a-parquet-file.html");
+    await tab.goto(integrationUrl(base + "anatomy-of-a-parquet-file.html"));
     await tab.evaluate(() => document.fonts.ready);
     await settled();
     const original = await tab.locator(".worked-example").evaluateAll((nodes) => nodes.map((e) => e.getBoundingClientRect().width));
@@ -1090,7 +1149,7 @@ await explore(base + "writing-parquet-well.html");
     const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width, height: 1000 }, colorScheme });
     const tab = await context.newPage();
     for (const chapter of chapters) {
-      await tab.goto(base + chapter.replaceAll("_", "-") + ".html");
+      await tab.goto(integrationUrl(base + chapter.replaceAll("_", "-") + ".html"));
       const results = tab.locator(".example-result");
       const expected = Object.entries(saved).filter(([p]) => p.split("/")[2] === chapter);
       check(await results.count() === expected.length, `${chapter}: every walkthrough has a visible worked result`);

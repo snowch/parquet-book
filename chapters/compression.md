@@ -29,6 +29,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+follow-literals-and-copies
+```
+
 ### One table, six codecs
 
 The `codec-*.parquet` files hold the same orders, encoded the same way: PLAIN, no dictionary.
@@ -40,6 +44,16 @@ or change it. Python runs in the page; Rust runs in a Codespace or at a desk as 
 [Appendix A](#running-the-lab). Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, decodes it with the reader's `decode_file_metadata` from
 [ch03](#the-type-system), and finds a column chunk's page with `walk_pages` from [ch06](#pages).
+
+A **literal** supplies bytes directly. A **copy** supplies a distance back into the bytes already
+produced and a length. Copying is sequential, so the source can include newly produced bytes:
+
+```transfer
+overlap-example
+```
+
+The miniature shows the copy rule, not the complete codec framing. The real Snappy walkthrough
+below adds that framing and reads bytes written by pyarrow.
 
 **Snappy by hand.** A Snappy page starts with a varint, the length of what comes out. Then come
 elements, each opening with a tag byte whose low two bits say what it is. `00` is a literal:
@@ -139,6 +153,17 @@ bits rather than whole bytes, so neighbouring tokens share a byte. Then open
 `pages-v2-snappy.parquet` and pick `country`. In version 2 data pages the levels sit in front of
 the compressed section, untouched.
 
+The reader decodes Snappy, LZ4_RAW and GZIP. ZSTD and Brotli are measured from metadata, not decompressed by this implementation.
+
+```practice
+question: A schematic output is AB. Copy five bytes from distance two, one byte at a time. What output results, and why is copying only the original two-byte slice wrong?
+answer: The result is ABABABA. Each newly written byte can become a source for later bytes in the same copy. A fixed slice of the original output cannot describe an overlapping copy.
+```
+
+```lesson
+compare-codec-patterns
+```
+
 ### What each codec saved
 
 The whole file under each codec:
@@ -166,6 +191,17 @@ it in almost nothing, as [ch05](#encodings) showed.
 
 Encoding and compression are not rivals. An encoding uses what it knows about the type; a codec
 finds whatever repetition is left.
+
+These are small single-page fixtures and the writer’s configured codec levels. No compression or decompression speed benchmark is reported.
+
+```practice
+question: A codec makes a repeated-label column smaller than another codec. Does that establish which will make a noisy floating-point column smaller, or which is fastest?
+answer: No. Different columns have different patterns, and size measurements do not establish speed. Compare that column under both codecs and measure runtime separately if speed matters.
+```
+
+```lesson
+weigh-compression-costs
+```
 
 ### Encoding before compression
 
@@ -211,6 +247,17 @@ The footer stores a codec as a number, and `parquet.thrift` names each one. Two 
 and reports it as `LZ4` in its own metadata, which is why the book's fixture tests map one name
 to the other. *Ask a library*, at the end of *Building it*, shows both names. `LZO` is defined
 and rarely written.
+
+Changing encoding can help or hurt a codec. Measure the combined choice on the workload instead of treating one fixture’s winner as a rule.
+
+```practice
+question: A query needs one value from a large compressed page. Does returning one value mean decompressing only its bytes? Can the size table alone rank end-to-end query latency?
+answer: No. The value may depend on earlier decompressed bytes, so page decompression is required. Latency also depends on network, CPU, skipping and implementation; file size alone cannot rank it.
+```
+
+```lesson
+build-decompressors
+```
 
 ## Building it
 
@@ -434,6 +481,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin compression_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (compression-limits)=

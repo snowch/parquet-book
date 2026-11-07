@@ -309,6 +309,9 @@ A file whose writer crashed before completing the footer has no valid map. Ordin
 readers cannot open it as a complete table. Some data pages may be present, but specialised
 recovery requires extra information and is outside this chapter.
 
+The fixtures here have no page indexes or Bloom filters. Other Parquet files can place those
+structures between column data and the footer; the footer need not follow the last chunk directly.
+
 ```transfer
 chunk
 ```

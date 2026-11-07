@@ -24,6 +24,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+compare-writer-layouts
+```
+
 ### Seven files, one table
 
 The `writing-*.parquet` files hold the same orders. `writing-baseline.parquet` is
@@ -121,6 +125,17 @@ reader ran those conditions, and one on amounts, against every file:
 Sorting makes lookups cheap only for the column sorted by. A rare value spread through every row
 group, such as a refund, costs nearly a full read whatever the layout.
 
+These files were written by the pinned pyarrow version. The experiment measures reads, not writer CPU or memory.
+
+```practice
+question: Two files produce different query costs, but one also contains different rows. Does that establish which writer setting caused the difference?
+answer: No. A controlled comparison keeps the table and query fixed while changing a setting. Otherwise a change in data or selectivity can explain the cost difference.
+```
+
+```lesson
+choose-writer-settings
+```
+
 ### What each setting changed
 
 The files themselves, before any query:
@@ -158,6 +173,17 @@ No setting is right for every table, but the measurements point one way:
   help most when requests are cheap.
 - **Add Bloom filters for equality lookups on unsorted, high-cardinality columns**, as
   [ch09](#skipping-data) showed for customer numbers.
+
+The fixture results are evidence for these rows and queries, not universal writer defaults.
+
+```practice
+question: A table mostly serves filters on country, then its workload changes to narrow order-id lookups. Should its previous country-sort winner remain the recommendation?
+answer: Not automatically. Reconsider the dominant predicate, row-group ranges, page indexes, metadata overhead and occasional full scans. A useful sort key depends on the query mix.
+```
+
+```lesson
+inspect-writer-settings
+```
 
 ## Building it
 
@@ -308,6 +334,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin writing_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (writing-parquet-well-limits)=

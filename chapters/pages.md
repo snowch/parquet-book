@@ -25,6 +25,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+walk-page-boundaries
+```
+
 ### Walk the pages yourself
 
 `pages.parquet` and `pages-v2.parquet` hold the same sixty orders. The writer was told to keep
@@ -68,6 +72,104 @@ header counts the page's rows and nulls. Then change the column to 2, which is `
 has no dictionary page, and its headers are longer. Each carries the page's minimum and maximum,
 which for this column are eight-byte integers, where `country`'s are two-letter strings.
 
+### What a page header says
+
+Every page starts with a Thrift `PageHeader`. This is the first data page of `amount_cents`, the
+column the first step walked when you changed it, read field by field:
+
+```{include} _generated/page-header-fields.md
+```
+
+`compressed_page_size` is the field a walker needs: the body's length, and so where the next
+header starts. Here the two sizes are equal because the file is not compressed;
+[ch07](#compression) makes them differ.
+
+The header also carries the page's own minimum, maximum and null count. They describe a few rows
+rather than a whole row group, which makes them more selective, and [ch09](#skipping-data) uses
+them to skip pages.
+
+These fixtures are uncompressed. Walking is sequential; a page index can later provide direct offsets.
+
+```practice
+question: A schematic header ends at offset eighty. Its compressed body has twenty bytes and its uncompressed body would have fifty. At which offset is the next header?
+answer: At one hundred: use the stored compressed body length, not the size after decompression. The current header’s own length is already accounted for by its end offset.
+```
+
+```lesson
+compare-page-versions
+```
+
+### Data page version 1
+
+These are the pages of `country` in version 1, with the rows each holds:
+
+```{include} _generated/pages-country-v1.md
+```
+
+The dictionary page is first, and there is only one: every data page's indices point into it.
+Each data page body holds three parts, in order:
+
+1. the repetition levels, with a four-byte length in front, if the column can repeat;
+2. the definition levels, with a four-byte length in front, if the column can be null;
+3. the values, in the page's encoding.
+
+A version 1 header counts the page's values, not its rows, so the reader counted the rows by
+decoding each page's levels. Under version 1, a page's whole body is compressed as one block. To
+count the nulls or the rows in a compressed page, a reader must decompress all of it first.
+
+### Data page version 2
+
+Version 2 changes where things are, not what they mean. The same column chunk:
+
+```{include} _generated/pages-country-v2.md
+```
+
+The first step showed the differences in the saved comparison on this file, and the two tables set them
+side by side:
+
+- **The level lengths moved into the header.** The levels have no four-byte prefix in the body,
+  which is why every body is smaller than its version 1 counterpart.
+- **The levels are never compressed.** Only the values section may be, and the header says
+  whether it is. A reader can count nulls or find row boundaries without decompressing anything.
+- **The header counts rows and nulls.** A reader skipping to a row knows which page holds it from
+  the headers alone.
+- **A page always starts a new row.** In version 1 a row of a repeated column can begin in one
+  page and continue in the next; version 2 forbids that, so pages can be skipped cleanly.
+
+Writers adopted version 2 slowly, and many still write version 1 by default for compatibility.
+Every reader a file will meet must support version 2 before a writer should produce it.
+
+The compression boundary makes the difference visible. Level streams appear only where the schema
+needs them; the diagram includes both to show their order.
+
+```{include} _generated/visual-page-layouts.md
+```
+
+Version support is a compatibility choice. These tiny pages make boundaries visible; they are not recommended production page sizes.
+
+```practice
+question: A reader wants row boundaries in a compressed V2 data page with a repeated field. Must it decompress the values first? Is a level stream present for a required flat field?
+answer: V2 keeps the level streams outside the compressed values, so they can be read first. A required flat path needs no level streams. V1 compresses the whole body and has different framing.
+```
+
+```lesson
+check-page-corruption
+```
+
+### Checksums
+
+A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page
+from one whose values happen to be unusual. Whether a writer includes it depends on the
+implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
+parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on.
+
+A checksum helps only a reader that checks it, and checking costs a pass over every body. The bit
+the damage walkthrough flipped turns one country into another, and the damaged index still points into
+the dictionary. A reader that skips the check reads the wrong country without complaint, as the
+library step at the end of *Building it* shows.
+
+### Corrupt a separate page
+
 **A damaged page.** Every page header in `pages-v2.parquet` carries a CRC-32 of the page's body.
 Recompute it for the last page of `country`, then flip one bit of the body and recompute it:
 
@@ -95,90 +197,14 @@ Change the byte the step flips, or flip two bits, and look at the checksum each 
 `[-1]` to `[1]` in Python, or `last()` to `get(1)` in Rust, to damage the first data page
 instead, and see which page the reader's walk marks.
 
-### What a page header says
-
-Every page starts with a Thrift `PageHeader`. This is the first data page of `amount_cents`, the
-column the first step walked when you changed it, read field by field:
-
-```{include} _generated/page-header-fields.md
+```practice
+question: A stored page’s checksum matches its body, but its encoding header is invalid. Has the checksum proved that decoding will succeed?
+answer: No. The checksum is evidence about the stored bytes matching the checksum, not about valid encoding or schema semantics. A missing checksum gives no such integrity check, and a reader must actually verify one for it to help.
 ```
 
-`compressed_page_size` is the field a walker needs: the body's length, and so where the next
-header starts. Here the two sizes are equal because the file is not compressed;
-[ch07](#compression) makes them differ.
-
-The header also carries the page's own minimum, maximum and null count. They describe a few rows
-rather than a whole row group, which makes them more selective, and [ch09](#skipping-data) uses
-them to skip pages.
-
-### Data page version 1
-
-These are the pages of `country` in version 1, with the rows each holds:
-
-```{include} _generated/pages-country-v1.md
+```lesson
+build-page-reader
 ```
-
-The dictionary page is first, and there is only one: every data page's indices point into it.
-Each data page body holds three parts, in order:
-
-1. the repetition levels, with a four-byte length in front, if the column can repeat;
-2. the definition levels, with a four-byte length in front, if the column can be null;
-3. the values, in the page's encoding.
-
-A version 1 header counts the page's values, not its rows, so the reader counted the rows by
-decoding each page's levels. Under version 1, a page's whole body is compressed as one block. To
-count the nulls or the rows in a compressed page, a reader must decompress all of it first.
-
-### Data page version 2
-
-Version 2 changes where things are, not what they mean. The same column chunk:
-
-```{include} _generated/pages-country-v2.md
-```
-
-The first step showed the differences when you ran it on this file, and the two tables set them
-side by side:
-
-- **The level lengths moved into the header.** The levels have no four-byte prefix in the body,
-  which is why every body is smaller than its version 1 counterpart.
-- **The levels are never compressed.** Only the values section may be, and the header says
-  whether it is. A reader can count nulls or find row boundaries without decompressing anything.
-- **The header counts rows and nulls.** A reader skipping to a row knows which page holds it from
-  the headers alone.
-- **A page always starts a new row.** In version 1 a row of a repeated column can begin in one
-  page and continue in the next; version 2 forbids that, so pages can be skipped cleanly.
-
-Writers adopted version 2 slowly, and many still write version 1 by default for compatibility.
-Every reader a file will meet must support version 2 before a writer should produce it.
-
-The compression boundary makes the difference visible. Level streams appear only where the schema
-needs them; the diagram includes both to show their order.
-
-```{include} _generated/visual-page-layouts.md
-```
-
-### Checksums
-
-A page header can carry a CRC-32 of the page body. When it does, a reader can tell a damaged page
-from one whose values happen to be unusual. Whether a writer includes it depends on the
-implementation. pyarrow leaves it out unless asked, and the Rust `parquet` crate never writes it;
-parquet-java writes it by default. `pages-v2.parquet` was written by pyarrow with it on.
-
-A checksum helps only a reader that checks it, and checking costs a pass over every body. The bit
-the second step flipped turns one country into another, and the damaged index still points into
-the dictionary. A reader that skips the check reads the wrong country without complaint, as the
-library step at the end of *Building it* shows.
-
-### How big a page should be
-
-A writer ends a page when its encoded size passes a target, commonly around a megabyte, or when a
-row count limit is reached. The fixtures use a tiny target so that pages are visible. The
-trade-off is the same at any size:
-
-- **Smaller pages** let a reader skip more precisely and decode less to reach one value, but cost
-  more headers and compress slightly worse.
-- **Larger pages** compress better and cost fewer headers, but make every read of one value
-  decode more.
 
 ## Building it
 
@@ -343,6 +369,21 @@ Codespace or at a desk:
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin pages_with_a_library
 ```
+
+```lesson
+reference
+```
+
+### How big a page should be
+
+A writer ends a page when its encoded size passes a target, commonly around a megabyte, or when a
+row count limit is reached. The fixtures use a tiny target so that pages are visible. The
+trade-off is the same at any size:
+
+- **Smaller pages** let a reader skip more precisely and decode less to reach one value, but cost
+  more headers and compress slightly worse.
+- **Larger pages** compress better and cost fewer headers, but make every read of one value
+  decode more.
 
 (pages-limits)=
 ## What this cannot tell you

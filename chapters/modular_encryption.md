@@ -25,6 +25,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+read-encryption-modes
+```
+
 ### Two files, two footer modes
 
 `plaintext-footer.parquet` and `encrypted-footer.parquet` hold the same twelve orders, with the
@@ -58,6 +62,43 @@ knows nothing of encryption opens it as usual. The encrypted-footer file has `PA
 and such a reader refuses it at the magic. Add `"tiny"` to the list of files: it ends with
 `PAR1` too, so the magic alone cannot tell a plaintext footer from a file with no encryption at
 all. Problem 13.2 asks you to tell the three apart.
+
+### What a plaintext footer shows
+
+```{include} _generated/encryption-plaintext-footer.md
+```
+
+With a plaintext footer, the file still starts and ends with `PAR1`, and a reader that knows
+nothing of encryption reads the unencrypted columns as usual. The encrypted columns keep a
+reduced `ColumnMetaData` in the footer: their type, encodings, codec, sizes and offsets, but no
+statistics. The full metadata, statistics included, is itself an encrypted module inside the
+footer. Readers without keys therefore cannot skip by those columns' statistics, and cannot read
+them at all.
+
+The footer ends with a **signature**: a nonce and a GCM tag computed with the footer key. A
+reader with that key can check that nobody changed the footer. A reader without it cannot, and
+has to trust the footer as it is.
+
+### What an encrypted footer shows
+
+```{include} _generated/encryption-encrypted-footer.md
+```
+
+With an encrypted footer, the file starts and ends with `PARE`, and the footer is a small
+plaintext `FileCryptoMetaData`, naming the algorithm and the footer key, followed by the real
+`FileMetaData` as one module. Even the unencrypted columns cannot be read: their bytes are there
+in plain form, but the footer that says where they are is not.
+
+The inspector is keyless. It identifies structure and refuses protected data; it does not decrypt or verify authenticity.
+
+```practice
+question: A plaintext-footer file contains an encrypted email column. Does reading its schema prove the reader can read email values, or that those values are plaintext?
+answer: No. Footer visibility and column protection are separate. A readable footer can describe encrypted columns that require keys and authenticated decryption.
+```
+
+```lesson
+distinguish-key-names-and-keys
+```
 
 ### Keys by name
 
@@ -96,6 +137,17 @@ keys, so one reader may see `amount_cents` and not `email`.
 The fixtures use a toy key service that wraps by XOR with master keys published in
 `fixtures/generate.py`. It protects nothing, on purpose: the files exist to show what encryption
 hides from a reader without keys, and anyone may regenerate them.
+
+The published fixture keys exist for tests. Their availability is not a model of production key-service access control.
+
+```practice
+question: A file reveals the name of a key-encryption key in readable metadata. Does copying that name grant access to the data key?
+answer: No. The name identifies a key or wrapping context. Access to actual key material and permission to unwrap the data key are separate requirements.
+```
+
+```lesson
+inspect-protected-modules
+```
 
 ### Modules
 
@@ -166,45 +218,30 @@ Try these:
 3. **Switch to `encrypted-footer.parquet`.** No column can be located. The structure view shows a
    plaintext `FileCryptoMetaData` and one encrypted module where the `FileMetaData` should be.
 
-### What a plaintext footer shows
-
-```{include} _generated/encryption-plaintext-footer.md
-```
-
-With a plaintext footer, the file still starts and ends with `PAR1`, and a reader that knows
-nothing of encryption reads the unencrypted columns as usual. The encrypted columns keep a
-reduced `ColumnMetaData` in the footer: their type, encodings, codec, sizes and offsets, but no
-statistics. The full metadata, statistics included, is itself an encrypted module inside the
-footer. Readers without keys therefore cannot skip by those columns' statistics, and cannot read
-them at all.
-
-The footer ends with a **signature**: a nonce and a GCM tag computed with the footer key. A
-reader with that key can check that nobody changed the footer. A reader without it cannot, and
-has to trust the footer as it is.
-
-### What an encrypted footer shows
-
-```{include} _generated/encryption-encrypted-footer.md
-```
-
-With an encrypted footer, the file starts and ends with `PARE`, and the footer is a small
-plaintext `FileCryptoMetaData`, naming the algorithm and the footer key, followed by the real
-`FileMetaData` as one module. Even the unencrypted columns cannot be read: their bytes are there
-in plain form, but the footer that says where they are is not.
-
 ### What still leaks
 
-Encryption hides values, not shape. From the steps, the tables above and the panel, a reader
+Encryption hides values, not shape. From the module walkthrough and the footer-mode lesson, a reader
 without keys still learns:
 
 - **the file's size, and in a plaintext footer every column chunk's size and offset;**
-- **how many pages each encrypted column has, and how long each is.** AES-GCM does not change a
-  module's length, so the ciphertext is exactly as long as the page, and page lengths can say
+- **how many pages each encrypted column has, and how long each is.** AES-GCM ciphertext has the same length as its plaintext; nonce, tag and framing add
+  overhead. Visible lengths can still say
   something about the values;
 - **which columns are protected, and by which named keys.**
 
 The encrypted footer hides more of the shape, at the price of making the whole file unreadable
 without the footer key.
+
+An authentication signature on a plaintext footer is different from the PAR1/PARE file signature used for recognition. This inspector does not authenticate either protected module contents or the footer.
+
+```practice
+question: A keyless tool can locate a protected module and report its length. Has it authenticated the ciphertext or learned its plaintext values?
+answer: No. Visible framing can reveal positions and sizes without decrypting values or verifying an authentication tag. Access patterns and sizes can still leak information.
+```
+
+```lesson
+build-encryption-inspector
+```
 
 ## Building it
 
@@ -386,6 +423,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encryption_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (modular-encryption-limits)=
