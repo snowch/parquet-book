@@ -11,8 +11,8 @@ What does Apache Iceberg add on top of Parquet, and which of it has this book al
 
 Parquet describes one file. Its footer knows the file's row groups, columns and statistics, and
 nothing about any other file. A table is many files, written over years, and it changes.
-[ch14](#lakehouse-and-beyond) found a table's files through a log, and
-[ch15](#changing-a-table) changed a table with snapshots, delete files and compaction. Apache
+[Lakehouse and beyond](#lakehouse-and-beyond) found a table's files through a log, and
+[Changing a table](#changing-a-table) changed a table with snapshots, delete files and compaction. Apache
 Iceberg is an open specification for that layer: metadata, kept beside the data files, that makes
 them one table with a history. Most of what it adds, the book has already shown in some form.
 This chapter maps each feature to the chapter that shows it, and describes briefly the pieces no
@@ -59,12 +59,12 @@ the append adds another branch.
 ```
 
 Manifest lists and manifests are Avro files, a row format. Each is written once, in one pass, and
-read one whole entry at a time, so a row layout suits them ([ch01](#why-parquet-exists)).
+read one whole entry at a time, so a row layout suits them ([Why Parquet exists](#why-parquet-exists)).
 
 A reader walks the tree from the top: the catalog, the metadata file, the snapshot's manifest
-list, then the manifests. Each level needs the one above it, so each is a round trip before the
-first data file is read, as [ch15](#changing-a-table) warned. ch15's `_snapshots.json` flattens
-the same tree into one file: a list of snapshots, each listing its data and delete files. The
+list, then the manifests. Discovering the next location depends on the preceding metadata,
+so this traversal can require dependent requests before choosing a data file. Caching can avoid them. The
+[snapshot fixture](follow-snapshots-and-deletes.html) flattens this idea into `_snapshots.json`: a list of snapshots, each listing its data and delete files. The
 levels exist so that nothing is rewritten that did not change. A commit that adds one file writes
 one new manifest, and a new manifest list that reuses every old manifest.
 
@@ -72,12 +72,12 @@ one new manifest, and a new manifest list that reuses every old manifest.
 
 Each manifest entry carries the file's statistics: for every column, the number of values and of
 nulls, and a lower and an upper bound. A writer usually takes them from the footer it wrote
-([ch08](#metadata-and-statistics)). A planner reads the manifests, and opens only the files whose
+([Metadata and statistics](#metadata-and-statistics)). A planner reads the manifests, and opens only the files whose
 bounds allow the query's condition.
 
-[ch14](#lakehouse-and-beyond) showed the same idea in Delta Lake's log, where each `add` action
+[Lakehouse and beyond](#lakehouse-and-beyond) showed the same idea in Delta Lake's log, where each `add` action
 carries a file's statistics as JSON, and measured it: the log ruled out files that a listing had
-to open. [ch09](#skipping-data) showed it one level down, in a footer that rules out row groups.
+to open. [Skipping data](#skipping-data) showed it one level down, in a footer that rules out row groups.
 Together they form a ladder: manifests rule out files, footers rule out row groups, and the page
 index rules out pages. Each level helps only as far as the layout lets it. A file whose bounds
 span every value is opened whatever its manifest says.
@@ -85,7 +85,7 @@ span every value is opened whatever its manifest says.
 Two details differ from a footer. The bounds are keyed by each column's **field id**, a stable
 number identifying a column, rather than its name. The next lesson shows why that identity
 must survive a rename. A writer may shorten a long string's
-bounds, as a Parquet writer may ([ch08](#metadata-and-statistics)), so a bound is a limit on the
+bounds, as a Parquet writer may ([Metadata and statistics](#metadata-and-statistics)), so a bound is a limit on the
 values and not always one of them.
 
 This is a schematic explanation of Iceberg’s metadata hierarchy. The teaching reader does not execute a real Iceberg metadata-tree scan.
@@ -102,7 +102,7 @@ keep-column-identity
 ### Columns by id
 
 **Schema evolution** changes a table's columns or their types while retaining readable older files.
-A table's schema changes too. A column is renamed, a new one is added, an old one is dropped. The
+A table's schema can change while its older files remain stored. A column is renamed, a new one is added, an old one is dropped. The
 files already written keep the schema they were written with, and nobody rewrites a table for a
 rename. So a reader must match the table's columns today with the columns of a file written long
 before.
@@ -110,9 +110,9 @@ before.
 Matching by name breaks on the first rename. Iceberg matches by number instead. Each column in the
 table's schema has a *field id*, assigned when the column is added and never changed or reused.
 An Iceberg writer records each column's id in every data file's footer, in the schema element's
-`field_id` ([ch03](#the-type-system) met the field). ch15's data files carry them. Read them with
-the book's reader, then resolve the file's columns through a table schema in which one column
-has been renamed and another added:
+`field_id` ([The type system](#the-type-system) introduces the schema). The fixture
+`fixtures/changes/data/part-0.parquet` carries these IDs. Read them with the book's reader,
+then resolve the file's columns through a small table schema with a rename and an added field:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -134,8 +134,8 @@ in a Codespace, or run it at a desk with `cargo run -p walkthroughs --bin field_
 
 The footer names each column twice: by the name the writer used, and by its id. The table's
 schema is keyed by id, so the step turns each id into this file's name, and asks the reader's
-engine for those columns. `order_number` is id 1, so it reads the file's `order_id`, although no
-file has a column of that name. `channel`, id 7, was added after the file was written. The file
+engine for those columns. `order_number` is id 1, so it reads the file's `order_id`, although the
+file has no column named `order_number`. `channel`, id 7, was added after the file was written. The file
 has no column with that id, so every row of the file reads it as null. By name, the file has
 neither column. A reader that matched names would lose the renamed column's values, and treat it
 as a column that was never written.
@@ -149,7 +149,7 @@ table's metadata and no file.
 Iceberg's other schema changes work the same way. Reordering columns changes only the schema.
 Widening a type, from a 32-bit to a 64-bit integer for example, is allowed where every stored
 value reads correctly as the new type. Nested fields carry ids too, as do the elements of a list
-and the keys and values of a map ([ch04](#nested-data)). A file written without ids, such as a
+and the keys and values of a map ([Nested data](#nested-data)). A file written without ids, such as a
 Parquet file brought into a table from elsewhere, is matched through a *name mapping* that the
 table keeps, from names to ids.
 
@@ -157,7 +157,7 @@ table keeps, from names to ids.
 
 pyarrow and the `parquet` crate read field ids too. pyarrow puts each in its field's metadata,
 under the key `PARQUET:field_id`, and writes one when that key is set: that is how the fixture
-generator gave ch15's files their ids. The crate keeps it in each field's basic information.
+generator gave the `fixtures/changes/` data files their ids. The crate keeps it in each field's basic information.
 Neither resolves a table's columns by id. Both read columns by name or by position, so turning an
 id into a column is yours to do, as the step before did. An Iceberg library does it for every
 file it reads.
@@ -202,11 +202,11 @@ evolve-partition-specs
 
 ### Hidden partitioning
 
-[ch14](#lakehouse-and-beyond)'s table was partitioned by path. The directory `country=UK` held
+The [partition-path example](read-partition-paths.html) uses a Hive-style orders table. The directory `country=UK` held
 the UK orders, the files did not hold `country` at all, and a query ruled files out only when it
 named `country`. A table partitioned by day works the same way, with one catch: a query must
 filter on the day column, which a writer computed from the timestamp. A query that filters on the
-timestamp itself rules nothing out.
+timestamp itself does not use that path-only partition test; other metadata may still help.
 
 **Hidden partitioning** lets queries filter on source columns without naming a separate
 partition column. A **partition spec** records the source columns and rules that derive the
@@ -226,12 +226,12 @@ so renaming `ordered_at` breaks neither spec.
 ### Sort orders
 
 A table can declare a sort order, and writers then sort the rows of each file by it. Each data
-file records the order it was written in. [ch11](#writing-parquet-well) wrote the same orders
-sorted and shuffled, and [ch09](#skipping-data) measured what sorting buys: each row group's
+file records the order it was written in. [Writing Parquet well](#writing-parquet-well) wrote the same orders
+sorted and shuffled, and [Skipping data](#skipping-data) measured what sorting buys: each row group's
 statistics span a narrow range, so a condition on the sort key rules most of them out. At the
-table's level the same holds for files. Sorted files have narrow bounds in their manifests, and a
-planner can rule them out. Compaction can sort as it rewrites, so a table written in arrival
-order becomes cheaper to filter over time.
+table's level, files covering narrow ranges can be ruled out by their manifest bounds. Sorting
+within each file does not by itself make different files' ranges disjoint. Compaction that
+reorganises rows into narrower file ranges can improve later pruning.
 
 ```practice
 question: Old files partition an event time by day, while new files use month. Can a planner interpret every old partition value with the new month transform?
@@ -243,6 +243,10 @@ commit-a-table-change
 ```
 
 ### Commits and catalogs
+
+This specification-level example uses the [Iceberg metadata tree](follow-iceberg-metadata.html):
+a catalog points to the current metadata file, which names the table's snapshots.
+The teaching reader does not implement a catalog or concurrent writers.
 
 A **commit** publishes a table metadata change. The **catalog** identifies the current metadata
 file. **Atomicity** means that readers see the old location or the new one when that pointer
@@ -270,46 +274,47 @@ reference
 
 ### Above the files
 
-Iceberg does not change a Parquet file. A table's data files are ordinary Parquet files, and
-everything the earlier chapters read in them still holds: the footer, the row groups, the
-statistics and the page index. What Iceberg adds is a set of metadata files above them, and rules
+Iceberg can store data in Parquet, Avro or ORC. This book follows its Parquet files, which keep
+their ordinary footer, row groups, statistics and optional page indexes. What Iceberg adds is a set of metadata files above them, and rules
 that writers and readers follow. A reader that knows those rules can plan a query over millions
 of files without listing a directory, read the table as it was last week, and keep reading while
 writers change it.
 
 ### A map of the features
 
-Each feature, the problem it solves, what it changes in the Parquet files, and where the book
-shows it:
+This map compares Iceberg's table-level features with the book's teaching examples. Start
+with [the metadata tree](follow-iceberg-metadata.html) for Iceberg's manifest-list layout.
+The linked examples demonstrate related mechanisms; they are not a complete Iceberg reader:
 
 | Feature | Solves | In the Parquet files | Shown in |
 |---|---|---|---|
-| Metadata tree | Finding a version's files without listing | Nothing | Here; [ch14](#lakehouse-and-beyond) lists and reads a log |
-| Statistics in manifests | Ruling files out without opening footers | Copied out of each file | [ch14](#lakehouse-and-beyond), [ch09](#skipping-data) |
-| Snapshots and time travel | A consistent version, and older ones | Nothing: files never change | [ch15](#changing-a-table) |
-| Copy-on-write, merge-on-read | Changing rows in files that cannot change | New files; delete files are Parquet | [ch15](#changing-a-table) |
-| Compaction, snapshot expiry | Small files, delete files, old versions | Whole files rewritten or deleted | [ch15](#changing-a-table) |
-| Schema evolution | Renaming and adding columns without rewrites | A field id on every column | Here |
-| Hidden partitioning | Partitions a query uses without naming them | The column stays in the file | Here; [ch14](#lakehouse-and-beyond) for paths |
-| Sort orders | Files whose statistics rule out well | Sorted rows, narrow ranges | [ch11](#writing-parquet-well), [ch09](#skipping-data) |
-| Commits and catalogs | Writers that do not overwrite each other | Nothing | Beyond this book |
+| Metadata tree | Finding a version's files without listing | Nothing | [Iceberg metadata tree](follow-iceberg-metadata.html); [log-based discovery](prune-files-before-footers.html) |
+| Statistics in manifests | Ruling files out without opening footers | Copied out of each file | [File pruning](prune-files-before-footers.html); [row-group pruning](rule-out-row-groups.html) |
+| Snapshots and time travel | A consistent version, and older ones | Nothing: files never change | [Snapshot history](follow-snapshots-and-deletes.html) |
+| Copy-on-write, merge-on-read | Changing rows in files that cannot change | New data or delete information | [Update costs](compare-update-costs.html) |
+| Compaction, snapshot expiry | Small files, delete files, old versions | Whole files rewritten or deleted | [Compaction](decide-when-to-compact.html); [expiry limits](changing-a-table-notes.html) |
+| Schema evolution | Renaming and adding columns without rewrites | A field id on every column | [Stable column identity](keep-column-identity.html) |
+| Hidden partitioning | Partitions a query uses without naming them | The column stays in the file | [Partition evolution](evolve-partition-specs.html); [partition paths](read-partition-paths.html) |
+| Sort orders | Files whose statistics rule out well | Sorted rows; bounds depend on file layout | [Writer layouts](compare-writer-layouts.html); [pruning](compose-a-pruning-plan.html) |
+| Commits and catalogs | Writers that do not overwrite each other | Nothing | [Commit model](commit-a-table-change.html), without an implementation |
 
-The rest of this section takes the rows in order.
+The rest of this comparison covers snapshots and changes, then contrasts Delta Lake and Hudi.
 
 ### Snapshots, changes and upkeep
 
-[ch15](#changing-a-table) built all of this on its own table, and Iceberg's versions differ
-mainly in detail:
+The [snapshot fixture](follow-snapshots-and-deletes.html) demonstrates data and position-delete
+files; the [compaction experiment](decide-when-to-compact.html) measures a rewrite. Iceberg
+adds its own metadata and commit rules around these mechanisms:
 
 - **Snapshots and time travel.** A data change makes a new snapshot, and the old ones stay
   readable, so a reader can ask for the table by snapshot or as it was at a time. A query that
   started on one snapshot keeps reading it while writers commit others.
 - **Copy-on-write and merge-on-read.** A table chooses one for its deletes, updates and merges.
-  Iceberg's position delete files are the ones ch15 read, with the same `file_path` and `pos`.
-  It also has *equality delete files*, which name values rather than positions, and, in its
+  The teaching fixture uses Iceberg's `file_path` and `pos` position-delete columns.
+  Iceberg also has *equality delete files*, which name values rather than positions, and, in its
   third format version, *deletion vectors*: a bitmap of deleted positions per data file.
 - **Compaction and snapshot expiry.** Compaction rewrites small files and files with deletes, as
-  ch15 planned, and commits the result as a new snapshot. Expiry removes old snapshots, then
+  the [compaction experiment](decide-when-to-compact.html) planned, and commits the result as a new snapshot. Expiry removes old snapshots, then
   deletes the files no remaining snapshot needs. Until then, time travel to those snapshots
   works, and their files are paid for.
 
@@ -320,9 +325,10 @@ None of these touches the inside of a Parquet file. They change which files a sn
 Two other open table formats solve the same problems over Parquet files. They keep the list of
 files differently, and they arrange changes differently.
 
-**Delta Lake** keeps a transaction log beside the data, which [ch14](#lakehouse-and-beyond) read:
-a directory of numbered JSON files, one per commit, of `add` and `remove` actions, with each
-file's statistics inside its `add`. Every so often a writer summarises the log so far in a
+**Delta Lake** keeps a transaction log beside the data: numbered JSON files of `add` and
+`remove` actions, with each file's statistics inside its `add`.
+[Prune files before reading their footers](prune-files-before-footers.html) reads one
+simplified log file in that shape, not a full multi-version Delta table. Every so often a writer summarises the log so far in a
 *checkpoint*, a Parquet file, so a reader need not replay every commit. A commit creates the next
 numbered file, and fails if another writer created it first. Deletes rewrite files or, with
 *deletion vectors*, mark rows in a small file beside the data file. Partitions are columns whose
@@ -343,12 +349,18 @@ record which files make a table, how they commit, and where they put the cost of
 
 ## What this cannot tell you
 
-**Iceberg's own files.** The book's table is not an Iceberg table. Its metadata is one JSON file
-of snapshots, and its table schema lives in the step's code. The book reads no metadata file, no
+These notes separate the module's specification explanations from its executable evidence.
+The [metadata tree](follow-iceberg-metadata.html) and [commit example](commit-a-table-change.html)
+are schematic. The [field-ID walkthrough](keep-column-identity.html) reads a real Parquet
+fixture and resolves its columns through a small schema supplied in code.
+[The feature comparison](what-iceberg-adds-comparison.html) connects these to other table formats.
+
+**Iceberg's own files.** The `fixtures/changes/` teaching table is not an Iceberg table. Its
+`_snapshots.json` lists snapshots, and the field-ID walkthrough's table schema lives in code. The book reads no metadata file, no
 manifest list and no Avro manifest, and nothing measures the round trips the tree costs.
 
-**Everything Iceberg specifies.** Its specification has three format versions, and features this
-chapter leaves out: branches and tags that name snapshots, default values for added columns, row
+**Everything Iceberg specifies.** The metadata-tree example uses format versions one to three.
+The specification continues to evolve and includes features omitted here: branches and tags that name snapshots, default values for added columns, row
 lineage, and statistics files kept beside the manifests. What an engine supports differs between
 engines and versions.
 
@@ -366,13 +378,14 @@ was written.
 :::{div}
 :class: takeaways
 
-- **Iceberg adds metadata above Parquet files, not inside them.** Every data file is a Parquet
-  file as the earlier chapters read it; the table is a tree of files that list them.
+- **Iceberg adds a table layer above data files.** This book follows the Parquet case;
+  Iceberg also supports Avro and ORC data files. The metadata tree identifies the table's files.
 - **Most of what it adds, the book has shown in another form.** Statistics that rule out files
-  ([ch14](#lakehouse-and-beyond)), snapshots, delete files and compaction
-  ([ch15](#changing-a-table)), and sorted files ([ch11](#writing-parquet-well)).
-- **A table names its columns by field id.** Each data file's footer records the ids, so a
-  rename changes only metadata, and a column added later reads as null from older files.
+  ([Lakehouse and beyond](#lakehouse-and-beyond)), snapshots, delete files and compaction
+  ([Changing a table](#changing-a-table)), and sorted files ([Writing Parquet well](#writing-parquet-well)).
+- **An Iceberg table names its columns by field id.** A rename preserves that identity.
+  The walkthrough's added nullable field has no non-null default, so older files supply null.
+  Other defaults require the table format's rules.
 - **An id is never reused.** A reused id would read an old column's values as a new column's.
 - **Partitions are derived from columns, not read from paths.** A query filters on the column,
   the planner applies the transform, and the spec can change without rewriting a file.
@@ -387,7 +400,10 @@ answer: A rename changes the label but preserves the identity. An older file can
 
 ## Problems
 
-Four, all for reasoning. No test grades them: the chapter builds nothing.
+These questions apply [stable field IDs](keep-column-identity.html), the
+[metadata tree](follow-iceberg-metadata.html), and [partition evolution](evolve-partition-specs.html)
+to new tables. The manifest questions use Iceberg's manifest-list layout from format versions
+one to three. No code or automated grading is required.
 
 **16.1 Rename by name.** No test. A table's column `order_id` is renamed `order_number`, and new
 files are written after the rename. Say what a reader that matches columns by name returns for
@@ -408,7 +424,7 @@ then manifests, and opens no data file until the manifests have ruled files out.
 equality it opens the one file whose range holds the value, and for the range the files whose
 ranges start below it. For `status` it opens every file whose bounds include the value, which is
 likely all of them. With files in arrival order every file spans most of `order_id`, so the
-bounds rule out little, as the shuffled file did in [ch09](#skipping-data). It also says the
+bounds rule out little, as the shuffled file did in [Skipping data](#skipping-data). It also says the
 manifest list's partition ranges could skip whole manifests if the table were partitioned on a
 column the query names.
 

@@ -48,7 +48,7 @@ or change it. Python runs in the page; Rust runs in a Codespace or at a desk as 
 [Appendix A](#running-the-lab).
 
 **Footer modes.** A Parquet file starts and ends with its magic, as
-[ch02](#anatomy-of-a-parquet-file) found. Read the first and last four bytes of both files:
+[Anatomy of a Parquet file](#anatomy-of-a-parquet-file) found. Read the first and last four bytes of both files:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -69,7 +69,7 @@ The plaintext-footer file starts and ends with `PAR1`, like every file so far, a
 knows nothing of encryption opens it as usual. The encrypted-footer file has `PARE` at both ends,
 and such a reader refuses it at the magic. Add `"tiny"` to the list of files: it ends with
 `PAR1` too, so the magic alone cannot tell a plaintext footer from a file with no encryption at
-all. Problem 13.2 asks you to tell the three apart.
+all. The [encryption-inspector lab](build-encryption-inspector.html) asks you to tell the three apart.
 
 ### What a plaintext footer shows
 
@@ -112,7 +112,10 @@ distinguish-key-names-and-keys
 
 ### Keys by name
 
-Neither file holds a plaintext encryption key. The file's **key metadata** identifies keys and
+The fixtures `plaintext-footer.parquet` and `encrypted-footer.parquet` encrypt `email` and
+`amount_cents`; they differ in whether the footer is encrypted too.
+[Recognise encryption modes](read-encryption-modes.html) shows what stays visible.
+Neither fixture holds a plaintext encryption key. The file's **key metadata** identifies keys and
 can contain protected key material. pyarrow writes it as JSON, so a search of the raw bytes
 finds it.
 
@@ -168,6 +171,10 @@ inspect-protected-modules
 
 ### Modules
 
+Use `plaintext-footer.parquet`, which leaves the footer readable while encrypting `email`
+and `amount_cents`. The [footer-mode comparison](read-encryption-modes.html) explains why
+this lets a keyless reader locate those columns. Here we follow their protected byte boundaries.
+
 A **module** is a separately protected piece, such as a page header or page body.
 Its **length prefix** is an integer before the content that says how many bytes follow.
 For the AES-GCM files inspected here, those bytes contain a nonce, ciphertext and authentication
@@ -204,12 +211,12 @@ of the column's metadata. The module's length counts the nonce, the ciphertext a
 the next module starts where it ends. Set `at` to that byte and run the step again: the second
 module ends exactly where the chunk ends. The first module is the page's header and the second
 the page. Change the column to `amount_cents` and read its first module the same way. Walking
-every module of a chunk is problem 13.1.
+every module of a chunk is an exercise in the [inspector lab](build-encryption-inspector.html).
 
 Encrypting each page separately keeps what earlier chapters built. A reader with the keys can
-still fetch one page from the middle of a file and decrypt it alone, as [ch10](#how-readers-read)
+still fetch one page from the middle of a file and decrypt it alone, as [How readers read](#how-readers-read)
 fetched pages. And a reader without the keys can still find every module, by its length prefix,
-the way [ch06](#pages) walked page headers.
+the way [Pages](#pages) walked page headers.
 
 The algorithm is **AES-GCM**, Advanced Encryption Standard in Galois/Counter Mode. It provides
 encryption and an authentication tag: a module changed by a
@@ -221,9 +228,8 @@ with plain counter mode, which is faster and leaves the pages unauthenticated.
 
 ### The file, module by module
 
-The panel lays out both files as the reader parsed them, in the structure and byte views of
-[ch02](#anatomy-of-a-parquet-file)'s panel, and lists the columns as a reader without keys finds
-them. Select a column's name to mark its bytes.
+The panel compares `plaintext-footer.parquet` with `encrypted-footer.parquet`, which also
+encrypts the footer. Its structure and byte views show what the keyless reader can locate. Select a column's name to mark its bytes.
 
 ```lab
 experiment: encryption
@@ -242,8 +248,9 @@ Try these:
 
 ### What still leaks
 
-Encryption hides values, not shape. From the module walkthrough and the footer-mode lesson, a reader
-without keys still learns:
+With the plaintext-footer fixture, a keyless reader can inspect more than encrypted values.
+The module walkthrough on this page and the [footer-mode comparison](read-encryption-modes.html)
+show that it can learn:
 
 - **the file's size, and in a plaintext footer every column chunk's size and offset;**
 - **how many pages each encrypted column has, and how long each is.** AES-GCM ciphertext has the same length as its plaintext; nonce, tag and framing add
@@ -251,8 +258,9 @@ without keys still learns:
   something about the values;
 - **which columns are protected, and by which named keys.**
 
-The encrypted footer hides more of the shape, at the price of making the whole file unreadable
-without the footer key.
+The encrypted-footer fixture still reveals its file size and visible footer framing, but
+hides the column map. Without the footer key, this inspector cannot assign data bytes to
+columns or report the per-column page counts above.
 
 An authentication signature on a plaintext footer is different from the PAR1/PARE file signature used for recognition. This inspector does not authenticate either protected module contents or the footer.
 
@@ -275,14 +283,15 @@ For the conceptual path, continue to [What this cannot tell you](#modular-encryp
 then the takeaways and the understanding check.
 :::
 
-The steps read the magic, the key metadata and one module by hand, and stopped where a key would
-be needed. The reader does the same for every module, in both footer modes, and says where it
-stops.
+This lab implements the keyless inspector from [Inspect module boundaries and leakage](inspect-protected-modules.html).
+It reads `plaintext-footer.parquet` and `encrypted-footer.parquet`, reports visible framing,
+and stops where keys would be needed. The [footer-mode comparison](read-encryption-modes.html)
+shows why the two files reveal different amounts of structure.
 
 ### Walking modules
 
-A module is read from its length prefix alone, as the step read one, and an encrypted column chunk
-is a run of them:
+The inspector reads a module's framing from its length prefix alone. An encrypted column chunk
+is a run of such modules, as the [single-module example](inspect-protected-modules.html) shows:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -329,8 +338,8 @@ rest as one module, which must end where the footer does:
 
 ### A signed plaintext footer
 
-In the step that read one module, `open_bytes` decoded the plaintext footer with the reader's
-footer decoder, the `metadata` module. That decoder refuses bytes left over after the
+The [single-module walkthrough](inspect-protected-modules.html) calls `open_bytes` to decode
+the plaintext footer through the reader's `metadata` module. That decoder refuses bytes left over after the
 `FileMetaData`: they mean the trailer's length and the structure disagree. An encrypted file with
 a plaintext footer leaves exactly a signature's worth, and says it uses encryption:
 
@@ -435,8 +444,8 @@ before it reads a page. Neither library opens the encrypted footer without keys.
 The Python step keeps away from one call. pyarrow's metadata for an encrypted column,
 `metadata.row_group(0).column(2)`, needs that column's key. Without the key, pyarrow does not
 raise an error: it stops the whole Python process, and in the page that stops every step. A
-reader with keys passes decryption properties from `pyarrow.parquet.encryption`, as the pyarrow
-documentation under *Where to go next* shows. Ask for the other encrypted column,
+reader with keys passes decryption properties from `pyarrow.parquet.encryption`; the
+[encryption notes and sources](modular-encryption-notes.html) link to pyarrow's documentation. Ask for the other encrypted column,
 `amount_cents`, instead of `email`: both libraries fail on it as they did on `email`.
 
 In Python, the first run loads pyarrow into the page, a much larger download than the other
@@ -454,6 +463,11 @@ reference
 (modular-encryption-limits)=
 ## What this cannot tell you
 
+These notes qualify the keyless inspection of `plaintext-footer.parquet` and
+`encrypted-footer.parquet`. The [footer-mode comparison](read-encryption-modes.html) shows
+visible metadata; the [module walkthrough](inspect-protected-modules.html) shows byte framing.
+Neither experiment decrypts data or verifies authentication tags.
+
 **How to decrypt.** This reader stops where the keys would be needed. Decrypting needs AES, GCM,
 the service that unwraps data keys, and the exact authenticated data for each module; the format
 specifies all of them, and this book does not implement them.
@@ -462,7 +476,7 @@ specifies all of them, and this book does not implement them.
 storage protects them only where they are stored. Which risk matters is a question about the
 data, not the format.
 
-**How table formats use it.** Engines that manage many files, [ch14](#lakehouse-and-beyond)'s
+**How table formats use it.** Engines that manage many files, [Lakehouse and beyond](#lakehouse-and-beyond)'s
 subject, decide which columns to encrypt and hold the keys; the files only carry the result.
 
 ## Key takeaways
@@ -478,7 +492,8 @@ subject, decide which columns to encrypt and hold the keys; the files only carry
   cannot be found.
 - **Files carry key names and wrapped data keys.** The data keys are encrypted by master keys
   that stay in a key service. The file does not contain the plaintext keys.
-- **Encryption hides values, not shape.** Sizes, page counts and page lengths remain visible.
+- **Visible shape depends on the footer mode.** A plaintext footer exposes chunk locations
+  and lets the inspector count protected modules. An encrypted footer hides that column map.
 :::
 
 ```checkpoint
@@ -540,4 +555,4 @@ cargo test -p exercises --test modular_encryption -- --ignored
   [encryption documentation](https://arrow.apache.org/docs/python/parquet.html#parquet-modular-encryption-columnar-encryption)
   shows how a real key service is plugged in.
 - AES-GCM is specified in NIST Special Publication 800-38D.
-- [ch14](#lakehouse-and-beyond) turns from one file to the many that make a table.
+- [Lakehouse and beyond](#lakehouse-and-beyond) turns from one file to the many that make a table.

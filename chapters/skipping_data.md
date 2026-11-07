@@ -9,7 +9,7 @@ title: Skipping data
 
 Given a predicate, which bytes can a reader prove it does not need?
 
-[ch08](#metadata-and-statistics) established when a footer's minimum and maximum can be trusted.
+[Metadata and statistics](#metadata-and-statistics) established when a footer's minimum and maximum can be trusted.
 This chapter puts them to work. A query arrives with a condition, such as `order_id = 431`. Before
 the reader fetches a column chunk or a page, it asks whether the metadata proves that nothing
 there can satisfy the condition. If it does, the reader skips it.
@@ -49,8 +49,8 @@ The first file is in `order_id` order; the second is shuffled.
 Each step shows its worked result first. Open **Read or run the code** if you want to inspect
 or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
 [Appendix A](#running-the-lab). Each step finds the footer as
-[ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
-`decode_file_metadata` from [ch03](#the-type-system).
+[Anatomy of a Parquet file](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
+`decode_file_metadata` from [The type system](#the-type-system).
 
 **Ranges in the footer.** The query is `order_id = 431`. Every row group's statistics give the
 smallest and largest `order_id` it holds. Read them, and ask of each row group whether `431` could
@@ -111,8 +111,9 @@ Row-group statistics decide whole row groups. A **page index** records metadata 
 pages, so a reader can decide which pages to fetch. It is written after
 the row groups, in two structures per column chunk: a **ColumnIndex** with each page's minimum,
 maximum and null count, and an **OffsetIndex** with each page's position, size and first row.
-The reader's `page_index` module reads both. Ask them about `order_id` in row group 2, the one
-row group the first step kept:
+The reader's `page_index` module reads both. Use `pruning-sorted.parquet` and the condition
+`order_id = 431`. [Rule out row groups safely](rule-out-row-groups.html) shows why only row
+group 2 survives. Here we inspect that group's `order_id` pages:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -162,9 +163,10 @@ test-bloom-membership
 
 ### Bloom filters
 
-Statistics cannot rule out a value inside a chunk's range. Customer numbers fill most of their
-range in every row group, so `customer_id = 424242` survives every minimum and maximum. A Bloom
-filter answers a different question: was this exact value ever added?
+The fixtures `pruning-sorted.parquet` and `pruning-shuffled.parquet` contain the same orders
+in different orders. Their `customer_id` ranges span nearly all customer numbers in every row
+group, so statistics retain every group for `customer_id = 424242`. A Bloom filter answers a
+different question: was this exact value ever added?
 
 A **Bloom filter** is a compact membership test: it can prove a value absent, but a possible
 match still needs checking. It stores a **bitset**, a sequence of bits that are either clear
@@ -220,7 +222,7 @@ thousands of customer numbers its row group does not hold:
 The writer sized each filter for the false-positive rate the table's note gives, and the
 measured rate is lower, because the filter's size is rounded up. False positives cost a read and
 nothing else: the sorted file's false positive makes the reader read a row group with no match in
-it. That is why, in the table in *Compose a safe skipping plan*, the sorted file reads bytes for
+it. That is why the [combined skipping comparison](compose-a-pruning-plan.html) reads bytes from the sorted file for
 `customer_id = 424242` and the shuffled one reads none. A correctly written and read filter has
 no **false negative**, which would reject a value that is present. It therefore never costs a
 matching row.
@@ -236,8 +238,10 @@ compose-a-pruning-plan
 
 ### What each mechanism adds
 
-This **pruning** plan combines the earlier absence tests: row-group statistics, page indexes
-and Bloom filters. Each can remove candidates; none turns a remaining candidate into a proven match.
+This **pruning** plan combines [row-group statistics](rule-out-row-groups.html),
+[page indexes](map-pages-to-rows.html) and [Bloom filters](test-bloom-membership.html).
+Each can remove candidates; none turns a remaining candidate into a proven match. Start with
+`order_id = 431` on `pruning-sorted.parquet`, then compare its shuffled twin.
 
 The reader's `prune.plan` puts the three mechanisms together. It takes a condition, the columns
 to read, and which mechanisms it may use, and decides row group by row group, saying why:
@@ -257,7 +261,7 @@ to read, and which mechanisms it may use, and decides row group by row group, sa
 :::
 ::::
 
-Statistics skip three row groups, as the first step did by hand. In row group 2, the page index
+Statistics skip three row groups, as the [footer-range example](rule-out-row-groups.html) showed. In row group 2, the page index
 keeps one page of five, and the reader reads that page's rows from every column. The last line
 counts the bytes of column chunks the plan reads, and the bytes of page index it fetched to
 decide.
@@ -277,7 +281,7 @@ The same two conditions, with the mechanisms allowed one at a time:
 Each mechanism costs bytes of its own: the page index and the filters are fetched before any data,
 and in an object store each fetch is a request. Row group statistics are free, because they came
 with the footer. Whether the others pay depends on how much they let the reader skip, and on how
-many requests they add, which [ch10](#how-readers-read) measures.
+many requests they add, which [How readers read](#how-readers-read) measures.
 
 ### Sorted data
 
@@ -297,7 +301,7 @@ Sorting often makes statistics selective. The combined comparison also uses page
 order numbers, and a condition on `order_id` rules out all but a few. In the shuffled file the
 same statistics are true and useless: every band is almost the whole range. Columns nobody sorted
 by, such as `customer_id` and `amount_cents`, behave alike in both files. This is why writers are
-told to sort by the column queries filter on most, and why [ch11](#writing-parquet-well) returns
+told to sort by the column queries filter on most, and why [Writing Parquet well](#writing-parquet-well) returns
 to it.
 
 The sorted/shuffled comparison combines these mechanisms. The planner models one condition at a time, and byte counts are not a complete runtime prediction.
@@ -321,8 +325,8 @@ For the conceptual path, continue to [What this cannot tell you](#skipping-data-
 then the takeaways and the understanding check.
 :::
 
-The steps read the statistics by hand, then asked the reader's `page_index` and `bloom` modules,
-then called `prune.plan`. This section builds the parts of the plan: the test of a condition
+The [combined pruning example](compose-a-pruning-plan.html) uses `pruning-sorted.parquet` and
+`pruning-shuffled.parquet` to choose row groups and pages. This lab builds that planner: the test of a condition
 against a range, the probe of a filter, and the step from kept rows to the pages of every column.
 The tabs switch every excerpt on the page between the two languages.
 
@@ -351,8 +355,8 @@ whose values are all null for any comparison:
 ::::
 
 For a comparison, `against_bounds` needs a usable minimum and maximum, which
-[ch08](#metadata-and-statistics)'s `bounds` decided. It places the value against each, and rules
-the comparison out by the fact in the core range-rules lesson:
+[Metadata and statistics](#metadata-and-statistics)'s `bounds` decided. It places the value against each, and rules
+the comparison out using the [range rules](rule-out-row-groups.html):
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -452,7 +456,7 @@ whose rows overlap the kept rows. Without an OffsetIndex, it reads the whole chu
 ### Checking it
 
 Three kinds of test hold the reader to the data rather than to itself. The OffsetIndex must list
-exactly the pages the walker from [ch06](#pages) finds. The ColumnIndex must hold each page's
+exactly the pages the walker from [Pages](#pages) finds. The ColumnIndex must hold each page's
 own minimum, maximum and null count, as the reader computes them from the decoded values. And
 for hundreds of conditions on every fixture, every row that matches must lie in a row range the
 plan keeps, in a page every column reads. Every value in a chunk must also pass its Bloom filter.
@@ -474,7 +478,8 @@ cargo test -p parquet-lab --test fixtures
 
 ### Ask a library
 
-pyarrow and the `parquet` crate can both skip row groups. Ask each the questions the steps asked:
+pyarrow and the `parquet` crate can both skip row groups. Compare `order_id = 431` on
+`pruning-sorted.parquet` with `customer_id = 424242` on `pruning-shuffled.parquet`:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -493,7 +498,7 @@ pyarrow and the `parquet` crate can both skip row groups. Ask each the questions
 
 pyarrow's dataset reader splits the file into row groups and keeps those whose statistics leave
 room for the condition. For `order_id = 431` on the sorted file it keeps row group 2, as the
-first step did. For `customer_id = 424242` on the shuffled file it keeps all four, where the
+[footer-range example](rule-out-row-groups.html) did. For `customer_id = 424242` on the shuffled file it keeps all four, where the
 reader's Bloom filters ruled out every one. pyarrow skips by statistics only. It uses neither the
 Bloom filters nor the page index to skip, and its Python API cannot read either. It says whether a
 column chunk has a ColumnIndex and an OffsetIndex, and versions newer than the one the page loads
@@ -502,8 +507,8 @@ page of the columns it needs.
 
 The crate does nothing unless you ask. Its row group predicate is a function you write, here one
 that reads `order_id`'s minimum and maximum, and it keeps row group 2 as well. Asked for the page
-index, it returns the kept row group's ColumnIndex: the order and the pages' bounds the second
-step printed. Asked for the Bloom filters, its `check` says, for every row group, that `424242` is
+index, it returns the kept row group's ColumnIndex: the order and the pages' bounds the
+[page-index example](map-pages-to-rows.html) printed. Asked for the Bloom filters, its `check` says, for every row group, that `424242` is
 not there. The crate's Arrow reader skips pages by the page index, with row selections and row
 filters. It needs the crate's `arrow` feature, which this workspace does not build.
 
@@ -522,6 +527,10 @@ reference
 (skipping-data-limits)=
 ## What this cannot tell you
 
+These notes qualify the [sorted and shuffled orders comparison](compose-a-pruning-plan.html).
+The teaching planner chooses byte ranges using footer statistics, page indexes and Bloom filters;
+it does not measure how long a production engine takes to read them.
+
 **How conditions combine.** The reader's plan takes one condition. Each condition yields row
 ranges, and `AND` intersects them while `OR` joins them; a row group is skipped only when the
 combined ranges are empty.
@@ -533,7 +542,7 @@ the page index for such columns.
 
 **Whether skipping is faster.** Skipping saves bytes and decoding. It can cost requests: a plan
 that reads five scattered pages makes five requests where reading the whole data region could make one.
-[ch10](#how-readers-read) weighs the two.
+[How readers read](#how-readers-read) weighs the two.
 
 **Other ways to skip.** Some readers fetch a column's dictionary page and look the value up
 there before reading any data page. This reader does not.
@@ -545,14 +554,14 @@ there before reading any data page. This reader does not.
 
 - **A skip must be certain; a read may be unnecessary.** Every mechanism answers "skip" or
   "cannot rule it out".
-- **Statistics rule out ranges, so sorting decides their worth.** The same statistics skip
-  most of a sorted file and almost none of a shuffled one.
+- **Statistics rule out ranges, so layout decides their worth.** For `order_id` in the
+  sorted/shuffled fixtures, sorting narrows the bounds and lets the planner skip more groups.
 - **The page index skips pages, and connects columns by row.** The OffsetIndex's first rows map
   kept rows to the pages of every other column.
 - **A Bloom filter rules out single values inside a range.** It has false positives, which cost
   reads, and no false negatives, which would cost rows.
 - **Every mechanism has its own cost in bytes and requests.** Only the footer's statistics come
-  free.
+  without another request after the footer has arrived.
 :::
 
 ```checkpoint
@@ -616,4 +625,4 @@ cargo test -p exercises --test skipping_data -- --ignored
   Space-Efficient Bloom Filters*, in the ACM Journal of Experimental Algorithmics.
 - xxHash64 is specified in the
   [xxHash repository](https://github.com/Cyan4973/xxHash/blob/dev/doc/xxhash_spec.md).
-- [ch10](#how-readers-read) turns these plans into requests against an object store.
+- [How readers read](#how-readers-read) turns these plans into requests against an object store.

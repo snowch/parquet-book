@@ -33,6 +33,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 follow-literals-and-copies
 ```
 
+(one-table-six-codecs)=
 ### One table, six codecs
 
 **Compression** represents bytes more compactly. Parquet uses lossless compression: a reader
@@ -98,7 +99,10 @@ This is the **LZ77** idea every codec here shares: replace a run of bytes the ou
 holds with how far back it is and how long. The codecs differ in how they write those references
 down, and in what else they do.
 
-**Three codecs, one page.** The reader's `compress.decompress` takes a codec's name from the
+(multi-codec-walkthrough)=
+### Decode the same page with different codecs
+
+The reader's `compress.decompress` takes a codec's name from the
 footer, a page's compressed bytes and the size its header promises. Give it the `country` page
 from three files, and compare each result with the same page in `codec-none.parquet`:
 
@@ -169,7 +173,12 @@ answer: The result is ABABABA. Each newly written byte can become a source for l
 compare-codec-patterns
 ```
 
+(what-each-codec-saved)=
 ### What each codec saved
+
+The `codec-*.parquet` fixtures contain the same orders and PLAIN-encoded page contents, with no
+dictionary. Only the codec differs. The [literal-and-copy walkthrough](#one-table-six-codecs)
+shows how some of their compressors work; here we compare stored sizes.
 
 A **compression level** is a writer setting that trades compression effort against output size.
 These files use the writer’s configured levels; a codec’s name alone does not fix its result.
@@ -211,20 +220,24 @@ answer: No. Different columns have different patterns, and size measurements do 
 weigh-compression-costs
 ```
 
+(encoding-before-compression)=
 ### Encoding before compression
 
-[ch05](#encodings) said that `BYTE_STREAM_SPLIT` does not shrink anything by itself, and that a
-compressor might find more in its output. `codec-zstd-split.parquet` is `codec-zstd.parquet`
-with both float columns split:
+[Byte-stream splitting](#byte-stream-split) groups each byte position of fixed-width values
+without shrinking them. Here we test what that rearrangement gives a compressor.
+`codec-zstd.parquet` stores orders using PLAIN encoding and ZSTD compression;
+`codec-zstd-split.parquet` changes both float columns to `BYTE_STREAM_SPLIT`, keeping the codec.
+The comparison measures their stored column sizes:
 
 ```{include} _generated/codec-split.md
 ```
 
-Splitting helped `distance_km` and hurt `weight_kg`. The noisy floats behave as [ch05](#encodings)
-described: the sign and exponent bytes barely change, and once they sit together the compressor
+Splitting helped `distance_km` and hurt `weight_kg` in these fixtures. The noisy floats expose the
+pattern from the [byte-split example](#byte-stream-split): the sign and exponent bytes barely change, and once they sit together the compressor
 finds them. The weights are different. Each is a number of kilograms to two decimal places, and a
 decimal fraction often has a repeating binary expansion. Its finite floating-point
-approximation can contain repeated byte patterns. Set the second step's column to `4`, `weight_kg`, and print the page it decompressed (`out.data.hex(" ")`
+approximation can contain repeated byte patterns. To inspect them, open the
+[multi-codec walkthrough](#multi-codec-walkthrough), select column `4`, `weight_kg`, and print the decompressed page (`out.data.hex(" ")`
 in Python, or `{:02x?}` of `out.bytes` in Rust). The same byte sequences recur, `33 33 33` and
 `14 ae 47 e1 7a` among them. In PLAIN order a compressor matches them as whole runs. Split, each
 run is scattered over eight streams.
@@ -247,13 +260,14 @@ A codec's saving is paid for when the file is read.
   bytes matter more depends on where the file lives: bytes fetched over a network cost more than
   bytes read from a local disk. [ch10](#how-readers-read) weighs the two.
 
+(codec-names)=
 ### Codec names
 
 The footer stores a codec as a number, and `parquet.thrift` names each one. Two names need care.
 `LZ4` is an early codec whose framing implementations disagreed about, and it is deprecated.
 `LZ4_RAW` is its replacement: a plain LZ4 block. pyarrow writes `LZ4_RAW` when asked for `lz4`,
 and reports it as `LZ4` in its own metadata, which is why the book's fixture tests map one name
-to the other. *Ask a library*, at the end of *Building it*, shows both names. `LZO` is defined
+to the other. The [library comparison](build-decompressors.html#ask-a-library) shows both names. `LZO` is defined
 and rarely written.
 
 Changing encoding can help or hurt a codec. Measure the combined choice on the workload instead of treating one fixture’s winner as a rule.
@@ -277,13 +291,14 @@ For the conceptual path, continue to [What this cannot tell you](#compression-li
 then the takeaways and the understanding check.
 :::
 
-The steps undid Snappy by hand, then called the reader's `decompress` on three codecs. This
-section builds the Snappy decoder, says where the other two are, and shows where the column
-reader calls them. The tabs switch every excerpt on the page between the two languages.
+Build the decompressors used in the [literal-and-copy walkthrough](#one-table-six-codecs).
+That example decodes the `country` page in the Snappy, LZ4 and GZIP fixtures and compares each
+with `codec-none.parquet`. Review its overlapping-copy example before implementing the decoder.
+This lab builds Snappy, locates the other decoders and connects them to the column reader. The tabs switch every excerpt on the page between the two languages.
 
 ### Snappy
 
-`snappy` reads the varint as the first step did, then decodes elements until the input ends,
+`snappy` reads the output-length varint from the [Snappy walkthrough](#one-table-six-codecs), then decodes elements until the input ends,
 recording each as a token. A literal copies bytes from the input:
 
 ::::{tab-set}
@@ -458,7 +473,7 @@ cargo test -p parquet-lab --test fixtures
 ### Ask a library
 
 pyarrow and the `parquet` crate both read the codec and the two sizes from the footer. Ask each
-for the `country` column chunk in the three files the second step decompressed:
+for `country` in `codec-snappy.parquet`, `codec-lz4.parquet` and `codec-gzip.parquet`:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -475,10 +490,10 @@ for the `country` column chunk in the three files the second step decompressed:
 :::
 ::::
 
-Both report the sizes the tables above were made from. Each counts the page header in both, and
+Both report the sizes used in the [codec-size tables](#what-each-codec-saved). Each counts the page header in both, and
 the header is never compressed, so the difference between them is what the codec saved. The
 names differ. The file names `LZ4_RAW`, and the crate says so, where pyarrow prints `LZ4`, as
-*Codec names* described. The crate's `compression()` answers with a writer's setting rather than
+the [codec-name explanation](#codec-names) describes. The crate's `compression()` answers with a writer's setting rather than
 the file's field: for GZIP it adds a compression level, which the file does not record. The level
 is the crate's default, the one it would write with. `compression_codec()` gives the name the file
 stores. No reader needs the level: a DEFLATE stream decodes the same way whatever level wrote it.
@@ -498,19 +513,23 @@ reference
 (compression-limits)=
 ## What this cannot tell you
 
+These notes cover the [codec-size comparison](#what-each-codec-saved) on identical PLAIN-encoded
+orders and the [encoding/compression comparison](#encoding-before-compression) on float columns.
+The [token inspector](#one-table-six-codecs) shows how the supported decompressors reconstruct bytes.
+
 **How fast each codec is.** The book's numbers come from files, not clocks, so they are the same
 on every machine. Speed depends on the implementation, the hardware and the data. Measure it
 with the reader you use, on files like yours.
 
-**How ZSTD and Brotli work inside.** Their sizes are measured here, and their pages are not
-decoded. Both add entropy coding to LZ77, as DEFLATE does, with larger windows and more careful
+**How ZSTD and Brotli work inside.** The codec-size comparison measures their stored sizes;
+the teaching reader does not decompress their pages. Both add entropy coding to LZ77, as DEFLATE does, with larger windows and more careful
 modelling. Their specifications are listed below.
 
 **How compression levels change the result.** Each fixture uses pyarrow's default level for its
 codec. Most codecs can trade more compression time for smaller output, and decompressing usually
 costs about the same whichever level wrote the file.
 
-**How real pages behave.** The fixtures hold one small page per column chunk. A compressor finds
+**How real pages behave.** The `codec-*.parquet` fixtures hold one small page per column chunk. A compressor finds
 more repetition in a larger input, so production pages of a megabyte or so usually compress
 better than these.
 
@@ -521,12 +540,12 @@ better than these.
 
 - **A codec compresses each page after encoding, and knows nothing about types.** It finds
   whatever repetition the encoding left.
-- **The data decides more than the codec.** Across the fixtures' columns, sizes differ far more
-  between columns than between codecs.
+- **Data patterns matter.** The codec-size comparison's repeated country codes shrink much
+  more than its noisy distance measurements under every tested codec.
 - **Every codec here replaces repeats with references to earlier bytes.** The smaller ones also
   give frequent symbols shorter codes.
-- **Encoding and compression interact.** `BYTE_STREAM_SPLIT` helped noisy floats and hurt
-  decimal-looking ones under the same codec. Measure both on your data.
+- **Encoding and compression interact.** In the ZSTD fixture comparison, `BYTE_STREAM_SPLIT`
+  helped noisy floats and hurt decimal-looking ones. Measure both on your data.
 - **A reader decompresses whole pages.** Version 2 leaves the levels uncompressed, so rows and
   nulls can be counted without decompressing.
 :::

@@ -46,6 +46,8 @@ through the core route. Each lesson has:
 Code beside an example is optional. The module also links to its build lab and coding problems,
 where it has them. Module notes collect further limitations, takeaways and primary sources.
 Qualifications needed for the core lesson stay beside its explanation.
+If you open a lesson directly from the contents, its preparation links take you to the
+specific examples it builds on. Notes link back to the evidence whose limits they discuss.
 
 New terms are explained where they become useful. The [Glossary](#glossary) provides short
 definitions and links back to the lessons that teach them.
@@ -105,6 +107,7 @@ is deliberately plain, and every chapter says what each quoted block does.
 
 ## Where this starts
 
-[ch01](#why-parquet-exists) stores one table two ways and counts the bytes a query touches.
+[ch01](#why-parquet-exists) compares bytes read from real CSV and Parquet files, then uses a
+separate row/column schematic to explain layout choices.
 [ch02](#anatomy-of-a-parquet-file) first recognises a real Parquet file from its signature, then
 uses its final bytes to find the metadata that describes it. The optional build lab starts the reader.

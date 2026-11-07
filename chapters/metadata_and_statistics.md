@@ -32,6 +32,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 compare-typed-values
 ```
 
+(read-the-statistics-yourself)=
 ### Read the statistics yourself
 
 **Statistics** summarise a column chunk, for example with a minimum, a maximum and a null
@@ -159,7 +160,12 @@ answer: No. The annotation supplies the order. The same stored bits can represen
 decide-usable-bounds
 ```
 
+(what-the-footer-records)=
 ### What the footer records
+
+Decide which statistics a reader may use from `statistics.parquet`, a table of orders with
+columns chosen to expose comparison mistakes. The [typed-comparison lesson](metadata_and_statistics.md#read-the-statistics-yourself)
+shows why the column's type determines how its bound bytes must be read.
 
 A **conservative bound** encloses every relevant value even when the bound itself is not stored
 in the column. For example, a lower bound of `ant` is safe for values `antelope` and `bat`,
@@ -168,7 +174,7 @@ A reader may use safe bounds to rule values out; it needs exact bounds to report
 as answers.
 
 This is which fields of the `Statistics` structure the writer set for each column of the first row
-group:
+group of `statistics.parquet`:
 
 ```{include} _generated/statistics-fields.md
 ```
@@ -193,7 +199,8 @@ bytes Java treats as signed. Its string statistics were wrong for any value with
 `0x7f`, and readers could not tell which files were affected.
 
 The fix added `min_value` and `max_value`, and a `column_orders` list in the footer that says,
-column by column, which order they use. `TYPE_ORDER` is the order introduced in the typed-comparison lesson, and the one
+column by column, which order they use. `TYPE_ORDER` is the type-defined order from the
+[typed-comparison lesson](metadata_and_statistics.md#read-the-statistics-yourself), and the one
 every fixture's footer names; this reader treats any other as unknown. A reader's rules follow
 from that history:
 
@@ -208,6 +215,7 @@ from that history:
 Some readers go further, and ignore statistics from particular releases of particular writers,
 which they recognise by the footer's `created_by` string. This reader does not.
 
+(let-the-reader-judge-the-bounds)=
 ### Let the reader judge the bounds
 
 **The reader decides.** The reader chooses an order for each column from its physical type and
@@ -231,7 +239,7 @@ and maximum:
 
 Every column chunk with a minimum and maximum gives a range in its column's order.
 `customer_id`'s maximums are the unsigned numbers, and `city`'s maximum in row group 0 is `Łódź`,
-as the second step predicted. `order_id`'s ranges do not overlap, because the rows were
+as the [string-order example](metadata_and_statistics.md#read-the-statistics-yourself) predicts. `order_id`'s ranges do not overlap, because the rows were
 written in order: a reader looking for one order reads one row group. `temp_c` holds a NaN in
 row group 0, and the bounds leave it out. Its minimum in row group 1 is `-0`.
 
@@ -258,22 +266,24 @@ answer: No. Unknown order cannot justify safe skipping. A shortened bound can st
 handle-null-and-float-statistics
 ```
 
+(missing-bounds-are-not-all-null-evidence)=
 ### Missing bounds are not all-null evidence
 
-In the preceding report, `coupon` has a null count proving an all-null chunk. `note` has no
-statistics, so the footer does not establish whether its values are null. These cases can both
-lack min/max but justify different conclusions. Keep the null count separate from the bounds.
+The [bounds report for `statistics.parquet`](#let-the-reader-judge-the-bounds) contains two cases worth
+separating. The `coupon` column has a chunk whose null count equals its value count, proving
+that chunk is all-null. The `note` column has no statistics, so its footer cannot establish
+whether its values are null. Both cases lack min/max but justify different conclusions. Keep the null count separate from the bounds.
 
 ### Floating point
 
-Under `TYPE_ORDER`, the type-defined order used by these fixtures and this reader, floats have
+Under `TYPE_ORDER`, the type-defined order used by `statistics.parquet` and this reader, floats have
 two traps. **NaN** means “not a number”, a special floating-point value. Ordinary floating-point
 comparisons do not make it less than, equal to or greater than anything. A writer using
 `TYPE_ORDER` leaves it out of the bounds, so those bounds cannot establish whether NaN is
 present. And `-0` equals `+0`, though their bytes differ. Under this order, writers should store
 a zero minimum as `-0` and a zero maximum as `+0`; readers must remember that a chunk with
-either may hold both. The `-0` the bounds walkthrough printed for `temp_c` in row group 1 is the
-first rule at work. A different declared order requires its own rules for NaNs and signed zeros.
+either may hold both. The `-0` for `temp_c` in row group 1 of the
+[bounds report](#let-the-reader-judge-the-bounds) illustrates the zero-minimum rule. A different declared order requires its own rules for NaNs and signed zeros.
 
 ```practice
 question: One chunk has a null count equal to its value count; another has no statistics. Are both proven all-null? Can ordinary min/max bounds prove that NaN is absent?
@@ -284,7 +294,12 @@ answer: Only the first is proven all-null. Missing statistics say nothing about 
 account-for-footer-cost
 ```
 
+(what-else-the-footer-says)=
 ### What else the footer says
+
+A Parquet footer is the metadata map a reader opens before fetching column data. This lesson
+uses `statistics.parquet` to compare that map's size with its data. The
+[footer-location example](#locate-the-footer) shows where the metadata lives.
 
 Beyond statistics, each row group records its row count and size, and may list the columns its
 rows are sorted by. `sorting_columns` is a claim: a reader may rely on it and cannot check it
@@ -301,9 +316,10 @@ All of it costs bytes, in a place every reader must fetch:
 ```
 
 In a small file the footer can outweigh the data. A table with hundreds of columns and many row
-groups can have a footer of megabytes, and every query pays for reading and decoding it before it
-reads anything else. [ch11](#writing-parquet-well) shows a footer growing with the number of row
-groups.
+groups can have a footer of megabytes. The teaching reader fetches and decodes the footer each
+time it opens the file, before choosing data ranges. Reusing previously decoded metadata can
+avoid repeating that work. [Writing Parquet well](#writing-parquet-well) shows a footer growing
+with the number of row groups.
 
 sorting_columns records a writer’s claim. Verifying sortedness would require reading values, not only the footer.
 
@@ -326,9 +342,10 @@ For the conceptual path, continue to [What this cannot tell you](#metadata-and-s
 then the takeaways and the understanding check.
 :::
 
-The steps read bounds out of the footer, compared bytes in two orders, and asked the reader which
-bounds it may use. This section builds the two parts of the reader the last step called: the
-comparator for a column, and the rules in `bounds`. The tabs switch every excerpt on the page
+Build the statistics reader used on `statistics.parquet`. The
+[typed-comparison examples](metadata_and_statistics.md#read-the-statistics-yourself) interpret bound bytes; the
+[bounds report](#let-the-reader-judge-the-bounds) accepts or refuses them under the file's declared order.
+This lab implements the column comparator and the rules in `bounds`. The tabs switch every excerpt on the page
 between the two languages.
 
 ### The comparator for a column
@@ -356,7 +373,7 @@ The order comes from the physical type and the annotation together:
 
 ### The rules
 
-`bounds` applies the rules in the order the chapter gives them, and says why when it refuses. It
+`bounds` applies the rules from the [usable-bounds lesson](#what-the-footer-records), and says why when it refuses. It
 refuses a type without an order first, then prefers `min_value` and `max_value`, which it uses
 only when the footer names their order and neither is NaN:
 
@@ -380,8 +397,8 @@ only when the footer names their order and neither is NaN:
 ::::
 
 Without the newer fields, it falls back to the deprecated pair, but only for a column whose order
-is signed and whose values are not byte arrays. This is the branch that refused `amount` when you
-set `old_writer`:
+is signed and whose values are not byte arrays. This branch refuses `amount` in the
+[bounds-report variation](#let-the-reader-judge-the-bounds) with `old_writer` enabled:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -401,9 +418,9 @@ set `old_writer`:
 :::
 ::::
 
-[ch03](#the-type-system)'s reader used `min` and `max` whenever `min_value` and `max_value` were
-missing. That was the mistake this chapter describes, and the statistics decoder now keeps the
-two pairs apart.
+The [physical/logical-type walkthrough](#stored-values-and-their-meaning) explains how to interpret stored
+bytes. Trusting a bound also requires checking which statistics field supplied those bytes.
+The statistics reader keeps the old and new pairs apart and checks whether their order is usable.
 
 ### Checking it
 
@@ -428,7 +445,8 @@ cargo test -p parquet-lab --test fixtures
 
 ### Ask a library
 
-pyarrow and the `parquet` crate both read the statistics for you. Ask each for row group 0:
+pyarrow and the `parquet` crate both read the statistics for you. Ask each for the first row
+group of `statistics.parquet`:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -447,15 +465,16 @@ pyarrow and the `parquet` crate both read the statistics for you. Ask each for r
 
 pyarrow reads the bounds through the logical type. Its `min` and `max` give `customer_id`'s
 maximum as the unsigned customer number, and `city`'s as a string. Its `min_raw` and `max_raw`
-give the physical type's reading, where `customer_id`'s maximum is negative, as the first step's
-signed reading was. It reports the footer's size, which is the footer bytes in the cost table,
+give the physical type's reading, where `customer_id`'s maximum is negative, as in the
+[signed/unsigned example](metadata_and_statistics.md#read-the-statistics-yourself). It reports the footer's size, which is the
+footer entry in the [cost table](#what-else-the-footer-says),
 and the row group's `sorting_columns`. It has no attribute for the exact flags, and none for the
 column orders.
 
 The crate reports each column's order from `column_orders`: `customer_id`'s is
 `TYPE_DEFINED_ORDER(UNSIGNED)`. Yet its statistics for an `INT32` column hold an `i32`, and
-`max_opt` returns `customer_id`'s maximum as a negative number. The crate hands you the first
-step's mistake, and applying the column order is left to you. It also says every bound is exact,
+`max_opt` returns `customer_id`'s maximum as a negative number. That is the signed reading of
+an unsigned column, and applying the column order is left to you. It also says every bound is exact,
 and that none came from the deprecated fields, although pyarrow wrote those too: where both pairs
 are present, the crate reads `min_value` and `max_value`.
 
@@ -474,11 +493,17 @@ reference
 (metadata-and-statistics-limits)=
 ## What this cannot tell you
 
+These notes cover `statistics.parquet`: its [typed comparisons](metadata_and_statistics.md#read-the-statistics-yourself),
+[bounds report](#let-the-reader-judge-the-bounds), [null and floating-point cases](#missing-bounds-are-not-all-null-evidence)
+and [footer costs](#what-else-the-footer-says). The fixture deliberately includes cases where a bound
+can be misread or is absent.
+
 **Whether a query can skip a chunk.** The bounds say what a chunk may hold. Turning a query's
 condition into a decision is [ch09](#skipping-data)'s subject, along with the finer statistics
 kept for each page.
 
-**What shortened bounds look like.** pyarrow wrote exact bounds for every value here. Writers
+**What shortened bounds look like.** pyarrow wrote exact bounds wherever it stored them in
+`statistics.parquet`. Writers
 that shorten long strings mark the bound as inexact, and the reader reports the flag, but no
 fixture exercises it.
 
@@ -495,13 +520,14 @@ language does cannot use these bounds directly.
 
 - **Statistics are bytes, and an order makes them mean something.** The column's type sets the
   order: signed, unsigned, by value, or byte by byte.
-- **A mistaken order is confidently wrong.** Unsigned integers, non-ASCII strings, negative
-  decimals and floats each have one, and the fixture catches every one.
+- **A mistaken order can discard matching data.** The typed-comparison examples show incorrect
+  bounds for unsigned integers, non-ASCII strings, decimals and floats.
 - **Use `min_value` and `max_value` when the footer gives their order.** Use the deprecated `min`
   and `max` only where signed comparison was right.
 - **Under `TYPE_ORDER`, NaN never belongs in a bound, and `-0` equals `+0`.** A reader looking
   for NaN cannot use those bounds. Other declared comparison orders require their own rules.
-- **The footer is not free.** Every statistic is read by every query before any data.
+- **The footer is not free.** A reader opening the file fetches its metadata before selecting
+  data. Reusing cached metadata can avoid paying that cost again.
 :::
 
 ```checkpoint

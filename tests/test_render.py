@@ -17,6 +17,21 @@ def test_text_is_escaped():
     assert render({"type": "text", "value": "<b>&"}) == "&lt;b&gt;&amp;"
 
 
+def test_chapter_links_name_the_subject_and_preserve_specific_labels():
+    def link(text):
+        return render(
+            {
+                "type": "crossReference",
+                "identifier": "encodings",
+                "children": [{"type": "text", "value": text}],
+            }
+        )
+
+    assert link("ch05") == '<a class="xref" href="encodings.html">Encodings</a>'
+    assert link("ch99's examples") == '<a class="xref" href="encodings.html">Encodings&#x27;s examples</a>'
+    assert link("dictionary examples") == '<a class="xref" href="encodings.html">dictionary examples</a>'
+
+
 def test_a_lab_block_becomes_a_mount_point_with_a_fallback():
     html = render({"type": "code", "lang": "lab", "value": "experiment: anatomy\nfixture: tiny.parquet"})
     assert 'class="lab"' in html

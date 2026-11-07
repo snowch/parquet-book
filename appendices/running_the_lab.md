@@ -7,6 +7,8 @@ title: Running the lab
 
 Reading the book does not require these tools. Worked results and diagrams are visible without
 running anything. Use this appendix when you want to explore code or build the reader.
+For a first example, open [the footer-reader lab](build-footer-reader.html). Its
+code follows the [worked footer calculations](locate-the-footer.html).
 
 ## In your browser
 
@@ -85,6 +87,9 @@ when a change is pushed to the repository.
 
 ## Running the reader at a desk
 
+The commands here inspect `tiny.parquet`, the file in
+[the footer byte-map example](read-the-footer-map.html), and reproduce
+[the footer request experiment](trace-footer-requests.html).
 Each reader has a command line that prints what the browser shows, as the same JSON:
 
 ::::{tab-set}
@@ -116,7 +121,9 @@ them.
 
 Each chapter's problems are stubs in Python, in `exercises/python/<chapter>.py`, and in Rust, in
 `exercises/src/<chapter>.rs`. Their tests are
-skipped by a plain test run, so the suite passes before you start. Run a chapter's problems with:
+skipped by a plain test run, so the suite passes before you start. The commands here run the
+[footer-reader lab’s coding problems](build-footer-reader.html). Open that lab to read
+the tasks and edit your answers:
 
 ::::{tab-set}
 :::{tab-item} Python

@@ -34,6 +34,7 @@ Read the explanations, worked results and diagrams; the code is optional.
 read-fewer-columns
 ```
 
+(two-columns-from-a-csv-file)=
 ### Two columns from a CSV file
 
 A **column** holds one field across a table; a **row** holds the fields of one record. A CSV
@@ -124,11 +125,14 @@ answer: No. Selecting fewer columns can save data reads, but the reader still ne
 choose-a-table-layout
 ```
 
+(one-table-two-layouts)=
 ### One table, two layouts
 
 A **layout** is the order in which a table's values are stored. A **row layout** keeps each
-record's fields together; a **column layout** keeps each field's values together. Store the
-eight orders both ways, and mark the values the query needs, one character a value:
+record's fields together; a **column layout** keeps each field's values together. This schematic
+uses the orders in `fixtures/formats/eight-orders.csv`. The query selects `country` and
+`amount_cents` across all orders, as in the [CSV/Parquet read comparison](#two-columns-from-a-csv-file).
+Store the values both ways and mark the selected ones, one character per value:
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -152,7 +156,8 @@ The filled cells below are the values the query selected. Follow their positions
 
 By rows, each order's values sit together, as in the CSV file, so the two columns come in one
 short run per order and a reader must skip past everything between them. By columns, each
-column's values sit together, as in a Parquet file, so the two columns are one run: one read.
+column's values sit together, as in a Parquet file, so these neighbouring columns form one run of selected values. This schematic counts runs,
+not storage requests or encoded bytes.
 
 Change `wanted` and run it again. Add columns, and the row layout keeps one run per order until
 every column is wanted; the column layout needs one run for each group of neighbouring columns.
@@ -173,9 +178,9 @@ WHERE order_date >= '2026-01-04'
 GROUP BY country
 ```
 
-It touches three columns out of five and every row. Real tables have hundreds of columns, and a
-query typically touches a handful. Three things follow from a column layout, and this chapter has
-measured the first:
+It needs `country`, `amount_cents` and `order_date` across the orders. Real tables have hundreds of columns, and a
+query typically touches a handful. Three things follow from a column layout. The
+[CSV/Parquet read comparison](#two-columns-from-a-csv-file) measures the first for its selected columns:
 
 - **Projection.** Selecting the columns the query needs lets a reader avoid the other columns.
   Here that includes `order_date`, which is tested but not returned.
@@ -210,33 +215,41 @@ reference
 
 ## What this cannot tell you
 
-**How the files compress.** The Parquet file is smaller than the CSV file, as well as cheaper to
-read from, because pyarrow encoded and compressed each column on its own. The two layouts above
-only reorder values, so they hold the same bytes. [ch05](#encodings) and [ch07](#compression)
-show what a column's encoding and compression do.
+These notes distinguish two examples: the [CSV/Parquet byte-read comparison](#two-columns-from-a-csv-file)
+uses real files and libraries; the [row and column layouts](#one-table-two-layouts) reorder
+the same table's values in a schematic. The schematic explains adjacency, while the real files
+also include metadata, encodings and compression.
 
-**Other CSV readers.** Some readers split a CSV file among workers, or skip the fields a query
-does not name while they parse. Each still reads every byte, because only reading a line finds
-where the next one begins.
+**How the files compress.** In the larger-table comparison, the Parquet file is smaller and the
+selected-column read transfers fewer bytes. The tiny file pays more for its footer than it saves
+on data. The layout schematic keeps the values unchanged and does not measure compression.
+[Encodings](#encodings) and [compression](#compression) examine how values become smaller bytes.
 
-**What your storage charges.** The counting files read from a local disk, where a request costs
-little. A local disk, an object store and a memory cache have very
-different request costs, and the best way to fetch changes with them. The shape of the result
-does not: a column layout turns a scan into a few large reads.
+**Other CSV readers.** The comparison's row-at-a-time reader scans the whole CSV file to find
+record boundaries. Skipping unwanted fields during parsing does not by itself avoid reading
+their bytes. Other readers may divide work between workers or use extra indexes; this example
+does not measure those strategies.
+
+**What your storage charges.** In the byte-read comparison, wrappers around local files count
+bytes returned to each reader. They do not measure storage latency or query time. A disk, an
+object store and a memory cache have different request costs. Grouping a column's values makes
+selective reads possible; how many requests a reader makes also depends on the file's groups,
+metadata and prefetch policy.
 
 ## Key takeaways
 
 :::{div}
 :class: takeaways
 
-- **A CSV reader reads every byte, whatever columns you want.** Each line holds every column, so
-  reaching the next row means reading past the ones you do not need.
-- **A Parquet reader reads the footer and the columns it wants.** On a table of any size that is
-  a fraction of the file; on a tiny table the footer costs more than the data.
+- **The example's CSV reader scans every byte.** Finding each next record means reading past
+  the fields the query does not need.
+- **Parquet can avoid unwanted columns, but opening the file has a cost.** The larger fixture
+  saves bytes; the tiny fixture's footer outweighs the saving. Prefetching can return extra bytes.
 - **A layout decides which bytes are next to each other.** Row and column layouts can hold
   identical bytes in a different order.
-- **A column scan is one range in a column layout and one range per row in a row layout.** That
-  is the whole of projection's advantage, and it grows with the table.
+- **The schematic gathers a selected column into one run of values.** A row layout separates
+  those values with other fields. Real Parquet files divide columns into chunks and pages, so
+  this picture does not predict a reader's request count.
 - **A whole-row lookup is the reverse.** Columns must be visited one by one to reconstruct a row.
 - **Parquet is built for analytical reads.** It trades cheap row access and in-place updates for
   cheap scans of a few columns.
@@ -249,13 +262,15 @@ answer: No. Reconstructing a complete order needs values from separate columns. 
 
 ## Problems
 
-Two, both for reasoning. No test grades them: there is no code to write until the next chapter.
+Apply the [row and column layout schematic](#one-table-two-layouts) to different workloads.
+Its cells represent values, not encoded bytes; the [real-file comparison](#two-columns-from-a-csv-file)
+adds footer and library costs. These two questions are for reasoning, with no code or graded test.
 
 **1.1 A wider table.** No test. Imagine the sales table with hundreds of columns and millions of
 rows, and a query that reads three of its columns for every row. For each layout, say how many
 separate ranges the query needs, and how the bytes it moves compare with the size of the table,
 both when it fetches range by range and when it fetches the whole object. Check the shape of
-your answer by changing `wanted` in the layouts step. A good answer says that the row layout needs a
+your answer by changing `wanted` in the [layout walkthrough](#one-table-two-layouts). A good answer says that the row layout needs a
 range per row, or else the whole object, while the column layout needs at most one range per
 column. It also says that the column layout moves about three columns' worth of bytes, however
 many rows there are.

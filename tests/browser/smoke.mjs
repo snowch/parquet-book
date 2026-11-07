@@ -1201,6 +1201,37 @@ await explore(base + "writing-parquet-well.html");
   }
 }
 
+// Optional pages are also contents entry points, with their own subjects and preparation.
+for (const [width, colorScheme] of [[390, "light"], [1440, "dark"]]) {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme, serviceWorkers: "block" });
+  const tab = await context.newPage();
+  tab.on("pageerror", (error) => errors.push(error.message));
+  const optional = course.filter((entry) => entry.optional && entry.module);
+  for (const entry of optional) {
+    await tab.goto(base + entry.href);
+    check((await tab.locator("h1").innerText()).includes(entry.title)
+      && await tab.locator(".lesson-preparation a").count() > 0,
+      `${entry.href}: direct entry names its subject and links preparation at ${width}px`);
+    check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      `${entry.href}: preparation and content fit in ${colorScheme} mode`);
+  }
+  await tab.goto(base + "read-fewer-columns.html");
+  if (width < 928) await tab.locator("#menu").click();
+  const notes = tab.locator('.nav-optional a[href="why-parquet-exists-notes.html"]');
+  await notes.focus();
+  await tab.keyboard.press("Enter");
+  await tab.waitForURL(/why-parquet-exists-notes\.html$/);
+  check(!await tab.evaluate(() => document.body.classList.contains("nav-open")),
+    "choosing notes from the contents reveals the destination");
+  const comparison = tab.locator('.lesson-preparation a[href="read-fewer-columns.html"]');
+  await comparison.focus();
+  await tab.keyboard.press("Enter");
+  await tab.waitForURL(/read-fewer-columns\.html$/);
+  check(await tab.locator(".worked-example").count() > 0,
+    "notes preparation leads to the actual worked byte-read comparison by keyboard");
+  await context.close();
+}
+
 // Definitions can be consulted without losing the lesson; the full reference remains native.
 for (const [width, colorScheme] of [[390, "light"], [1440, "dark"]]) {
   const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme, serviceWorkers: "block" });

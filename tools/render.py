@@ -275,8 +275,8 @@ def _xref(node: dict, inner: str) -> str:
 
     MyST resolves a reference to a page-root URL such as ``/encodings``. The site is served under
     a base path it is not told, so every internal link is rewritten to the relative file this
-    build writes. A reference to a chapter whose text opens with a label (``ch05``) gets the
-    label re-derived from the outline, so it cannot go stale when chapters move.
+    build writes. Replace authoring shorthand such as ``ch05`` with the destination's title:
+    readers arriving on a standalone page need the subject, not an internal chapter code.
     """
     ident = str(node.get("identifier") or "")
     target = BY_ANCHOR.get(ident)
@@ -284,7 +284,7 @@ def _xref(node: dict, inner: str) -> str:
         text = text_of(node).strip()
         m = LABELLED.match(text)
         if m:
-            inner = html.escape(target.label + text[m.end() :])
+            inner = html.escape(target.title + text[m.end() :])
         return f'<a class="xref" href="{target.anchor}.html">{inner}</a>'
     url = str(node.get("url") or "")
     path, _, fragment = url.partition("#")

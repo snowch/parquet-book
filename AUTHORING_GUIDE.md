@@ -280,6 +280,13 @@ notes, appends coding problems to the build lab, and gives explainer questions t
 practice page. Large feature/query comparisons have separate optional destinations. Never copy
 prose or source code into a second lesson file.
 
+Review every resulting URL as an entry point from the contents, including notes, build labs,
+practice and comparison pages. Give supporting pages subject-specific titles and a short account
+of the examples they qualify. Name and link preparation where it is needed; replace references
+to absent figures or steps with the actual example and its destination. Keep explanations and
+qualifications beside the claim, so a link is a way to inspect evidence rather than a substitute
+for context. Check link labels and targets in the rendered page after partitioning.
+
 Each core lesson ends with a fresh application: a `practice` fence with `question:` and `answer:`,
 or a `transfer` case from `tools/lesson_practice.py`. Use specific reasoning, not a completion
 score. Worked miniatures are explicitly labelled and bridge to the real format or fixture.
