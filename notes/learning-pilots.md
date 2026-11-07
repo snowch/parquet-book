@@ -1,5 +1,8 @@
 # Learning progression pilots
 
+Historical record of the initial pilots. The subsequent whole-course rollout removes combined
+chapter pages; see `notes/course-learning-design.md` for the current structure and decisions.
+
 ## Decision and scope
 
 Keep the sixteen chapters as modules, with shorter independently navigable lessons where the

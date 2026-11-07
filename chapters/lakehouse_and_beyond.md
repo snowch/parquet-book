@@ -25,6 +25,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+read-partition-paths
+```
+
 ### A table of nine files
 
 `fixtures/table/` holds the orders from [ch11](#writing-parquet-well), written by pyarrow's
@@ -91,6 +95,17 @@ it never reads a byte of a file it rules out.
 
 A condition on any other column learns nothing from a path. Listing can only find files; it cannot
 say what is in them.
+
+This model reads country partition values as text. A production table also needs partition types, escaping and null conventions.
+
+```practice
+question: A file under country=FR has no stored country column. Can a dataset reader still answer country for its rows? Would an arbitrary city predicate be answered by that path?
+answer: The dataset can supply FR from the partition path under that partitioning contract. The path says nothing about a different column such as city, so that predicate needs other metadata or data.
+```
+
+```lesson
+prune-files-before-footers
+```
 
 ### A log that lists the files
 
@@ -207,6 +222,17 @@ Time follows requests. Each file is fetched whole in one request, as [ch10](#how
 found best for small files, and with four connections the table's files arrive in rounds of four.
 Fewer files means fewer rounds.
 
+The model uses one log file, not the full Delta Lake protocol, checkpoint or multi-version implementation.
+
+```practice
+question: A country path survives a filter, but the log’s trustworthy order-id range rules the file out. Must a reader fetch its Parquet footer to discover the same range again?
+answer: No. Table metadata can justify skipping before any file read. A surviving range is still only a possible match; the query must inspect retained data as needed.
+```
+
+```lesson
+resolve-table-membership
+```
+
 ### What the log adds beyond skipping
 
 A listing tells a reader what is in a directory now. A log tells it what is in the table, which is
@@ -222,6 +248,26 @@ not the same:
 
 These are why table formats exist, and the files do not change for any of them. Each file is a
 Parquet file exactly as the earlier chapters read it.
+
+### Replay a small complete history
+
+Consider a schematic log: add `north.parquet`, add `south.parquet`, then remove `north.parquet`.
+After the first action the table contains north. After the second it contains both. After the
+third it contains only south, even if north's bytes remain in storage. A later add of
+`replacement.parquet` makes south and replacement active. Each version is the result of the
+actions through that version, not a fresh listing of all objects.
+
+This history teaches membership semantics; the fixture walkthrough uses one log file containing
+adds, not a complete implementation of versioned Delta Lake history.
+
+```practice
+question: A fresh history adds east.parquet and west.parquet, then removes east.parquet. Storage still contains both plus an orphan file never added. Which files are active at that version?
+answer: Only west.parquet. Physical presence does not imply membership, and removing a file from a version does not require immediately deleting its stored bytes. Historical readers may still need them.
+```
+
+```lesson
+build-table-reader
+```
 
 ## Building it
 
@@ -422,6 +468,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin table_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (lakehouse-and-beyond-limits)=

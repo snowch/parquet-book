@@ -2,17 +2,17 @@
 
 The working list. PLAN.md §2 has the phases; this is the order to do them in.
 
-## Done: short reading-route pilots
+## Done: short lessons across the course
 
-Anatomy now has five core lessons; nested data has four, progressing from a nullable scalar
-through one list and nested lists to physical level storage. Each has a fresh no-code case and
-a native explanation disclosure. Both modules retain a full reference and an optional build
-lab, generated from the same canonical source. Existing code, problems and chapter anchors stay
-available. The sidebar, Next route and reading-position storage support individual lessons.
+All chapters are modules of short core lessons, optional build labs and bounded supporting
+material. Canonical chapter URLs now serve module indexes. Old section links route to their
+owning lesson, and no combined chapter is published. Python/Rust code, exercises and generated
+evidence are preserved. The sidebar opens the current module and Next follows the core route.
 
-Independent learner and technical reviews, fixes and evidence gaps are recorded in
-`notes/learning-pilots.md`. Next: observe new readers attempting fresh cases before applying the
-structure to further modules. Keep complete reader traces and writer comparisons together.
+Review decisions and checks are recorded in `notes/course-learning-design.md`. Next: observe new
+readers using the course without coaching and attempting fresh cases, recording first attempts
+and any help separately. Keep complete traces and controlled experiments together when adjusting
+boundaries; do not apply a universal word limit.
 
 ## Done: the first vertical slice
 

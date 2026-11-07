@@ -76,6 +76,7 @@ problems:  ## Run the chapter problems. They fail until you solve them; that is 
 
 .PHONY: browser-test
 browser-test: all  ## Drive the built site in a headless browser and check the experiments
+	$(PYTHON) scripts/build-site.py --out _build/html --integration-out _build/integration
 	node tests/browser/smoke.mjs _build/html
 
 .PHONY: check

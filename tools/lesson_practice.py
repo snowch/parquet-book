@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "python"))
-from parquet_lab import metadata, nested, rle, schema  # noqa: E402
+from parquet_lab import column, compress, metadata, nested, rle, schema  # noqa: E402
 from parquet_lab.column import Triple  # noqa: E402
 from parquet_lab.format import footer_span, parse_trailer  # noqa: E402
 
@@ -34,6 +34,34 @@ def table(headers, rows) -> str:
 
 
 def render_transfer(case: str) -> str:
+    if case == "overlap-example":
+        out = bytearray(b"XY")
+        compress.copy_back(out, 2, 4)
+        return (
+            '<div class="worked-miniature"><p><strong>A complete overlapping copy.</strong> '
+            "Start with schematic output XY. A copy at distance two writes four more bytes. "
+            "It writes X, then Y, then reuses those newly written bytes for X and Y. "
+            f"The reader’s copy routine produces <code>{out.decode()}</code>. "
+            "The later codec walkthrough adds tags and lengths around this same rule.</p></div>"
+        )
+    if case == "delta-example":
+        data = (ROOT / "fixtures/encodings.parquet").read_bytes()
+        trailer = parse_trailer(data[-8:], len(data))
+        span = footer_span(len(data), trailer.footer_length)
+        md = metadata.decode_file_metadata(data[span.start : span.end], span.start)
+        tree = schema.build(md.schema)
+        leaf = next(leaf for leaf in schema.leaves(tree) if leaf.path == ["order_id"])
+        values = [
+            t.value for t in column.read_column(data, md.row_groups[0].columns[leaf.column], leaf).triples[:3]
+        ]
+        deltas = [right - left for left, right in zip(values, values[1:], strict=False)]
+        return (
+            '<div class="worked-miniature"><p><strong>A complete value sequence.</strong> '
+            f"The reader decodes the first order_id values of encodings.parquet as <code>{values}</code>. "
+            f"Keep the first value, {values[0]}, and the differences <code>{deltas}</code>. "
+            f"Adding each difference back gives {values[0]} → {values[1]} → {values[2]}. "
+            "This demonstrates the delta rule; it is not the complete physical page header.</p></div>"
+        )
     if case == "run-example":
         raw, width, count = bytes([4, 1]), 2, 2
         values = rle.values(rle.decode(raw, 0, width, count))

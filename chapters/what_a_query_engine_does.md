@@ -26,6 +26,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+separate-scan-and-filter
+```
+
 ### Who does what
 
 A Parquet file is data and metadata, and nothing more. It holds column chunks, and a footer that
@@ -104,18 +108,7 @@ the decoded rows before grouping.
 ```{include} _generated/visual-query-stages.md
 ```
 
-Change the query to `SELECT count(*) FROM orders`, and the scan reads no column at all. Then try
-the queries in the table below, and watch the Scan line.
-
-### What each query read
-
-The engine ran one query of each kind this section goes through, on the same file:
-
-```{include} _generated/engine-costs.md
-```
-
-The rest of this section takes the table a row or two at a time. For each kind of query it says
-what the scan read, and what an engine can do that the book's engine does not.
+Change the query to `SELECT count(*) FROM orders`, and the scan reads no column at all. The optional module notes compare further query shapes. The following lessons examine their individual mechanisms.
 
 ### Projection
 
@@ -147,6 +140,53 @@ effect on the range, which an engine rarely knows. A comparison of two columns n
 columns' values, row by row. Engines that cannot push a condition down still apply it, after
 decoding every row. Where you can, write conditions on the stored columns themselves.
 
+This small engine prunes row groups and decodes retained values. It does not implement every page-index or production-optimizer technique.
+
+### The same query in a library
+
+At work a library or an engine runs the query. pyarrow's dataset module pushes the condition
+down into its scan, keeps the row groups whose statistics allow it, reads only the columns the
+query needs, then filters and groups. The `parquet` crate has no query language. You give it a
+predicate on each row group's statistics, as in [ch09](#skipping-data), and a projection of the
+columns to read, then filter and count the rows yourself:
+
+::::{tab-set}
+:::{tab-item} Python
+:sync: python
+```{literalinclude} ../walkthroughs/python/what_a_query_engine_does/query_with_a_library.py
+:language: python
+```
+:::
+:::{tab-item} Rust
+:sync: rust
+```{literalinclude} ../walkthroughs/libraries/src/bin/query_with_a_library.rs
+:language: rust
+```
+:::
+::::
+
+Both keep the two row groups the book's engine read, and both count the same orders per country.
+pyarrow's `subset` says which row groups a condition keeps, from the statistics alone, before any
+page is read. The crate's predicate tests each row group's minimum, and its row iterator decodes
+only the projected columns. Change the limit to `450` in either, and both keep a third row group.
+
+In Python, the first run loads pyarrow into the page, a much larger download than the engine's
+step. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
+Codespace or at a desk:
+
+```bash
+cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin query_with_a_library
+```
+
+```practice
+question: A row group’s range admits a predicate, but only one of its rows really matches. Can the scan pass all its rows through as final matches without checking them?
+answer: No. Metadata admits possible matches. The engine must evaluate the predicate on decoded rows before grouping or returning results. A retained row group does not prove every row passes.
+```
+
+```lesson
+answer-from-metadata
+```
+
 ### Answers from the footer
 
 `count(*)` read no bytes after the footer. The footer records each row group's row count, and
@@ -165,6 +205,15 @@ things:
 
 `count(column)` works the same way: the row count, less the null count from the statistics.
 
+```practice
+question: An unfiltered file has row counts, but a new query asks count(*) where status is refunded. May the engine always reuse the whole-file count?
+answer: No. Whole-file counts include rows the predicate can remove. The engine must inspect the predicate column unless metadata proves that every or no row passes. Missing or inexact bounds also prevent some metadata-only answers.
+```
+
+```lesson
+group-dictionary-values
+```
+
 ### Grouping
 
 `GROUP BY country` read one column, and a cheap one, because it is dictionary-encoded
@@ -181,11 +230,24 @@ dictionaries. And a writer that fell back to plain encoding, because a dictionar
 large, leaves some pages with no indices at all ([ch05](#encodings)). The book's engine decodes
 every string and groups by comparing them.
 
+Two schematic chunk dictionaries illustrate the problem. Chunk A has `[UK, FR]` and one
+index of zero; chunk B has `[FR, UK]` and one index of zero. Resolve each locally: the rows
+are UK and FR, so grouping produces one row in each country group, not two UK rows.
+
+```practice
+question: A fresh chunk’s dictionary is [FR, DE], while another is [DE, FR]. Both return index one. Do those rows belong to the same country group?
+answer: No. Index one is DE in the first chunk and FR in the second. Resolve or unify the chunk-local dictionaries before treating the indices as shared group identities.
+```
+
+```lesson
+limit-a-sorted-query
+```
+
 ### Sorting with a limit
 
 `ORDER BY amount_cents DESC LIMIT 5` returned five rows, and read both of its columns for every
-row. The largest amounts could be in any row group, and no stage can know it has the top five
-until it has seen every row. An engine keeps only the best rows found so far, so its memory stays
+row. The largest amounts could be in any row group, and without safe bounds or known order, a stage cannot know it has the top five
+until it has examined every candidate row. An engine keeps only the best rows found so far, so its memory stays
 small, but its scan reads everything. It can still skip a row group whose maximum amount is below
 the fifth largest found so far, which the statistics allow and some engines do. The book's engine
 does not.
@@ -196,6 +258,15 @@ learn it from the footer: a writer may record it in each row group's `sorting_co
 ([ch08](#metadata-and-statistics)), and the statistics show whether row groups' ranges overlap.
 An engine that knows the order can read the first row group and stop. So sorting a file on the
 key that queries order by, or filter on, makes both kinds of query cheap.
+
+```practice
+question: A top-k operator keeps only a small heap in memory over an unsorted file. Does that alone let it stop before later row groups?
+answer: No. A later row may beat the current candidates. Early stopping or skipping needs ordering or safe bounds that rule out better rows; small working memory alone does not provide that proof.
+```
+
+```lesson
+use-join-derived-filters
+```
 
 ### Joins
 
@@ -234,6 +305,17 @@ with the matching partition of the other, or merges the two sorted inputs in ste
 then holds a whole side. The partitioned table of [ch14](#lakehouse-and-beyond) is one such
 layout.
 
+The figure runs a probe-side scan with a join-derived range. The book’s engine does not execute a join.
+
+```practice
+question: An inner join’s build keys are ten and twenty, and the probe scan keeps the whole interval between them. Is a probe row with key fifteen necessarily a join match?
+answer: No. The range is a conservative filter and can retain gaps between actual keys. The join must still test membership in the build side. Dynamic pruning reduces scan work, not the need to perform the join.
+```
+
+```lesson
+reference
+```
+
 ### Wide tables and many small files
 
 A table with hundreds of columns makes projection matter more, not less: a query still reads only
@@ -248,41 +330,17 @@ the cost stays a cost per file. Statistics in a table's log can rule out whole f
 they are opened ([ch14](#lakehouse-and-beyond)). Compacting small files into larger ones
 removes the cost ([ch15](#changing-a-table)).
 
-### The same query in a library
 
-At work a library or an engine runs the query. pyarrow's dataset module pushes the condition
-down into its scan, keeps the row groups whose statistics allow it, reads only the columns the
-query needs, then filters and groups. The `parquet` crate has no query language. You give it a
-predicate on each row group's statistics, as in [ch09](#skipping-data), and a projection of the
-columns to read, then filter and count the rows yourself:
 
-::::{tab-set}
-:::{tab-item} Python
-:sync: python
-```{literalinclude} ../walkthroughs/python/what_a_query_engine_does/query_with_a_library.py
-:language: python
+### What each query read
+
+The engine ran one query of each kind this section goes through, on the same file:
+
+```{include} _generated/engine-costs.md
 ```
-:::
-:::{tab-item} Rust
-:sync: rust
-```{literalinclude} ../walkthroughs/libraries/src/bin/query_with_a_library.rs
-:language: rust
-```
-:::
-::::
 
-Both keep the two row groups the book's engine read, and both count the same orders per country.
-pyarrow's `subset` says which row groups a condition keeps, from the statistics alone, before any
-page is read. The crate's predicate tests each row group's minimum, and its row iterator decodes
-only the projected columns. Change the limit to `450` in either, and both keep a third row group.
-
-In Python, the first run loads pyarrow into the page, a much larger download than the engine's
-step. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
-
-```bash
-cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin query_with_a_library
-```
+The core lessons examine the table’s mechanisms separately. For each kind of query it says
+what the scan read, and what an engine can do that the book's engine does not.
 
 ## What this cannot tell you
 

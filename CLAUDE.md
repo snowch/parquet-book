@@ -221,7 +221,7 @@ markdown ending with its conditions line, run `make figures`, and `{include}` th
 
 British English, direct, active voice, short sentences, the reader as *you*. No em dashes. No
 "In this chapter". No *simply*, *just*, *obviously*, *basically*: `tests/test_book.py` enforces
-the list. Every chapter has the seven headings in `tools/outline.CHAPTER_SHAPE` (a chapter that
+the list. Every canonical chapter source has the seven headings in `tools/outline.CHAPTER_SHAPE` (a chapter that
 explains and builds nothing, in `EXPLAINERS`, has six: no *Building it*, no reader code quoted,
 and problems that are questions without tests). STYLE.md is the checklist; run both of its passes
 over a page before finishing it.
@@ -237,3 +237,11 @@ shorthand for the format itself, and the book never recommends a vendor.
 - Upgrading pyarrow without regenerating fixtures (the check refuses to run under another version).
 - A new MyST directive or node type without a branch in `tools/render.py`.
 - A root-relative URL (`/lab/...`) anywhere in a page: the site is served under a base path.
+
+## Published course structure
+
+All chapters publish as module indexes and short lessons. The canonical seven-section Markdown
+is an authoring source, not a combined public page. Preserve code and generated evidence in
+the owning core or optional lesson. Keep essential limitations on the core route; module notes
+and build/practice pages retain supporting material and exercises. AUTHORING_GUIDE.md documents
+source markers, anchor migration and the private, non-published component integration harness.

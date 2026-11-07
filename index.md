@@ -32,20 +32,17 @@ footer length, a byte range or a request, the reader computed it from the bytes 
 
 ## How a chapter works
 
-Every chapter has the same seven sections, so you always know where you are:
+Each chapter is a module of short lessons. Open its index to choose a lesson, or follow Next
+through the core route. Each lesson has:
 
-1. **The question** it answers, and why the previous chapter left it open.
-2. **The experiment**: worked results you can read immediately, optional code you can run and
-   change, the reader's view of the same bytes, and generated tables. Where a picture helps (a map of a file's bytes, a timeline
-   of requests), a panel draws what the reader returned.
-3. **Building it**, optional: the reader's code, quoted from the implementation, and then the same answer
-   from a library.
-4. **What this cannot tell you**: the limits of the experiment and of the code.
-5. **Key takeaways**, followed by a question you can answer without code. Try explaining your
-   answer before opening the explanation.
-6. **Problems**, optional: functions for you to write, with tests that fail until they are right, and one
-   question about your own tables.
-7. **Where to go next**: primary sources.
+1. **A goal and preparation:** what you will be able to explain or do, and what it builds on.
+2. **A complete example:** real bytes, a saved result or a clearly labelled schematic case.
+3. **A fresh application:** try a different case and explain your reasoning before revealing the answer.
+4. **A stopping point:** continue when ready; the book remembers your lesson and reading position.
+
+Code beside an example is optional. The module also links to its build lab and coding problems,
+where it has them. Module notes collect further limitations, takeaways and primary sources.
+Qualifications needed for the core lesson stay beside its explanation.
 
 Three chapters explain and build nothing, so they have no *Building it* and their problems are
 questions to reason about. [ch01](#why-parquet-exists) sets up the question the book answers,
@@ -55,12 +52,10 @@ Parquet files to the chapters that show it.
 
 ## Choose how to read
 
-**Read for understanding.** Follow the question, explanations, diagrams and worked results.
-Every walkthrough shows its Python output before the code, and important comparisons show what
-changes. You do not need to install anything or press Run. Skip *Building it* if you wish, but
-keep *What this cannot tell you*: its limits are part of the lesson. Finish with the takeaways
-and the understanding check. An occasional byte sequence or SQL expression is worth reading;
-writing a program is optional.
+**Read for understanding.** Follow the lessons, diagrams and worked results, then try each fresh
+case. Every walkthrough shows its Python output before the code. You do not need to install
+anything or press Run. An occasional byte sequence or SQL expression is useful to read;
+writing a program is optional. Module notes offer further detail and primary sources.
 
 **Explore the examples.** Open **Read or run the code** beside a worked result. Pick Python or
 Rust, read the source, or change an input and predict the result before running it. Python can
@@ -68,18 +63,18 @@ run in the page; Rust runs in a Codespace or at a desk. The saved result stays b
 so you can compare them. The displayed output uses Python's notation; the Rust examples are
 checked against the same facts but may format them differently.
 
-**Build the reader.** Add *Building it* and the coding problems to that reading path. Open the
+**Build the reader.** Add the module’s optional build lab and coding problems to that reading path. Open the
 implementation excerpts, run the checks, and extend the reader yourself. The explanations and
 worked results remain available whichever path you choose.
 
 Worked results are produced by running the examples when the book is built and checked again
 by its tests. Request times from the teaching object store use a fixed network model; they are
 not timings measured on your computer. A library may choose different reads in another version
-or environment. The chapter explains those limits.
+or environment. Each lesson states the relevant limits.
 
 ## Two rules the book keeps
 
-**No number is typed into the prose.** A byte count, an offset, a request total or a time appears
+**Measured numbers come from the reader.** A byte count, an offset, a request total or a time appears
 in a generated table, computed by the reader when the book was built, or in an experiment,
 computed as you watch. If the reader changes, the build recomputes the numbers and fails if a
 committed table is stale.

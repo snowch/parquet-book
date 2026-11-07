@@ -28,6 +28,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+compare-typed-values
+```
+
 ### Read the statistics yourself
 
 `statistics.parquet` holds twelve orders, four to a row group. Each column was chosen for a way
@@ -94,6 +98,93 @@ code points. Rust sorts a `str` by its bytes.
 Add `"Écija"` or `"Ängelholm"`, two more of the fixture's cities, and see where each order puts
 them.
 
+### Sort orders
+
+The same bytes sort differently depending on what they hold. The format fixes an order for every
+type:
+
+| Values | Order |
+|---|---|
+| `INT32`, `INT64`, and the dates, times and timestamps stored in them | signed |
+| `INT32`, `INT64` annotated as unsigned integers | unsigned |
+| `FLOAT`, `DOUBLE`, `FLOAT16` | by value, with NaN left out |
+| `DECIMAL` stored in bytes | by value, as a big-endian two's complement integer |
+| every other byte array: strings, UUIDs, binary | unsigned, byte by byte |
+| `INT96`, `INTERVAL` | undefined |
+
+The order of strings is the order of their bytes in UTF-8, as the second step showed. It is not
+alphabetical order for a person: `Århus` sorts after `Zürich`.
+
+### What a mistaken order gives
+
+Each column in the fixture has a likely mistake. The reader decodes the values, finds the
+smallest and largest in the column's order, and checks them against the footer. Then it finds
+them again in the mistaken order:
+
+```{include} _generated/statistics-mistakes.md
+```
+
+Every mistaken result is confidently wrong, and the damage comes when two orders meet: bounds
+computed in one and compared in the other. A reader comparing strings correctly against the
+mistaken `city` bounds finds `Aarhus` below their minimum, and skips the row group that holds it.
+One comparing customer numbers correctly against the mistaken `customer_id` bounds skips the row
+group holding the largest of them. Nothing in the bytes warns of it; only the column's type does.
+
+String ordering uses UTF-8, not a user-language collation. Bounds and predicates must use compatible ordering.
+
+```practice
+question: A customer identifier uses unsigned INT32 semantics, but a bound looks negative when read as a signed integer. Can it safely be compared with a positive customer number using signed order?
+answer: No. The annotation supplies the order. The same stored bits can represent a large unsigned identifier; mixing signed bounds and unsigned predicates can wrongly skip matching data.
+```
+
+```lesson
+decide-usable-bounds
+```
+
+### What the footer records
+
+This is which fields of the `Statistics` structure the writer set for each column of the first row
+group:
+
+```{include} _generated/statistics-fields.md
+```
+
+- **`min_value` and `max_value`** are the bounds in the column's own sort order.
+- **`min` and `max`** are older fields with the same purpose. They are deprecated. pyarrow still
+  writes them, as copies of `min_value` and `max_value`, for every column whose order is signed.
+  Here that is every column but the unsigned integers and the strings, as the table shows.
+- **`null_count`** counts the nulls. A chunk whose null count equals its value count holds no
+  values at all.
+- **`is_min_value_exact` and `is_max_value_exact`** say whether each bound is a value in the
+  chunk. A writer may shorten a long string to keep the footer small, and the shortened bound is
+  then only a bound.
+- **`distinct_count`** is defined and rarely written. pyarrow does not write it.
+
+### The deprecated fields
+
+The first versions of the format defined `min` and `max` without saying in what order. The most
+widely used writer of the time compared everything as signed values, including strings, whose
+bytes Java treats as signed. Its string statistics were wrong for any value with a byte above
+`0x7f`, and readers could not tell which files were affected.
+
+The fix added `min_value` and `max_value`, and a `column_orders` list in the footer that says,
+column by column, which order they use. `TYPE_ORDER` is the order introduced in the typed-comparison lesson, and the one
+every fixture's footer names; this reader treats any other as unknown. A reader's rules follow
+from that history:
+
+- Use `min_value` and `max_value` when the footer has `column_orders`. Without it, their order is
+  undefined.
+- Use `min` and `max` only where signed comparison is the right order and the values are not
+  byte arrays. That rules out `amount`, a decimal stored in bytes. pyarrow's copies for it are
+  right, but a reader cannot tell pyarrow's from the old writer's, which compared every byte as
+  signed. For a decimal's bytes after the first, that order is wrong.
+- Never use a bound that is NaN.
+
+Some readers go further, and ignore statistics from particular releases of particular writers,
+which they recognise by the footer's `created_by` string. This reader does not.
+
+### Let the reader judge the bounds
+
 **The reader decides.** The reader chooses an order for each column from its physical type and
 its annotation, then asks its `bounds` function whether it may use each column chunk's minimum
 and maximum:
@@ -127,83 +218,26 @@ Set `old_writer` to true (`True` in Python). The step then deletes `min_value` a
 deprecated `min` and `max`, as a writer from before the newer fields would have. The reader still
 accepts `order_id`, `delta` and `temp_c`. `customer_id` and the strings have nothing left, because
 pyarrow wrote no deprecated fields for them. The reader refuses `amount`, although pyarrow wrote
-both pairs for it, and the section on the deprecated fields below says why. Then set `old_writer`
+both pairs for it, and the deprecated-fields section explains why. Then set `old_writer`
 back, and make `type_order` false, as if the footer had no `column_orders`: every chunk with
 statistics is refused.
 
-### What the footer records
+Statistics are optional. Historical writer defects can require additional reader safeguards; this teaching reader does not model every writer-specific exception.
 
-This is which fields of the `Statistics` structure the writer set for each column of the first row
-group:
-
-```{include} _generated/statistics-fields.md
+```practice
+question: A file has min_value and max_value but no known column order. Should a reader guess an order to skip a row group? Does a shortened string bound necessarily equal a stored value?
+answer: No. Unknown order cannot justify safe skipping. A shortened bound can still be conservative without being a value in the chunk; exact-value answers require stronger evidence.
 ```
 
-- **`min_value` and `max_value`** are the bounds in the column's own sort order.
-- **`min` and `max`** are older fields with the same purpose. They are deprecated. pyarrow still
-  writes them, as copies of `min_value` and `max_value`, for every column whose order is signed.
-  Here that is every column but the unsigned integers and the strings, as the table shows.
-- **`null_count`** counts the nulls. A chunk whose null count equals its value count holds no
-  values at all.
-- **`is_min_value_exact` and `is_max_value_exact`** say whether each bound is a value in the
-  chunk. A writer may shorten a long string to keep the footer small, and the shortened bound is
-  then only a bound.
-- **`distinct_count`** is defined and rarely written. pyarrow does not write it.
-
-### Sort orders
-
-The same bytes sort differently depending on what they hold. The format fixes an order for every
-type:
-
-| Values | Order |
-|---|---|
-| `INT32`, `INT64`, and the dates, times and timestamps stored in them | signed |
-| `INT32`, `INT64` annotated as unsigned integers | unsigned |
-| `FLOAT`, `DOUBLE`, `FLOAT16` | by value, with NaN left out |
-| `DECIMAL` stored in bytes | by value, as a big-endian two's complement integer |
-| every other byte array: strings, UUIDs, binary | unsigned, byte by byte |
-| `INT96`, `INTERVAL` | undefined |
-
-The order of strings is the order of their bytes in UTF-8, as the second step showed. It is not
-alphabetical order for a person: `Århus` sorts after `Zürich`.
-
-### What a mistaken order gives
-
-Each column in the fixture has a likely mistake. The reader decodes the values, finds the
-smallest and largest in the column's order, and checks them against the footer. Then it finds
-them again in the mistaken order:
-
-```{include} _generated/statistics-mistakes.md
+```lesson
+handle-null-and-float-statistics
 ```
 
-Every mistaken result is confidently wrong, and the damage comes when two orders meet: bounds
-computed in one and compared in the other. A reader comparing strings correctly against the
-mistaken `city` bounds finds `Aarhus` below their minimum, and skips the row group that holds it.
-One comparing customer numbers correctly against the mistaken `customer_id` bounds skips the row
-group holding the largest of them. Nothing in the bytes warns of it; only the column's type does.
+### Missing bounds are not all-null evidence
 
-### The deprecated fields
-
-The first versions of the format defined `min` and `max` without saying in what order. The most
-widely used writer of the time compared everything as signed values, including strings, whose
-bytes Java treats as signed. Its string statistics were wrong for any value with a byte above
-`0x7f`, and readers could not tell which files were affected.
-
-The fix added `min_value` and `max_value`, and a `column_orders` list in the footer that says,
-column by column, which order they use. `TYPE_ORDER` is the order in the table above, and the one
-every fixture's footer names; this reader treats any other as unknown. A reader's rules follow
-from that history:
-
-- Use `min_value` and `max_value` when the footer has `column_orders`. Without it, their order is
-  undefined.
-- Use `min` and `max` only where signed comparison is the right order and the values are not
-  byte arrays. That rules out `amount`, a decimal stored in bytes. pyarrow's copies for it are
-  right, but a reader cannot tell pyarrow's from the old writer's, which compared every byte as
-  signed. For a decimal's bytes after the first, that order is wrong.
-- Never use a bound that is NaN.
-
-Some readers go further, and ignore statistics from particular releases of particular writers,
-which they recognise by the footer's `created_by` string. This reader does not.
+In the preceding report, `coupon` has a null count proving an all-null chunk. `note` has no
+statistics, so the footer does not establish whether its values are null. These cases can both
+lack min/max but justify different conclusions. Keep the null count separate from the bounds.
 
 ### Floating point
 
@@ -211,7 +245,16 @@ Floats have two traps. NaN is not less than, equal to or greater than anything, 
 leaves it out of the bounds, and a reader looking for NaN cannot use them. And `-0` equals `+0`,
 though their bytes differ. The format asks writers to store a zero minimum as `-0` and a zero
 maximum as `+0`, and asks readers to remember that a chunk with either may hold both. The `-0`
-the third step printed for `temp_c` in row group 1 is the first rule at work.
+the bounds walkthrough printed for `temp_c` in row group 1 is the first rule at work.
+
+```practice
+question: One chunk has a null count equal to its value count; another has no statistics. Are both proven all-null? Can ordinary min/max bounds prove that NaN is absent?
+answer: Only the first is proven all-null. Missing statistics say nothing about values. NaN is excluded from ordinary bounds, so they cannot establish its absence. Either zero sign can coexist with the other.
+```
+
+```lesson
+account-for-footer-cost
+```
 
 ### What else the footer says
 
@@ -232,6 +275,17 @@ In a small file the footer can outweigh the data. A table with hundreds of colum
 groups can have a footer of megabytes, and every query pays for reading and decoding it before it
 reads anything else. [ch11](#writing-parquet-well) shows a footer growing with the number of row
 groups.
+
+sorting_columns records a writer’s claim. Verifying sortedness would require reading values, not only the footer.
+
+```practice
+question: A writer makes many more row groups in a wide table. If a query ultimately reads one small column range, is opening the file necessarily cheap?
+answer: No. Every reader still needs the metadata map. More row groups and columns can enlarge the footer, so pruning granularity trades against metadata transfer and decoding costs.
+```
+
+```lesson
+build-statistics-reader
+```
 
 ## Building it
 
@@ -382,6 +436,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin statistics_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (metadata-and-statistics-limits)=

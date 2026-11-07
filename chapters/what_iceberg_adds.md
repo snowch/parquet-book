@@ -29,35 +29,15 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
-### Above the files
-
-Iceberg does not change a Parquet file. A table's data files are ordinary Parquet files, and
-everything the earlier chapters read in them still holds: the footer, the row groups, the
-statistics and the page index. What Iceberg adds is a set of metadata files above them, and rules
-that writers and readers follow. A reader that knows those rules can plan a query over millions
-of files without listing a directory, read the table as it was last week, and keep reading while
-writers change it.
-
-### A map of the features
-
-Each feature, the problem it solves, what it changes in the Parquet files, and where the book
-shows it:
-
-| Feature | Solves | In the Parquet files | Shown in |
-|---|---|---|---|
-| Metadata tree | Finding a version's files without listing | Nothing | Here; [ch14](#lakehouse-and-beyond) lists and reads a log |
-| Statistics in manifests | Ruling files out without opening footers | Copied out of each file | [ch14](#lakehouse-and-beyond), [ch09](#skipping-data) |
-| Snapshots and time travel | A consistent version, and older ones | Nothing: files never change | [ch15](#changing-a-table) |
-| Copy-on-write, merge-on-read | Changing rows in files that cannot change | New files; delete files are Parquet | [ch15](#changing-a-table) |
-| Compaction, snapshot expiry | Small files, delete files, old versions | Whole files rewritten or deleted | [ch15](#changing-a-table) |
-| Schema evolution | Renaming and adding columns without rewrites | A field id on every column | Here |
-| Hidden partitioning | Partitions a query uses without naming them | The column stays in the file | Here; [ch14](#lakehouse-and-beyond) for paths |
-| Sort orders | Files whose statistics rule out well | Sorted rows, narrow ranges | [ch11](#writing-parquet-well), [ch09](#skipping-data) |
-| Commits and catalogs | Writers that do not overwrite each other | Nothing | Beyond this book |
-
-The rest of this section takes the rows in order.
+```lesson
+follow-iceberg-metadata
+```
 
 ### The metadata tree
+
+A Parquet footer maps one file. An Iceberg table needs another map to find the files belonging
+to a snapshot. The following hierarchy is a schematic specification explanation, not output
+from this book's reader opening a real Iceberg table.
 
 Iceberg keeps a table's metadata as a tree of files, read from the top:
 
@@ -104,24 +84,16 @@ for the reason *Columns by id* below reads out of a file. And a writer may short
 bounds, as a Parquet writer may ([ch08](#metadata-and-statistics)), so a bound is a limit on the
 values and not always one of them.
 
-### Snapshots, changes and upkeep
+This is a schematic explanation of Iceberg’s metadata hierarchy. The teaching reader does not execute a real Iceberg metadata-tree scan.
 
-[ch15](#changing-a-table) built all of this on its own table, and Iceberg's versions differ
-mainly in detail:
+```practice
+question: A manifest list rules out a manifest for a partition predicate. Must a planner open every data file listed in that skipped manifest to justify the same exclusion?
+answer: No. Conservative table metadata can rule out the whole branch before data-file footers are fetched. Kept branches still require further planning and row filtering.
+```
 
-- **Snapshots and time travel.** Every commit makes a new snapshot, and the old ones stay
-  readable, so a reader can ask for the table by snapshot or as it was at a time. A query that
-  started on one snapshot keeps reading it while writers commit others.
-- **Copy-on-write and merge-on-read.** A table chooses one for its deletes, updates and merges.
-  Iceberg's position delete files are the ones ch15 read, with the same `file_path` and `pos`.
-  It also has *equality delete files*, which name values rather than positions, and, in its
-  third format version, *deletion vectors*: a bitmap of deleted positions per data file.
-- **Compaction and snapshot expiry.** Compaction rewrites small files and files with deletes, as
-  ch15 planned, and commits the result as a new snapshot. Expiry removes old snapshots, then
-  deletes the files no remaining snapshot needs. Until then, time travel to those snapshots
-  works, and their files are paid for.
-
-None of these touches the inside of a Parquet file. They change which files a snapshot lists.
+```lesson
+keep-column-identity
+```
 
 ### Columns by id
 
@@ -212,6 +184,17 @@ Codespace or at a desk:
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin field_ids_with_a_library
 ```
 
+The example adds a nullable field without a non-null default, so missing old-file values become null. Defaults and other evolution rules require the table format’s semantics.
+
+```practice
+question: A table drops an old field named region, then adds a different field with the same name and a new ID. May old file values be attached to the new field by matching the name?
+answer: No. A new ID means a different field. Match the intended field identity, not its current spelling. A rename preserves an ID; dropping and reusing a name does not.
+```
+
+```lesson
+evolve-partition-specs
+```
+
 ### Hidden partitioning
 
 [ch14](#lakehouse-and-beyond)'s table was partitioned by path. The directory `country=UK` held
@@ -244,6 +227,15 @@ table's level the same holds for files. Sorted files have narrow bounds in their
 planner can rule them out. Compaction can sort as it rewrites, so a table written in arrival
 order becomes cheaper to filter over time.
 
+```practice
+question: Old files partition an event time by day, while new files use month. Can a planner interpret every old partition value with the new month transform?
+answer: No. Each file’s partition data belongs to its recorded spec. Apply the predicate under that spec, then combine candidate files. A new spec does not rewrite old files or globally sort their rows.
+```
+
+```lesson
+commit-a-table-change
+```
+
 ### Commits and catalogs
 
 A commit writes new data files, new manifests, a new manifest list and a new metadata file, and
@@ -253,6 +245,64 @@ the new metadata, checks whether the two changes conflict, and tries again. A ca
 service, a database table, or a filesystem that offers an atomic rename; Iceberg's REST catalog
 specification defines one as an HTTP API. How writers conflict, and how catalogs keep the pointer
 safe, is beyond this book: its store has one reader and no writers.
+
+This is a specification-level concurrency example. The teaching reader does not run a catalog or concurrent writers; conflict rules depend on the operation.
+
+```practice
+question: Two writers plan from the same metadata version. After one commits, may the other overwrite the pointer with its stale plan without checking again?
+answer: No. The second must detect the changed base and revalidate or retry under the table’s conflict rules. Otherwise it can lose a committed change. Atomic pointer replacement alone is not a reason to trust a stale plan.
+```
+
+```lesson
+reference
+```
+
+### Above the files
+
+Iceberg does not change a Parquet file. A table's data files are ordinary Parquet files, and
+everything the earlier chapters read in them still holds: the footer, the row groups, the
+statistics and the page index. What Iceberg adds is a set of metadata files above them, and rules
+that writers and readers follow. A reader that knows those rules can plan a query over millions
+of files without listing a directory, read the table as it was last week, and keep reading while
+writers change it.
+
+### A map of the features
+
+Each feature, the problem it solves, what it changes in the Parquet files, and where the book
+shows it:
+
+| Feature | Solves | In the Parquet files | Shown in |
+|---|---|---|---|
+| Metadata tree | Finding a version's files without listing | Nothing | Here; [ch14](#lakehouse-and-beyond) lists and reads a log |
+| Statistics in manifests | Ruling files out without opening footers | Copied out of each file | [ch14](#lakehouse-and-beyond), [ch09](#skipping-data) |
+| Snapshots and time travel | A consistent version, and older ones | Nothing: files never change | [ch15](#changing-a-table) |
+| Copy-on-write, merge-on-read | Changing rows in files that cannot change | New files; delete files are Parquet | [ch15](#changing-a-table) |
+| Compaction, snapshot expiry | Small files, delete files, old versions | Whole files rewritten or deleted | [ch15](#changing-a-table) |
+| Schema evolution | Renaming and adding columns without rewrites | A field id on every column | Here |
+| Hidden partitioning | Partitions a query uses without naming them | The column stays in the file | Here; [ch14](#lakehouse-and-beyond) for paths |
+| Sort orders | Files whose statistics rule out well | Sorted rows, narrow ranges | [ch11](#writing-parquet-well), [ch09](#skipping-data) |
+| Commits and catalogs | Writers that do not overwrite each other | Nothing | Beyond this book |
+
+The rest of this section takes the rows in order.
+
+### Snapshots, changes and upkeep
+
+[ch15](#changing-a-table) built all of this on its own table, and Iceberg's versions differ
+mainly in detail:
+
+- **Snapshots and time travel.** Every commit makes a new snapshot, and the old ones stay
+  readable, so a reader can ask for the table by snapshot or as it was at a time. A query that
+  started on one snapshot keeps reading it while writers commit others.
+- **Copy-on-write and merge-on-read.** A table chooses one for its deletes, updates and merges.
+  Iceberg's position delete files are the ones ch15 read, with the same `file_path` and `pos`.
+  It also has *equality delete files*, which name values rather than positions, and, in its
+  third format version, *deletion vectors*: a bitmap of deleted positions per data file.
+- **Compaction and snapshot expiry.** Compaction rewrites small files and files with deletes, as
+  ch15 planned, and commits the result as a new snapshot. Expiry removes old snapshots, then
+  deletes the files no remaining snapshot needs. Until then, time travel to those snapshots
+  works, and their files are paid for.
+
+None of these touches the inside of a Parquet file. They change which files a snapshot lists.
 
 ### Delta Lake and Apache Hudi
 

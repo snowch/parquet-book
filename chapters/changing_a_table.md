@@ -28,6 +28,21 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+follow-snapshots-and-deletes
+```
+
+### One snapshot, one later delete
+
+A **snapshot** records a table's visible files at a version. In a small schematic history,
+`before` references one data file. `after` references that same immutable data file plus a
+position-delete file naming one of its row positions. Reading `after` omits that row; reading
+`before` still sees it. A delete file changes the selected snapshot's view without altering
+the old data bytes.
+
+Now follow that distinction through the real fixture's history. The named snapshots below
+are complete examples of these choices, with measured requests and byte counts.
+
 ### A table and its history
 
 `fixtures/changes/` holds the orders from [ch11](#writing-parquet-well), written by pyarrow in
@@ -111,6 +126,17 @@ The delete file names a position, not an order: the row's place in its data file
 zero. The data file still holds the order; the delete file says it is gone. Change the path to
 another delete file and run it again.
 
+Position deletes identify a data file and row position, not a global row key. This model does not implement equality deletes or deletion vectors.
+
+```practice
+question: A later snapshot adds a position delete for one row, but an earlier snapshot is still retained. Should reading the earlier snapshot apply the later delete?
+answer: No. Resolve the data and delete files belonging to the chosen snapshot. The later delete changes that snapshot’s view; it does not rewrite history or the original Parquet file.
+```
+
+```lesson
+trace-a-table-lookup
+```
+
 ### Find one order
 
 Now let the book's reader look up order `300` in `after-a-day`, as a query engine would, through
@@ -173,11 +199,22 @@ keys, and a lookup would open every file. A key-value store answers the same que
 request of about one row's bytes. That gap is the price of a layout built for scans, and no
 reader setting closes it.
 
+The model stores snapshot metadata in one file. Real table metadata trees and caches can change the request chain.
+
+```practice
+question: A lookup returns one row. Does that imply one storage request, even if none of its table or file metadata is cached?
+answer: No. It can depend on table membership, delete metadata, the file trailer/footer, page indexes and data. Result cardinality alone does not determine request count.
+```
+
+```lesson
+compare-update-costs
+```
+
 ### Delete one order, two ways
 
 A table format can delete a row in two ways. *Copy-on-write* rewrites the row's file without it.
 *Merge-on-read* writes a small delete file that names the row, and leaves the reader to take it
-out. Both first find the row, which is the lookup above:
+out. Both first find the row, as the preceding lookup lesson traced:
 
 ```{include} _generated/changes-writes.md
 ```
@@ -209,6 +246,22 @@ store's latency. The small appends of `after-a-day` are worse: each file is a re
 brings its own footer, so the table carries many more bytes for a few more rows. And a position
 delete file removes a row only after the reader has decoded its page, so the deleted rows are
 decoded all the same.
+
+### Where the work is paid
+
+**Copy-on-write** replaces affected data with rewritten files. **Merge-on-read** keeps data
+and adds delete information that readers must apply. The earlier delete walkthrough demonstrates
+both. The scan comparison shows the consequence: deferred work and extra files are paid for on
+later reads. Neither policy wins for every read/write mix.
+
+```practice
+question: A workload rarely changes rows but repeatedly scans the whole table. Is the smallest immediate delete write always the cheapest long-term choice?
+answer: No. A small delete file defers work to later reads, which must apply deletes and may fetch more files. Rewriting data pays more upfront but can reduce repeated read work. Compare the workload, not only the update bytes.
+```
+
+```lesson
+decide-when-to-compact
+```
 
 ### Compaction
 
@@ -248,6 +301,17 @@ should be compacted: a table scanned all day repays it quickly, and one read onc
 never do so. The job also has to run somewhere, at some time, and it competes with the writers:
 if a writer deletes from `data/part-1.parquet` while compaction is rewriting it, one of the two
 commits must fail and retry.
+
+The model omits real decode/re-encode and distributed scheduling costs. Its simulated break-even is conditional, not a production timing promise.
+
+```practice
+question: Compaction would save requests on future scans, but a table will not be read again before expiry. Are those potential savings enough to justify the rewrite? Can retained snapshots’ old files be deleted immediately?
+answer: No future reads means no read savings to repay compaction. Retained snapshots can still refer to replaced files, so compaction alone is not permission to delete them.
+```
+
+```lesson
+build-snapshot-reader
+```
 
 ## Building it
 
@@ -437,6 +501,10 @@ Codespace or at a desk:
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin deletes_with_a_library
+```
+
+```lesson
+reference
 ```
 
 (changing-a-table-limits)=

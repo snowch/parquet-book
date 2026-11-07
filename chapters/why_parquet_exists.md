@@ -30,6 +30,10 @@ Read the explanations, worked results and diagrams; the code is optional.
 
 ## The experiment
 
+```lesson
+read-fewer-columns
+```
+
 ### Two columns from a CSV file
 
 `fixtures/formats/` holds a table of orders twice, both written by pyarrow with its default
@@ -92,6 +96,17 @@ eight orders it needs more than the whole CSV file, because the footer alone is 
 data: Parquet pays a fixed cost for every file, and wins only when a file holds enough rows to
 repay it. [ch15](#changing-a-table) comes back to that cost, when a table is made of many small
 files.
+
+The byte counts include the libraries’ different tail-read strategies. They are not query-time benchmarks.
+
+```practice
+question: A report reads a few columns from every row, but its input files are extremely small. Must Parquet transfer fewer bytes than CSV?
+answer: No. Projection avoids unwanted columns, but footer metadata and prefetching can outweigh the saving on tiny files. Compare the actual reader and file sizes, not the extensions.
+```
+
+```lesson
+choose-a-table-layout
+```
 
 ### One table, two layouts
 
@@ -161,6 +176,17 @@ position of every column chunk in the footer, which is why both libraries read t
 anything else. [ch02](#anatomy-of-a-parquet-file) opens a file from its last byte and finds the
 footer for itself: first by hand, in a few lines of Python or Rust, then with the book's reader,
 then with pyarrow.
+
+The layout picture reorders identical values. The real CSV/Parquet comparison also includes metadata, encoding and library read strategies.
+
+```practice
+question: A service fetches one complete order by its key; a report sums one field across all orders. Which access pattern benefits most from contiguous columns, and why?
+answer: The report can read a run of the one field. A complete-record lookup needs pieces from every column; a row layout or an indexed store can suit that workload better. A column layout alone does not provide a key index.
+```
+
+```lesson
+reference
+```
 
 ## What this cannot tell you
 
