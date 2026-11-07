@@ -2,6 +2,13 @@
 
 The working list. PLAN.md §2 has the phases; this is the order to do them in.
 
+## Done: terminology and glossary review
+
+All core lessons, optional resources and front/reference pages have been reviewed for terms
+used before their explanation. The glossary has stable entry links, alphabetical navigation,
+search and optional definition lookups beside the lesson. See
+`notes/terminology-learning-review.md` for scope, decisions and independent review evidence.
+
 ## Done: short lessons across the course
 
 All chapters are modules of short core lessons, optional build labs and bounded supporting

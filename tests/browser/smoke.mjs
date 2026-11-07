@@ -527,10 +527,10 @@ await explore(base + "writing-parquet-well.html");
   await page.waitForFunction(() => document.querySelector('.lab[data-experiment="changes"]')?.dataset.state === "ok", null, { timeout: 60000 });
   const lookup = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--lookup", "300"]);
   check(await changesLab.getAttribute("data-requests") === String(lookup.totals.requests) &&
-    await changesLab.getAttribute("data-round-trips") === String(lookup.totals.round_trips) &&
+    await changesLab.getAttribute("data-dependency-phases") === String(lookup.totals.dependency_phases) &&
     await changesLab.getAttribute("data-answer") === "found" &&
     await changesLab.locator(".timeline .req").count() === lookup.totals.requests,
-    `finding order 300 draws ${lookup.totals.requests} requests in ${lookup.totals.round_trips} round trips, as the native reader's lookup makes`);
+    `finding order 300 draws ${lookup.totals.requests} requests in ${lookup.totals.dependency_phases} dependency phases, as the native reader's lookup makes`);
   check(await changesLab.locator(".timeline .lane").count() === 4, "the timeline has a lane per connection");
   check(await changesLab.locator("select, input").count() === 2 && await changesLab.locator("table").count() === 0,
     "the panel asks for a snapshot and an order, and nothing else: no scan, no compaction, no tables");
@@ -551,8 +551,8 @@ await explore(base + "writing-parquet-well.html");
   const t = lookup.totals;
   const lines = await runStep("look_up_an_order", "requests,");
   check(lines.includes(`${t.requests} requests, ${t.bytes_fetched} bytes, ${Math.floor(t.elapsed_us / 1000)} ms`) &&
-    lines.filter((l) => l.startsWith("round trip ")).length === t.round_trips,
-    "the Python reader in the page makes the lookup the panel draws, round trip for round trip");
+    lines.filter((l) => l.startsWith("phase ")).length === t.dependency_phases,
+    "the Python reader in the page makes the lookup the panel draws, phase for phase");
   const plan = native(["changes", "fixtures/changes.json", "--snapshot", "after-a-day", "--compact"]);
   const part = plan.groups.find((g) => g.data_files.includes("data/part-1.parquet"));
   const library = await runStep("deletes_with_a_library", "their amounts");
@@ -1199,6 +1199,63 @@ await explore(base + "writing-parquet-well.html");
     }
     await context.close();
   }
+}
+
+// Definitions can be consulted without losing the lesson; the full reference remains native.
+for (const [width, colorScheme] of [[390, "light"], [1440, "dark"]]) {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme, serviceWorkers: "block" });
+  const tab = await context.newPage();
+  tab.on("pageerror", (error) => errors.push(error.message));
+  await tab.goto(base + "read-fewer-columns.html");
+  const term = tab.locator('a.term-link[href="glossary.html#term-projection"]').first();
+  await term.evaluate((link) => { link.scrollIntoView({ behavior: "instant", block: "center" }); link.focus({ preventScroll: true }); });
+  const position = await tab.evaluate(() => scrollY);
+  await tab.keyboard.press("Enter");
+  await tab.locator(".term-dialog[open]").waitFor();
+  check(await tab.locator("#term-dialog-title").textContent() === "Projection",
+    `a keyboard definition lookup opens at ${width}px in ${colorScheme}`);
+  check(await tab.locator(".term-close").evaluate((button) => document.activeElement === button),
+    "the definition has a focused, labelled close control");
+  await tab.mouse.move(2, 100);
+  await tab.mouse.wheel(0, 700);
+  await tab.waitForTimeout(100);
+  check(Math.abs(await tab.evaluate(() => scrollY) - position) <= 2,
+    "scrolling the backdrop does not move the covered lesson");
+  await tab.keyboard.press("Escape");
+  await tab.waitForFunction(() => !document.querySelector(".term-dialog").open);
+  check(await term.evaluate((link) => document.activeElement === link)
+    && Math.abs(await tab.evaluate(() => scrollY) - position) <= 2, "closing a definition preserves focus and reading position");
+  await tab.goto(base + "glossary.html");
+  const search = tab.locator("#glossary-search");
+  for (const [query, id] of [["RLE", "run-length-encoding"], ["BYTE_STREAM_SPLIT", "byte-stream-split"], ["CRC-32", "crc"], ["prefetching", "prefetch"]]) {
+    await search.fill(query);
+    check(await tab.locator(`#term-${id}`).isVisible(), `glossary search recognises ${query}`);
+  }
+  await search.fill("zzzz-no-term");
+  check((await tab.locator("#glossary-status").textContent()).startsWith("No matching"), "empty glossary search explains how to recover");
+  await tab.evaluate(() => { location.hash = "term-projection"; });
+  await tab.waitForFunction(() => document.getElementById("glossary-search").value === "");
+  check(await tab.locator("#term-projection").isVisible(), "a glossary deep link clears a filter hiding its target");
+  check(await tab.evaluate(() => JSON.parse(localStorage.getItem("last-read")).page) === "read-fewer-columns.html",
+    "a glossary visit preserves the lesson bookmark");
+  check(await tab.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "glossary reflows without page overflow");
+  await context.route("**/glossary.json", (route) => route.abort());
+  await tab.goto(base + "read-fewer-columns.html");
+  await tab.locator('a.term-link[href="glossary.html#term-projection"]').first().click();
+  await tab.waitForURL(/glossary\.html#term-projection$/);
+  check(await tab.locator("#term-projection").isVisible(), "failed definition loading falls back to the glossary page");
+  await context.close();
+}
+{
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 375, height: 844 } });
+  const tab = await context.newPage();
+  await tab.goto(base + "read-fewer-columns.html");
+  await tab.locator('a.term-link[href="glossary.html#term-projection"]').first().focus();
+  await tab.keyboard.press("Enter");
+  await tab.waitForURL(/glossary\.html#term-projection$/);
+  check(await tab.locator("#term-projection").isVisible() && !await tab.locator("#glossary-search").isVisible(),
+    "without JavaScript, a term opens its full definition and no inactive search is shown");
+  await context.close();
 }
 
 check(errors.length === 0, `no errors in the browser console${errors.length ? `: ${errors.join("; ")}` : ""}`);

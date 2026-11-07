@@ -36,18 +36,21 @@ follow-iceberg-metadata
 ### The metadata tree
 
 A Parquet footer maps one file. An Iceberg table needs another map to find the files belonging
-to a snapshot. The following hierarchy is a schematic specification explanation, not output
-from this book's reader opening a real Iceberg table.
+to a snapshot. This schematic follows the manifest-list layout of Iceberg format versions one
+to three. It explains the specification; it is not output from this book's reader opening a real
+Iceberg table.
 
-Iceberg keeps a table's metadata as a tree of files, read from the top:
+A **commit** publishes a new version of the table's metadata. Iceberg keeps that metadata as
+a tree of files, followed from the top:
 
-- **A metadata file**, in JSON, holds the table's schemas, its partition specs and sort orders,
-  every snapshot it still keeps, and which snapshot is current. Each commit writes a new one.
-- **A manifest list**, one per snapshot, lists the snapshot's manifests, with the range of
+- A **catalog** records which metadata file is current for each table. Its pointer is a file
+  location, not the contents of the table.
+- A **metadata file**, in JSON, holds the table's schemas, partition rules and sort orders,
+  retained snapshots and the current snapshot. Each commit writes a new metadata file.
+- A **manifest list**, one per snapshot, lists the snapshot's manifests, with the range of
   partition values each one covers.
-- **A manifest** lists data files, or delete files, one entry per file: its path, its partition
+- A **manifest** lists data files, or delete files, one entry per file: its path, its partition
   values, its row count and size, and statistics for each column.
-- **A catalog** holds one pointer per table, to its current metadata file.
 
 Follow the pointers below from the catalog to the data. Both snapshots refer to the shared manifest;
 the append adds another branch.
@@ -79,8 +82,9 @@ Together they form a ladder: manifests rule out files, footers rule out row grou
 index rules out pages. Each level helps only as far as the layout lets it. A file whose bounds
 span every value is opened whatever its manifest says.
 
-Two details differ from a footer. The bounds are keyed by each column's field id, not its name,
-for the reason *Columns by id* below reads out of a file. And a writer may shorten a long string's
+Two details differ from a footer. The bounds are keyed by each column's **field id**, a stable
+number identifying a column, rather than its name. The next lesson shows why that identity
+must survive a rename. A writer may shorten a long string's
 bounds, as a Parquet writer may ([ch08](#metadata-and-statistics)), so a bound is a limit on the
 values and not always one of them.
 
@@ -97,6 +101,7 @@ keep-column-identity
 
 ### Columns by id
 
+**Schema evolution** changes a table's columns or their types while retaining readable older files.
 A table's schema changes too. A column is renamed, a new one is added, an old one is dropped. The
 files already written keep the schema they were written with, and nobody rewrites a table for a
 rename. So a reader must match the table's columns today with the columns of a file written long
@@ -203,8 +208,9 @@ named `country`. A table partitioned by day works the same way, with one catch: 
 filter on the day column, which a writer computed from the timestamp. A query that filters on the
 timestamp itself rules nothing out.
 
-Iceberg's partitions are *hidden*. A table's *partition spec* derives each partition value from a
-column, by a *transform*: the column's value itself, its year, month, day or hour, a bucket from a
+**Hidden partitioning** lets queries filter on source columns without naming a separate
+partition column. A **partition spec** records the source columns and rules that derive the
+partition values. A **partition transform** is one such rule: the column's value itself, its year, month, day or hour, a bucket from a
 hash of it, or a truncation of it. A writer computes each row's partition value, groups rows by
 it, and records it in the file's manifest entry. The column stays in the file, and
 readers never read a value from a path. A query filters on the column, `ordered_at`, and the
@@ -238,8 +244,13 @@ commit-a-table-change
 
 ### Commits and catalogs
 
-A commit writes new data files, new manifests, a new manifest list and a new metadata file, and
-then asks the catalog to move the table's pointer from the metadata file it started from to the
+A **commit** publishes a table metadata change. The **catalog** identifies the current metadata
+file. **Atomicity** means that readers see the old location or the new one when that pointer
+changes, never a partially written location. **Optimistic concurrency** lets writers prepare changes
+independently, then check that publishing them will not overwrite a conflicting change.
+
+A commit that appends data writes new data files, new manifests, a new manifest list and a new
+metadata file, then asks the catalog to move the table's pointer from the metadata file it started from to the
 new one. The move succeeds only if nobody moved it first. If another writer did, the commit reads
 the new metadata, checks whether the two changes conflict, and tries again. A catalog can be a
 service, a database table, or a filesystem that offers an atomic rename; Iceberg's REST catalog
@@ -290,7 +301,7 @@ The rest of this section takes the rows in order.
 [ch15](#changing-a-table) built all of this on its own table, and Iceberg's versions differ
 mainly in detail:
 
-- **Snapshots and time travel.** Every commit makes a new snapshot, and the old ones stay
+- **Snapshots and time travel.** A data change makes a new snapshot, and the old ones stay
   readable, so a reader can ask for the table by snapshot or as it was at a time. A query that
   started on one snapshot keeps reading it while writers commit others.
 - **Copy-on-write and merge-on-read.** A table chooses one for its deletes, updates and merges.

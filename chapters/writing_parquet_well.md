@@ -30,6 +30,10 @@ compare-writer-layouts
 
 ### Seven files, one table
 
+A **point lookup** asks for rows with one particular key value, such as `order_id = 431`.
+The query's **selectivity** describes the fraction of rows that satisfy its condition.
+We keep the rows and query fixed so differences in reads can be traced to the writer's settings.
+
 The `writing-*.parquet` files hold the same orders. `writing-baseline.parquet` is
 sorted by `order_id`, dictionary-encoded, compressed with Snappy, and written in four row groups
 of small pages with a page index. Each other file changes one of those settings: one row group,
@@ -171,8 +175,9 @@ No setting is right for every table, but the measurements point one way:
   gains nothing from one.
 - **Write the page index for tables queried selectively** on a sorted column, and expect it to
   help most when requests are cheap.
-- **Add Bloom filters for equality lookups on unsorted, high-cardinality columns**, as
-  [ch09](#skipping-data) showed for customer numbers.
+- **Add Bloom filters for equality lookups on unsorted columns with many distinct values**, as
+  [ch09](#skipping-data) showed for customer numbers. A column's **cardinality** is its number
+  of distinct values; customer numbers have high cardinality compared with a few country codes.
 
 The fixture results are evidence for these rows and queries, not universal writer defaults.
 

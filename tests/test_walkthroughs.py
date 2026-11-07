@@ -1110,7 +1110,7 @@ def changes_facts() -> dict:
             f"order {deleted[0]}",
         ],
         ("changing_a_table", "look_up_an_order"): [
-            "round trip 1:\n",
+            "phase 1:\n",
             "GET _snapshots.json · read the table's snapshots\n",
             *(f"GET {d['path']} · read a delete file" for d in names),
             f"GET {part['path']} bytes={size - 8}-{size - 1} read the trailer\n",

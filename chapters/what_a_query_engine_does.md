@@ -32,12 +32,20 @@ separate-scan-and-filter
 
 ### Who does what
 
+A **query engine** turns a query into operations that produce its answer. Its **query plan**
+orders those operations and the data passed between them. A **scan** reads data from storage;
+a **filter** tests decoded rows against a condition and keeps the matching rows.
+**Projection** selects the columns needed by the query, including columns used only by a condition.
+
 A Parquet file is data and metadata, and nothing more. It holds column chunks, and a footer that
 says where each one is and what range its values span ([ch02](#anatomy-of-a-parquet-file),
 [ch08](#metadata-and-statistics)). It runs nothing, and it cannot tell which of its bytes a query
 needs.
 
-The engine does everything else:
+The engine does everything else. **Predicate pushdown** gives a condition to the scan so it
+can apply it close to the data. Metadata **pruning** is one possible benefit: ruling out a
+region before reading its values. The scan may also filter decoded rows; pushing a condition
+down does not mean metadata alone can decide which individual rows match.
 
 - **It plans the query.** It parses the text, checks the names against the file's schema, and
   works out which columns and which conditions each part of the query needs.
@@ -73,6 +81,9 @@ fetched:
 They decide only how much of the file the answer costs.
 
 ### The book's engine
+
+An **aggregate** combines several values into a result, such as a count or a sum.
+The following query counts orders for each country.
 
 **Run a query.** The book's reader includes a small engine. It runs a query as a few stages and
 reports what each stage did. It is simple where production engines are clever (see *What this
@@ -134,8 +145,8 @@ are spread through every row group ([ch09](#skipping-data)). The book's engine s
 groups. A scan that also uses the page index reads fewer pages of the row groups it keeps, as
 [ch09](#skipping-data) measured.
 
-Only a condition that compares a stored column with a constant can be judged against a minimum
-and a maximum. A function of the column, such as `lower(country) = 'fr'`, needs the function's
+This teaching engine judges only comparisons of a stored column with a constant against a
+minimum and a maximum. A function of the column, such as `lower(country) = 'fr'`, needs the function's
 effect on the range, which an engine rarely knows. A comparison of two columns needs both
 columns' values, row by row. Engines that cannot push a condition down still apply it, after
 decoding every row. Where you can, write conditions on the stored columns themselves.
@@ -216,6 +227,10 @@ group-dictionary-values
 
 ### Grouping
 
+**Grouping** puts rows with the same key values together, such as all orders for one country.
+An aggregate can then compute one count or sum for each group. The dictionary indices below
+are compact labels for stored values, not shared identities across all chunks.
+
 `GROUP BY country` read one column, and a cheap one, because it is dictionary-encoded
 ([ch05](#encodings)). It holds a few distinct values, so each chunk is a small dictionary page and
 a run of short indices. The same rows of `order_id`, whose values are all distinct, cost several
@@ -245,6 +260,10 @@ limit-a-sorted-query
 
 ### Sorting with a limit
 
+A **top-k** query asks for the first *k* rows under an ordering, such as the five largest amounts.
+Keeping only the best candidates found so far limits memory use. It does not prove that unread
+rows contain no better candidate.
+
 `ORDER BY amount_cents DESC LIMIT 5` returned five rows, and read both of its columns for every
 row. The largest amounts could be in any row group, and without safe bounds or known order, a stage cannot know it has the top five
 until it has examined every candidate row. An engine keeps only the best rows found so far, so its memory stays
@@ -260,7 +279,7 @@ An engine that knows the order can read the first row group and stop. So sorting
 key that queries order by, or filter on, makes both kinds of query cheap.
 
 ```practice
-question: A top-k operator keeps only a small heap in memory over an unsorted file. Does that alone let it stop before later row groups?
+question: A top-k operator keeps only its best candidates so far in memory over an unsorted file. Does that alone let it stop before later row groups?
 answer: No. A later row may beat the current candidates. Early stopping or skipping needs ordering or safe bounds that rule out better rows; small working memory alone does not provide that proof.
 ```
 
@@ -270,16 +289,20 @@ use-join-derived-filters
 
 ### Joins
 
-A join matches the rows of two inputs on a key. The usual plan for a join on equal keys is a
-*hash join*. The engine reads one input, the *build side*, into a hash table on the key. Then it
-reads the other, the *probe side*, and looks up each row's key in the table. The build side is
-the smaller input, because its hash table must fit in memory, while the probe side streams past
-it and is never held whole.
+A **join** matches rows from two inputs using a condition. For the equality joins here, that
+condition is equal key values. An **inner join** returns only matching pairs.
+
+A **hash join** uses a **hash table**, a lookup structure that uses a key's hash to find its
+possible matches, then checks key equality. The engine stores one input, the **build side**,
+in that table. It reads the other, the **probe side**, and looks up each row's key.
+For a join that fits in memory, the smaller input is usually the build side; the probe side
+can stream past it without being held whole.
 
 The build side is read first, so its keys are known before the probe side's scan starts. An
 engine can turn them into a filter on that scan: the keys' smallest and largest value as a range
 condition, a Bloom filter of the keys, or the list of keys if it is short. The probe side's scan
-then skips row groups as any filtered scan does. Trino calls this *dynamic filtering*; Spark has
+then skips row groups as any filtered scan does. **Dynamic filtering** uses values learned
+while running one part of a query to restrict another part's scan. Trino uses that name; Spark has
 *runtime filters* and *dynamic partition pruning*. The book's engine has no joins. Its scan can
 run the range condition a join would push down, though, with three small files from later
 chapters' fixtures as build sides:
@@ -299,7 +322,8 @@ Each row makes one point:
   existing order, so no row group of either probe side could match. The scan reads nothing, and
   the join is empty before a page is read.
 
-Partitions and sort orders help a join in a second way. When both inputs are partitioned on the
+A **partition** groups rows by a shared key or derived value. Partitions and sort orders help
+a join in a second way. When both inputs are partitioned on the
 key, or sorted by it, an engine can join them piece by piece. It joins each partition of one side
 with the matching partition of the other, or merges the two sorted inputs in step. No hash table
 then holds a whole side. The partitioned table of [ch14](#lakehouse-and-beyond) is one such
@@ -345,9 +369,9 @@ what the scan read, and what an engine can do that the book's engine does not.
 ## What this cannot tell you
 
 **How engines work inside.** The book's engine handles one row at a time, keeps every decoded row
-in memory, and groups by searching a list. Production engines process columns in batches with
-vectorised code, decode only the rows a filter keeps, spill to disk when memory runs out, run
-stages in parallel, and choose between plans by their estimated cost. Each of those is a subject
+in memory, and groups by searching a list. Production engines can process batches of values
+with vectorised code, decode only the rows a filter keeps, and write temporary data to disk when
+memory runs out. They can run stages in parallel and choose plans by estimated cost. Each of those is a subject
 of its own.
 
 **Time.** The table counts bytes and values, not time. The engine reads from memory. Against an
@@ -382,8 +406,8 @@ groups, projection and skipping save far more.
   one on a value spread through every row group skips none.
 - **Some answers need no data pages.** `count(*)` comes from the footer's row counts, and `min`
   and `max` from exact statistics when no condition removes rows.
-- **`ORDER BY` with `LIMIT` reads every row, unless the engine knows the file is sorted on the
-  key.** Only then can it stop after the first row group.
+- **`ORDER BY` with `LIMIT` needs a reason to stop reading.** Known ordering or safe bounds can
+  rule out better candidates. Small working memory alone cannot.
 - **A join's build side becomes a filter on its probe side.** Its keys' range skips the probe
   side's row groups when the probe side is sorted on the key and the keys are close together.
 :::

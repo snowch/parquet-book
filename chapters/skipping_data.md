@@ -35,9 +35,15 @@ rule-out-row-groups
 
 ### The same orders, sorted and shuffled
 
+A **predicate** is a condition that a row must satisfy, such as `order_id = 431`.
+**Pruning** uses metadata to rule out regions that cannot contain a matching row, before
+reading their data. A region that survives is only a candidate; its rows still need checking.
+
 `pruning-sorted.parquet` and `pruning-shuffled.parquet` hold the same orders, written the same
-way: four row groups, pages of forty rows, a page index for every column, and a Bloom filter for
-`customer_id`. The first is in `order_id` order; the second is shuffled.
+way: four row groups and pages of forty rows. They also have page indexes, which describe
+individual pages, and Bloom filters, which can rule out an exact value. Later lessons examine
+those structures. Here we use only the row-group statistics in the footer.
+The first file is in `order_id` order; the second is shuffled.
 [Appendix B](#the-fixtures) says how pyarrow wrote them.
 
 Each step shows its worked result first. Open **Read or run the code** if you want to inspect
@@ -101,7 +107,8 @@ map-pages-to-rows
 
 ### The page index
 
-Row group statistics decide whole row groups. The page index decides pages. It is written after
+Row-group statistics decide whole row groups. A **page index** records metadata for individual
+pages, so a reader can decide which pages to fetch. It is written after
 the row groups, in two structures per column chunk: a **ColumnIndex** with each page's minimum,
 maximum and null count, and an **OffsetIndex** with each page's position, size and first row.
 The reader's `page_index` module reads both. Ask them about `order_id` in row group 2, the one
@@ -130,7 +137,9 @@ and which row it starts at, so the reader can fetch that page without the pages 
 Change the file to `pruning-shuffled.parquet`. The boundary order is `UNORDERED`, each page
 covers nearly every order number, and every page must be read.
 
-A page skipped in the condition's column means rows skipped, not bytes skipped in every column.
+The **predicate column** supplies the values tested by the condition. The **projected columns**
+are the columns the scan needs to read. A page skipped in the predicate column means rows
+skipped, not bytes skipped in every projected column.
 The reader turns the kept pages into row ranges using their first rows, then asks each other
 column's OffsetIndex which of its pages hold those rows. The fixtures cut every column's pages at
 the same row counts, so the pages line up. Writers that cut pages by size give each column
@@ -157,6 +166,13 @@ Statistics cannot rule out a value inside a chunk's range. Customer numbers fill
 range in every row group, so `customer_id = 424242` survives every minimum and maximum. A Bloom
 filter answers a different question: was this exact value ever added?
 
+A **Bloom filter** is a compact membership test: it can prove a value absent, but a possible
+match still needs checking. It stores a **bitset**, a sequence of bits that are either clear
+(zero) or set (one). A **hash** is a fixed-size number computed from a value's bytes. The same
+bytes produce the same hash. Different values can produce the same hash, a **hash collision**.
+Even different hashes can choose overlapping bits. Together, values already added can set all
+the bits tested by a value that was never added, leaving a possible match.
+
 The filter is a bitset of 32-byte blocks. To add a value, the writer hashes its PLAIN bytes with
 xxHash64. The hash's high half picks a block; its low half, multiplied by eight fixed constants,
 picks one bit in each of the block's eight 32-bit words; the writer sets those bits. To test a
@@ -164,7 +180,10 @@ value, the reader computes the same hash and checks the same bits. One clear bit
 was never added. All set means it may have been: other values may have set those bits.
 
 Probe each row group's filter in the shuffled file for customer `424242` with the reader's `bloom`
-module:
+module. In the result, each `(position, True/False)` pair describes one tested bit. The pairs
+refer to different thirty-two-bit words in the block. Each position counts from zero within
+its own word; `True` means the bit is set, and `False` means it is clear. Equal positions in
+different pairs therefore refer to different bits.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -189,8 +208,8 @@ reader skips the whole file for it.
 Change `424242` to `426545`, the customer in the shuffled file's first row: row group 0's
 filter has all eight bits set, as it must, since a filter never forgets a value it was given.
 Then change the file to `pruning-sorted.parquet` and probe `424242` again. One row group's filter
-has all eight bits set, although no order in the file is from that customer. That is a false
-positive.
+has all eight bits set, although no order in the file is from that customer. That is a
+**false positive**: a possible match for a value that is absent.
 
 The reader measured how often that happens. It probed every filter in the shuffled file with
 thousands of customer numbers its row group does not hold:
@@ -202,7 +221,9 @@ The writer sized each filter for the false-positive rate the table's note gives,
 measured rate is lower, because the filter's size is rounded up. False positives cost a read and
 nothing else: the sorted file's false positive makes the reader read a row group with no match in
 it. That is why, in the table in *Compose a safe skipping plan*, the sorted file reads bytes for
-`customer_id = 424242` and the shuffled one reads none. A filter never produces a false negative, so it never costs a row.
+`customer_id = 424242` and the shuffled one reads none. A correctly written and read filter has
+no **false negative**, which would reject a value that is present. It therefore never costs a
+matching row.
 
 ```practice
 question: All tested Bloom bits are set for a new key. Can a reader return a matching row without decoding data? What changes if one tested bit is clear?
@@ -214,6 +235,9 @@ compose-a-pruning-plan
 ```
 
 ### What each mechanism adds
+
+This **pruning** plan combines the earlier absence tests: row-group statistics, page indexes
+and Bloom filters. Each can remove candidates; none turns a remaining candidate into a proven match.
 
 The reader's `prune.plan` puts the three mechanisms together. It takes a condition, the columns
 to read, and which mechanisms it may use, and decides row group by row group, saying why:
@@ -503,11 +527,12 @@ ranges, and `AND` intersects them while `OR` joins them; a row group is skipped 
 combined ranges are empty.
 
 **How to skip within repeated columns.** In a column that repeats, a page's values are not its
-rows, and a reader needs the level histograms to map one to the other. This reader does not use
+rows, and a reader needs additional row-boundary information, such as counts of definition and repetition
+levels, to map one to the other. This reader does not use
 the page index for such columns.
 
 **Whether skipping is faster.** Skipping saves bytes and decoding. It can cost requests: a plan
-that reads five scattered pages makes five requests where a full scan could make one.
+that reads five scattered pages makes five requests where reading the whole data region could make one.
 [ch10](#how-readers-read) weighs the two.
 
 **Other ways to skip.** Some readers fetch a column's dictionary page and look the value up

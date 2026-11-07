@@ -36,9 +36,13 @@ read-fewer-columns
 
 ### Two columns from a CSV file
 
-`fixtures/formats/` holds a table of orders twice, both written by pyarrow with its default
-settings, as a pipeline's `write_csv` and `write_table` write them. A query wants two of its
-columns, `country` and `amount_cents`: the total spent in each country. First the CSV file, read
+A **column** holds one field across a table; a **row** holds the fields of one record. A CSV
+(comma-separated values) file writes each row as a line of text. An **analytical query**
+summarises many rows, such as adding up sales by country.
+
+`fixtures/formats/` holds a table of orders twice, both written by pyarrow, a library that reads and
+writes Parquet. The files use pyarrow's default `write_csv` and `write_table` settings. A query
+wants two of the table's columns, `country` and `amount_cents`: the total spent in each country. First the CSV file, read
 the way programs read CSV, a row at a time, through a file that counts the bytes it hands over:
 
 ::::{tab-set}
@@ -61,6 +65,14 @@ next line without reading past the fields you do not want, since nothing says wh
 
 ### The same two columns from Parquet
 
+For a file scan, **projection** means selecting the columns a query needs, including any
+columns used by a filter even if they are not returned. Here the needed columns are `country`
+and `amount_cents`. Parquet stores columns separately, so a reader can leave the other columns
+unread.
+
+The reader first needs **metadata**: information describing the table and where its data is
+stored. Parquet keeps its main metadata in the **footer**, a region near the end of the file.
+
 Now the Parquet file, read with a library, through the same kind of counting file:
 
 ::::{tab-set}
@@ -82,11 +94,15 @@ The same answer, from a fraction of the file. In Python the first run loads pyar
 page, which takes a while; in Rust the step needs the `parquet` crate, so it runs in a Codespace
 or at a desk. The two libraries read different amounts. The Rust crate reads the file's last
 bytes, then its footer, then the two columns and nothing else. pyarrow reads a large piece of the
-file's end in its first request, which usually holds the footer and saves a round trip, at the
-price of bytes the query did not need. [ch10](#how-readers-read) weighs that trade.
+file's end in its first request, which usually holds the footer and avoids a later request, at the
+price of bytes the query did not need. Reading extra bytes in advance, hoping to avoid another
+request, is **prefetching**. [ch10](#how-readers-read) weighs that trade.
 
 The least any Parquet reader can read, worked out by the book's reader from each file's footer,
-beside what a CSV reader reads:
+beside what a CSV reader reads. In this table, the **trailer** is the small final block that
+lets the reader locate the footer. A **row group** is a batch of the table's rows, and a
+**column chunk** holds one column's values for that batch. The table counts the chunks for the
+columns this query needs; the next module shows where these regions sit in the file.
 
 ```{include} _generated/csv-or-parquet.md
 ```
@@ -101,7 +117,7 @@ The byte counts include the libraries’ different tail-read strategies. They ar
 
 ```practice
 question: A report reads a few columns from every row, but its input files are extremely small. Must Parquet transfer fewer bytes than CSV?
-answer: No. Projection avoids unwanted columns, but footer metadata and prefetching can outweigh the saving on tiny files. Compare the actual reader and file sizes, not the extensions.
+answer: No. Selecting fewer columns can save data reads, but the reader still needs the footer and may fetch extra bytes in advance. On tiny files those costs can outweigh the saving. Compare the actual reader and file sizes, not the extensions.
 ```
 
 ```lesson
@@ -110,7 +126,8 @@ choose-a-table-layout
 
 ### One table, two layouts
 
-Why the difference? A layout is only the order in which a table's values are stored. Store the
+A **layout** is the order in which a table's values are stored. A **row layout** keeps each
+record's fields together; a **column layout** keeps each field's values together. Store the
 eight orders both ways, and mark the values the query needs, one character a value:
 
 ::::{tab-set}
@@ -146,7 +163,8 @@ makes, and the reason it is not a database format.
 
 ### Why analytical queries favour columns
 
-An analytical query looks like this:
+An analytical query summarises many records. This one adds sales amounts by country after
+selecting dates:
 
 ```sql
 SELECT country, SUM(amount_cents)
@@ -159,29 +177,31 @@ It touches three columns out of five and every row. Real tables have hundreds of
 query typically touches a handful. Three things follow from a column layout, and this chapter has
 measured the first:
 
-- **Projection.** A reader fetches only the columns a query names.
-- **Compression.** A column holds values of one type that often repeat or change slowly: the
+- **Projection.** Selecting the columns the query needs lets a reader avoid the other columns.
+  Here that includes `order_date`, which is tested but not returned.
+- **Compression.** A lossless compressor represents bytes more compactly while allowing the
+  original bytes to be recovered. A column holds values that often repeat or change slowly: the
   `country` column above repeats a few codes. Similar values side by side encode and compress far
   better than interleaved rows ([ch05](#encodings), [ch07](#compression)).
-- **Vectorised processing.** A processor is fastest running one operation over a run of values of
-  one type. A column is already that run.
+- **Vectorised processing.** The engine applies an operation to a batch of values instead of
+  handling one record at a time. A column supplies values of one type for that batch.
 
 The cost is the lookup of one order. Fetching one row means visiting every column, and changing
 one value means rewriting encoded, compressed blocks. Parquet accepts that: it is a format for
 data written once and read many times.
 
-Parquet adds the rest of its structure around the column layout. It splits a table into row
-groups, so that a writer never holds a whole table in memory. It keeps types, encodings and the
-position of every column chunk in the footer, which is why both libraries read the footer before
-anything else. [ch02](#anatomy-of-a-parquet-file) opens a file from its last byte and finds the
+Parquet adds a map around the column layout. It divides the table into groups of rows and
+records where each group's columns were written. The footer holds that map, so a writer can
+write the table in pieces and a reader can find the columns it needs.
+[ch02](#anatomy-of-a-parquet-file) opens a file from its last byte and finds the
 footer for itself: first by hand, in a few lines of Python or Rust, then with the book's reader,
 then with pyarrow.
 
-The layout picture reorders identical values. The real CSV/Parquet comparison also includes metadata, encoding and library read strategies.
+The layout picture reorders identical values. The real CSV/Parquet comparison also includes the footer, compact representations of values and the libraries’ choices about which bytes to fetch.
 
 ```practice
-question: A service fetches one complete order by its key; a report sums one field across all orders. Which access pattern benefits most from contiguous columns, and why?
-answer: The report can read a run of the one field. A complete-record lookup needs pieces from every column; a row layout or an indexed store can suit that workload better. A column layout alone does not provide a key index.
+question: A service fetches one complete order by its key; a report sums one field across all orders. Which access pattern benefits most from storing each column together, and why?
+answer: The report can read a run of the one field. A complete-record lookup needs pieces from every column; keeping each row together can suit that workload better. The layout alone does not tell the service where a particular order is stored.
 ```
 
 ```lesson

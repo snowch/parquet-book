@@ -66,6 +66,10 @@ PAGES: dict[str, str] = {}
 #: render, for the site build to copy each one beside the pages.
 IMAGES: dict[str, Path] = {}
 
+# Populated from the glossary parse at build time. Only explicitly bold term names receive
+# lookup links; prose, source listings and arbitrary word occurrences remain untouched.
+TERMS: dict[str, str] = {}
+
 #: A reference whose text opens with a chapter label, which the renderer re-derives.
 LABELLED = re.compile(r"^(ch\d+|Appendix [A-Z])\b")
 
@@ -369,6 +373,13 @@ def render(node: dict, footnotes: list | None = None, label: str = "") -> str:
             f'<a class="anchor" href="#{html.escape(hid)}" aria-label="Link to this section">#</a></h{level}>'
         )
     if kind == "strong":
+        name = text_of(node).strip().rstrip(".:").casefold()
+        if name in TERMS and all(c.get("type") == "text" for c in node.get("children", [])):
+            return (
+                f'<strong><a class="term-link" href="{html.escape(TERMS[name])}" '
+                f'aria-label="{html.escape(text_of(node).rstrip(".:"))}: glossary definition">'
+                f"{children()}</a></strong>"
+            )
         return f"<strong>{children()}</strong>"
     if kind == "emphasis":
         return f"<em>{children()}</em>"

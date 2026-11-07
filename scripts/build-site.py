@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from tools import render as renderer  # noqa: E402
+from tools.glossary import entries as glossary_entries  # noqa: E402
+from tools.glossary import render_glossary  # noqa: E402
+from tools.glossary import targets as glossary_targets  # noqa: E402
 from tools.lessons import (  # noqa: E402
     MODULES,
     legacy_navigation,
@@ -140,6 +143,7 @@ def nav_html(pages: list[dict], here: str) -> str:
     for p in pages:
         if p["source"] in ("cover.md", "index.md"):
             out.append(f'<li class="nav-front">{link(p["href"], p.get("nav", p["title"]))}</li>')
+    out.append(f'<li class="nav-front">{link("glossary.html", "Glossary")}</li>')
     for part in PARTS:
         chapters = [c for c in CHAPTERS if c.part == part.title]
         href = f"{part.slug.replace('_', '-')}.html"
@@ -175,7 +179,9 @@ def nav_html(pages: list[dict], here: str) -> str:
                     out.append(f"<li>{link(lesson.href, lesson.title)}</li>")
             out.append("</ul></div></details></li>")
         out.append("</ol></details></li>")
-    appendix_pages = [p for p in pages if p["source"].startswith("appendices/")]
+    appendix_pages = [
+        p for p in pages if p["source"].startswith("appendices/") and p["href"] != "glossary.html"
+    ]
     active = any(p["href"] == here for p in appendix_pages)
     out.append(
         f'<li class="nav-part nav-appendices"><details{" open" if active else ""}>'
@@ -305,9 +311,9 @@ HEAD_SCRIPT = r"""<script>
     return;
   }
   // The cover is where the book starts anyway, so it is never the place to go back to. The
-  // preface is read like any other page, so it is.
+  // preface is read like any other page, so it is. A glossary lookup keeps the lesson bookmark.
   const remember = () => {
-    if (page === "index.html") return;
+    if (page === "index.html" || page === "glossary.html") return;
     const now = { page, title: document.title.split(" · ").slice(0, -1).join(" · "), y: moduleIndex ? 0 : Math.round(scrollY) };
     try { localStorage.setItem("last-read", JSON.stringify(now)); } catch (e) {}
     // The service worker cannot read localStorage, so the place is also kept where it can, for a
@@ -788,6 +794,7 @@ def page_html(
 <meta name="theme-color" content="#35648f">
 <link rel="stylesheet" href="book.css">
 <script src="navigation.js" defer></script>
+<script src="glossary.js" defer></script>
 {lab}
 {HEAD_SCRIPT}
 {RAILS}
@@ -1007,8 +1014,11 @@ def build(out: Path, integration_out: Path | None = None) -> None:
         sys.exit(f"MyST produced no parse for: {', '.join(missing)}. Is each page in myst.yml's toc?")
     renderer.PAGES.clear()
     renderer.IMAGES.clear()
+    renderer.TERMS.clear()
     for p in canonical:
         renderer.PAGES[parse[p["source"]]["slug"]] = p["href"]
+    glossary_intro, terms = glossary_entries(parse["appendices/glossary.md"]["mdast"])
+    renderer.TERMS.update(glossary_targets(terms))
     groups = {p["source"]: lesson_nodes(parse[p["source"]]["mdast"], p["chapter"].slug) for p in modules}
     support = {p["source"]: supporting_nodes(groups[p["source"]], p["chapter"]) for p in modules}
     if out.exists():
@@ -1019,7 +1029,10 @@ def build(out: Path, integration_out: Path | None = None) -> None:
     bodies, outlines, anchors = {}, {}, {}
     for p in pages:
         chapter, lesson = p.get("chapter"), p.get("lesson")
-        if p.get("module"):
+        if p["source"] == "appendices/glossary.md":
+            body = render_glossary(glossary_intro, terms)
+            toc = '<aside class="toc" id="toc"></aside>'
+        elif p.get("module"):
             # Start at the choices, rather than repeating the old chapter-length introduction.
             heading = next(
                 n
@@ -1124,6 +1137,17 @@ def build(out: Path, integration_out: Path | None = None) -> None:
         for p in pages
     ]
     (out / "course.json").write_text(json.dumps(manifest_pages, indent=2) + "\n")
+    # Lookup panels and the full reference share the same canonical definitions and migrated
+    # lesson links. No definitions are authored in JavaScript or a second data source.
+    glossary_data = {
+        term.ident: {
+            "title": term.title,
+            "href": term.href,
+            "body": migrate_links(renderer.render({"type": "root", "children": term.nodes}), anchors),
+        }
+        for term in terms
+    }
+    (out / "glossary.json").write_text(json.dumps(glossary_data, ensure_ascii=False) + "\n")
     # Existing component integration tests exercise full sets of labs in one worker context.
     # Their harness stays outside the publish directory and is never cached or deployed.
     if integration_out:
@@ -1141,6 +1165,7 @@ def build(out: Path, integration_out: Path | None = None) -> None:
 
     shutil.copy(ROOT / "web" / "book.css", out / "book.css")
     shutil.copy(ROOT / "web" / "navigation.js", out / "navigation.js")
+    shutil.copy(ROOT / "web" / "glossary.js", out / "glossary.js")
     # The pictures the pages show, such as the cover's, under the names the pages use.
     for name, source in sorted(renderer.IMAGES.items()):
         shutil.copy(source, out / name)

@@ -2273,7 +2273,7 @@ fn changes_note(connections: usize) -> String {
 }
 
 /// The rounds of requests a trace took: each phase waits for the one before.
-fn round_trips(requests: &[parquet_lab::object_store::Request]) -> usize {
+fn dependency_phases(requests: &[parquet_lab::object_store::Request]) -> usize {
     let mut phases: Vec<usize> = requests.iter().map(|r| r.phase).collect();
     phases.dedup();
     phases.len()
@@ -2354,7 +2354,7 @@ fn changes_lookup(root: &Path) -> Result<String, String> {
     use parquet_lab::changes::lookup;
     let model = NetworkModel::default();
     let mut rows = vec![
-        "| Lookup | Round trips (requests) | Bytes fetched | Time |".to_string(),
+        "| Lookup | Dependency phases (requests) | Bytes fetched | Time |".to_string(),
         "|---|--:|--:|--:|".to_string(),
     ];
     let mut kv = (0, 0);
@@ -2390,7 +2390,7 @@ fn changes_lookup(root: &Path) -> Result<String, String> {
         }
         rows.push(format!(
             "| {label} | {} ({}) | {} | {} |",
-            round_trips(&r.requests),
+            dependency_phases(&r.requests),
             r.requests.len(),
             thousands(r.bytes_fetched),
             ms_of(r.elapsed_us),

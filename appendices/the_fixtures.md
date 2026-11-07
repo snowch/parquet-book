@@ -5,6 +5,7 @@ title: The fixtures
 (the-fixtures)=
 # The fixtures
 
+A **fixture** is an example input kept with a project so examples and tests can be repeated.
 Every experiment in the book runs on one of these files. Each was written by pyarrow, a
 production Parquet implementation, from a generator in the repository, so anyone can rebuild them
 and get the same bytes. The book's reader never writes a fixture: it is tested against files it

@@ -10,14 +10,16 @@ title: Preface
 This book is for data engineers who write Parquet every day and want to know what is in the
 files. You can learn from the explanations and worked results, then explore the code if you want
 to. Each chapter asks one question about the
-format and answers it on the bytes of a real Parquet file, in three steps:
+format and answers it on the bytes of a real Parquet file. A **reader** is software that turns
+those stored bytes into values and information about the file. The book follows three steps:
 
 1. **By hand.** A few lines of Python or Rust that open the file and print the structure the
-   chapter is about: the magic number, the footer, a page header, a column's statistics.
+   chapter is about: how to recognise the file, where its values are stored, or which values
+   it might contain.
 2. **In the reader.** Those lines grow into a piece of a working Parquet reader, which the book
-   builds as it goes. By the end it opens files in an object store, decodes their pages, skips
-   data it can prove it does not need, and answers small SQL queries.
-3. **With a library.** The same question asked of pyarrow and of the Rust `parquet` crate, the
+   builds as it goes. By the end it reads selected parts of remotely stored files, turns bytes
+   back into values, skips data it can prove it does not need, and answers small SQL queries.
+3. **With a library.** The same question asked of pyarrow and of the Rust `parquet` library, the
    tools you use at work, with the answer checked against what you found by hand.
 
 Every chapter that builds a piece of the reader takes all three steps. Three chapters explain
@@ -27,7 +29,8 @@ The reader exists twice, in Python and in Rust, held to identical answers by tes
 of the reader has a tab for each; pick one and the whole book follows. The same code runs in the
 tests, which check it against files written by pyarrow, a production implementation; on the
 command line; and in this page, where Python runs under Pyodide in the steps you run and the
-problems you solve, and Rust, compiled to WebAssembly, draws the pictures. When a page shows a
+problems you solve. Pyodide is the Python runtime that works in a browser. Rust draws the
+pictures through WebAssembly, a compiled program format browsers can execute. When a page shows a
 footer length, a byte range or a request, the reader computed it from the bytes of the file.
 
 ## How a chapter works
@@ -43,6 +46,9 @@ through the core route. Each lesson has:
 Code beside an example is optional. The module also links to its build lab and coding problems,
 where it has them. Module notes collect further limitations, takeaways and primary sources.
 Qualifications needed for the core lesson stay beside its explanation.
+
+New terms are explained where they become useful. The [Glossary](#glossary) provides short
+definitions and links back to the lessons that teach them.
 
 Three chapters explain and build nothing, so they have no *Building it* and their problems are
 questions to reason about. [ch01](#why-parquet-exists) sets up the question the book answers,
@@ -85,7 +91,9 @@ block names the file.
 
 ## What you need
 
-To read the book: a browser. Explanations, worked results, diagrams and answer reveals remain
+To read the book, you should recognise tables, rows and columns, and be able to follow a small
+SQL query. You do not need to know Parquet’s internal layout or binary encodings in advance.
+A browser is enough. Explanations, worked results, diagrams and answer reveals remain
 available with JavaScript disabled. Running Python steps and problems in the page needs JavaScript.
 
 To run the Rust, or everything at a desk: Python with pyarrow, and a Rust toolchain, or a
@@ -98,5 +106,5 @@ is deliberately plain, and every chapter says what each quoted block does.
 ## Where this starts
 
 [ch01](#why-parquet-exists) stores one table two ways and counts the bytes a query touches.
-[ch02](#anatomy-of-a-parquet-file) opens a real Parquet file from its last byte, by hand, then in
-the reader, then with pyarrow, and is where the reader begins.
+[ch02](#anatomy-of-a-parquet-file) first recognises a real Parquet file from its signature, then
+uses its final bytes to find the metadata that describes it. The optional build lab starts the reader.

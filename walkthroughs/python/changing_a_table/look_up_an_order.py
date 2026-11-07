@@ -2,6 +2,7 @@
 import sys
 from itertools import groupby
 from pathlib import Path
+
 sys.path.insert(0, "python")  # the book's reader, from the repository's python/ directory
 from parquet_lab.changes import lookup
 from parquet_lab.object_store import MemoryStore, NetworkModel
@@ -15,8 +16,8 @@ for path in Path("fixtures/changes").rglob("*"):
 snapshot, key, prefetch = "after-a-day", 300, 0
 result = lookup(store, "", snapshot, key, prefetch, connections=4, model=NetworkModel())
 
-for trip, (_, requests) in enumerate(groupby(result.requests, lambda r: r.phase), 1):
-    print(f"round trip {trip}:")
+for phase, (_, requests) in enumerate(groupby(result.requests, lambda r: r.phase), 1):
+    print(f"phase {phase}:")
     for r in requests:
         print(f"  {r.end_us // 1000:>3} ms: {r.method} {r.key} {r.range or '·'} {r.why}")
 if result.found is None:

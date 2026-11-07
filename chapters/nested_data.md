@@ -36,7 +36,8 @@ nullable-values
 ### One nullable value
 
 Start with `email`, one optional string per order in `nested.parquet`. Optional means that a
-record can have a value or a null. Losing a value must not make its record disappear.
+record can have a value or a **null**, meaning that no value is present. A single value, as
+opposed to a list, is a **scalar**. Losing a value must not make its record disappear.
 
 A **slot** is one position in the column's sequence. A **definition level**, written `d`, says
 how much of the optional or repeated path exists at that position. For a single optional field,
@@ -207,7 +208,8 @@ stored-levels
 ### The levels as stored
 
 A column chunk is a run of **pages**, smaller units with a header and a body. The header
-describes the page; the body holds the levels and values.
+describes the page; the body holds the levels and values. A **stream** here is a sequence of
+integers written consecutively. Its **bit width** is the number of bits used for each integer.
 [ch06](#pages) reads pages in full; here the reader's `walk_pages` finds the one page of
 `items[].discounts[]`, the discounts of every item of every order. Unpack the start of its body
 by hand:
@@ -250,7 +252,8 @@ width without giving each a whole byte. **Run-length encoding**, or **RLE**, sto
 value once, together with its count.
 
 The hybrid stream mixes both kinds of run. Each run starts with an unsigned variable-length
-integer header, called **ULEB128**. Small headers fit in one byte, as the examples here do;
+integer header, using **ULEB128**. This is one kind of **varint**, an integer stored in a
+variable number of bytes. Small headers fit in one byte, as the examples here do;
 larger headers use more bytes. After decoding that integer, its lowest bit, the rightmost
 binary digit, identifies the kind. Remove that bit, or divide the integer by two and discard
 the remainder, to get the count:
@@ -398,7 +401,8 @@ page each stream starts with a four-byte length. The second version of the data 
 ::::
 
 Only slots whose definition level is the maximum have a value, so the reader counts those, and
-decodes that many PLAIN values after the levels (the `plain` module).
+decodes that many **PLAIN** values after the levels (the `plain` module). PLAIN writes each
+value directly in its physical type’s representation; the next module compares other encodings.
 
 ### Rebuilding records
 
@@ -451,7 +455,7 @@ cargo test -p parquet-lab --test fixtures records_rebuilt
 
 pyarrow reads the levels and does not show them. It turns them into Arrow's shape for a list: an
 array of *offsets*, where list `i` runs from `offsets[i]` to `offsets[i + 1]` in one array of
-values, and a *validity bitmap* saying which lists are null. The `parquet` crate's column reader
+values, and a **validity bitmap**: one bit per list saying whether it is present or null. The `parquet` crate's column reader
 works below Arrow, and hands you the levels as the page stores them:
 
 ::::{tab-set}
