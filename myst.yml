@@ -74,4 +74,4 @@ project:
 # theme: scripts/build-site.py renders the site, and scripts/parse-book.sh tolerates the theme
 # download failing where there is no network.
 site:
-  template: book-theme
+  template: ./tools/myst-parse

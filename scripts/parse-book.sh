@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # Parse every page with MyST, resolve every cross-reference, and fail on any warning.
 #
-# MyST is a parser here, not a renderer: scripts/build-site.py renders the site from the parse in
-# _build/site/content. After parsing, MyST also tries to fetch its site theme. This book never
-# uses the theme, and where the network is closed the fetch fails; that one failure is tolerated.
-# Anything else, including a single warning about a broken reference, a missing literalinclude
-# anchor or an unknown directive, fails the build.
+# scripts/build-site.py renders the site from the MyST parse in _build/site/content.
+# The local template supplies the metadata MyST requires for that export. A warning about a
+# broken reference, a missing literalinclude anchor or an unknown directive fails the build.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -31,7 +29,7 @@ if grep -E "⚠|⛔" "$log" >&2; then
   rm -f "$log"
   exit 1
 fi
-if [ "$status" -ne 0 ] && ! grep -q "Problem downloading template" "$log"; then
+if [ "$status" -ne 0 ]; then
   echo "ERROR: MyST failed after parsing:" >&2
   tail -25 "$log" >&2
   rm -f "$log"
