@@ -152,7 +152,7 @@
     "comparisons": []
   },
   "walkthroughs/python/how_readers_read/read_with_a_strategy.py": {
-    "source_sha256": "f873a95ea5756905a7eb2e8193de10ec8e6c6dcb4bea4c0021ae0c1ee384ac98",
+    "source_sha256": "cf172d42429f8bc5ad7dade9235c09f59478c7ec7e9fe96db5271a6a690d19f2",
     "stdout": "  0- 20 ms on 1: HEAD  learn the file size, to know where the end is\n 20- 40 ms on 1: GET bytes=26918-26925 read the trailer\n 40- 60 ms on 1: GET bytes=25026-26917 read the footer: the trailer says where it starts\n 60- 80 ms on 1: GET bytes=23340-23450 read the indexes the plan needs\n 80-100 ms on 1: GET bytes=24564-24619 read the indexes the plan needs\n100-120 ms on 1: GET bytes=24620-24675 read the indexes the plan needs\n120-140 ms on 1: GET bytes=24676-24738 read the indexes the plan needs\n140-160 ms on 1: GET bytes=24739-24794 read the indexes the plan needs\n160-180 ms on 1: GET bytes=10732-11070 read the pages the plan kept\n180-200 ms on 1: GET bytes=12427-12765 read the pages the plan kept\n200-220 ms on 1: GET bytes=14122-14171 read the pages the plan kept\n220-240 ms on 1: GET bytes=14172-14217 read the pages the plan kept\n240-260 ms on 1: GET bytes=14402-14740 read the pages the plan kept\n13 requests, 3355 bytes, 260 ms\nrows matching: [430]\n",
     "comparisons": []
   },
