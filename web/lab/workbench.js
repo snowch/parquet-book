@@ -10,9 +10,10 @@
 // Rust cannot compile in a page at reasonable cost, so the Rust problems are one click away in a
 // GitHub Codespace instead: the repository, its toolchain and an editor, in the browser.
 
+import { loadDrafts, saveDrafts, savedAnswers } from "./answers.js";
 import { KEYS, codeArea } from "./code.js";
 import { fetchText } from "./pyodide.js";
-import { runPython, savedAnswers, stopPython } from "./runner.js";
+import { runPython, stopPython } from "./runner.js";
 
 export const CODESPACES = "https://codespaces.new/snowch/parquet-book?quickstart=1";
 const BILLING = "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces";
@@ -27,23 +28,6 @@ export const CODESPACES_COST = "A Codespace runs on your own GitHub account. Per
   `then charges you (<a href="${BILLING}" target="_blank" rel="noopener">GitHub's terms</a>). Stop or ` +
   "delete the Codespace when you are done, since a stopped one still uses its storage allowance.";
 
-const key = (chapter) => `problems:${chapter}`;
-
-function saved(chapter) {
-  try {
-    return localStorage.getItem(key(chapter));
-  } catch {
-    return null;
-  }
-}
-
-function save(chapter, text, stub) {
-  try {
-    if (text === stub) localStorage.removeItem(key(chapter));
-    else localStorage.setItem(key(chapter), text);
-  } catch {}
-}
-
 const escape = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 export async function mountWorkbench(el) {
@@ -56,7 +40,8 @@ export async function mountWorkbench(el) {
     <div class="workbench-bar">
       <button type="button" class="primary" data-act="run">Run the tests</button>
       <button type="button" data-act="stop" hidden>Stop</button>
-      <button type="button" data-act="restore">Restore the stub</button>
+      <button type="button" data-act="restore" hidden>Restore the stub</button>
+      <button type="button" data-act="recover" hidden>Recover saved work</button>
       <button type="button" data-act="download">Download</button>
       <span class="status" role="status"></span>
     </div>
@@ -72,17 +57,32 @@ export async function mountWorkbench(el) {
   const results = el.querySelector(".results");
   const output = el.querySelector(".output");
   const button = (act) => el.querySelector(`[data-act="${act}"]`);
-  const area = codeArea(saved(chapter) ?? stub, {
+  const drafts = loadDrafts(chapter);
+  let previous = drafts.previous;
+  const asDraft = (text) => text === stub ? null : text;
+  const updateControls = () => {
+    button("restore").hidden = area.value === stub;
+    button("recover").hidden = previous === null || previous === area.value;
+  };
+  const area = codeArea(drafts.draft ?? stub, {
     label: `Your answers, ${file}`,
     onRun: () => run(),
-    onInput: (text) => save(chapter, text, stub),
+    onInput: (text) => {
+      if (!saveDrafts(chapter, { draft: asDraft(text), previous })) {
+        status.textContent = "This browser could not save the current draft.";
+      }
+      updateControls();
+    },
   });
   area.rows = Math.min(Math.max(stub.split("\n").length, 14), 32);
   el.querySelector(".workbench-bar").before(area);
+  updateControls();
 
   const idle = (text) => {
     button("run").disabled = false;
     button("stop").hidden = true;
+    button("restore").disabled = false;
+    button("recover").disabled = false;
     status.textContent = text;
     el.dataset.state = "idle";
   };
@@ -107,6 +107,8 @@ export async function mountWorkbench(el) {
     el.dataset.state = "running";
     button("run").disabled = true;
     button("stop").hidden = false;
+    button("restore").disabled = true;
+    button("recover").disabled = true;
     results.innerHTML = "";
     status.textContent = "Waiting for the page's other Python runs…";
     const argv = ["pytest", `exercises/python/tests/test_${chapter}.py`, "--problems", "-q", "--tb=short"];
@@ -114,16 +116,32 @@ export async function mountWorkbench(el) {
       .then(show, (error) => idle(error.message === "Stopped." ? "Stopped." : `The tests could not run: ${error.message}`));
   }
 
+  function switchDraft(text, message) {
+    const nextPrevious = asDraft(area.value);
+    if (!saveDrafts(chapter, { draft: asDraft(text), previous: nextPrevious })) {
+      status.textContent = "This browser could not save a recovery copy. Your work is still in the editor.";
+      return;
+    }
+    previous = nextPrevious;
+    area.value = text;
+    results.innerHTML = "";
+    output.hidden = true;
+    status.textContent = message;
+    updateControls();
+    area.focus();
+  }
+
   el.addEventListener("click", (e) => {
     const act = e.target.closest("button[data-act]")?.dataset.act;
     if (act === "run") run();
     if (act === "stop" && el.dataset.state === "running") stopPython();
-    if (act === "restore" && confirm("Replace your answers with the stub? Your edits here are lost.")) {
-      area.value = stub;
-      save(chapter, stub, stub);
-      results.innerHTML = "";
-      output.hidden = true;
-      status.textContent = "Restored the stub.";
+    if (act === "restore" && area.value !== stub) {
+      if (previous !== null && previous !== area.value &&
+          !confirm("Replace the existing recovery copy with the code in the editor and restore the stub?")) return;
+      switchDraft(stub, "The stub is ready to run. Use Recover saved work to return to your draft.");
+    }
+    if (act === "recover" && previous !== null) {
+      switchDraft(previous, "Recovered your saved work.");
     }
     if (act === "download") {
       const a = document.createElement("a");

@@ -46,11 +46,11 @@ how many connections to use. **Coalescing** merges nearby byte ranges into one r
 including any gap between them. **Concurrency** lets independent requests overlap in time.
 Neither can remove a dependency on metadata that has not arrived yet.
 
-The step is a few lines of code. In Python, run it in the page, change it with **Edit**, and run
-it again. In Rust, open it in a Codespace, or run it at a desk with
+Open **Read or run the code**. In the Python tab, click **Run** to see the starting trace. Then
+click **Edit** to try the changes below. In the Rust tab, click **Open in Codespaces** or run
 `cargo run -p walkthroughs --bin read_with_a_strategy`. The
-[footer-reading walkthrough](trace-footer-requests.html) stops once the footer arrives;
-this trace continues through the indexes and data:
+[footer-reading walkthrough](trace-footer-requests.html) stops once the footer arrives.
+This trace continues through the indexes and data.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -74,16 +74,21 @@ statistics keep, and an OffsetIndex for each column. Last come the pages, one re
 it ends. The bytes are a small share of the file, and they move in almost no time. The time is
 the latency, paid once per request.
 
-Change the strategy one line at a time, and run the step after each change:
+After each change, click **Run** in Python or rerun the `cargo run` command in Rust. The output
+lists individual requests, then gives the total requests, bytes fetched and simulated elapsed
+time in milliseconds.
 
 - **Read more of the tail.** Find the footer with `SuffixRange()` and `prefetch=8192`
   (`SizeSource::SuffixRange` and `prefetch: 8192` in Rust). The first request brings the trailer,
   the footer and the indexes together, because the indexes sit immediately before the footer.
   Every index request disappears.
-- **Merge ranges.** Add `coalesce_gap=4096` (`Some(4096)`). The pages of the four columns become
-  one request, which also reads the bytes between them.
-- **Use more connections.** Put the gap back to `None` and set `connections=4`. The pages go out
-  side by side, each on a connection of its own, but none starts before the footer has arrived.
+- **Merge ranges.** Set `coalesce_gap` to `4096` (`Some(4096)` in Rust). The pages of the four
+  columns become one request, which also reads the bytes between them.
+- **Use more connections.** Keep the suffix range and prefetch. Set `coalesce_gap` back to
+  `None`, leave `connections` at `1`, and run the unmerged scan. Then change only
+  the `connections` value to `4` and run again. Which totals stay the same? Which changes? Look
+  at the request times to see which requests overlap. Separate connections can fetch pages in
+  parallel once the reader knows where the pages are.
 - **Read everything.** Set `prefetch=65536`, more than the file holds. The first request reads
   all of it, and there is nothing left to ask for.
 

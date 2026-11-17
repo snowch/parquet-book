@@ -21,7 +21,7 @@
 
 import { Lab } from "./wasm.js";
 import { packageList } from "./pyodide.js";
-import { codeArea } from "./code.js";
+import { KEYS, codeArea } from "./code.js";
 import { runPython, stopPython } from "./runner.js";
 import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 
@@ -230,7 +230,8 @@ function mountCodespace(pre, lines) {
  * compile Rust.
  */
 function mountWalkthroughs(root) {
-  for (const figure of root.querySelectorAll("figure.walkthrough[data-file]")) {
+  const figures = [...root.querySelectorAll("figure.walkthrough[data-file]")];
+  for (const [index, figure] of figures.entries()) {
     const file = figure.dataset.file;
     const pre = figure.querySelector("pre");
     if (!pre || pre.parentElement.classList.contains("runnable")) continue;
@@ -250,53 +251,90 @@ function mountWalkthroughs(root) {
     const change = button(box, "Edit", "Change the code, then run it");
     change.classList.add("edit-button");
     let area = null;
+    let draft = original;
+    let runs = 0;
+    const keys = document.createElement("p");
+    keys.className = "run-note editor-keys";
+    keys.id = `walkthrough-keys-${index + 1}`;
+    keys.textContent = KEYS;
+    keys.hidden = true;
+    const activity = document.createElement("div");
+    activity.className = "run-result walkthrough-activity";
+    activity.innerHTML = '<div class="run-head" role="status"></div><pre class="run-diagnostic"></pre>';
+    const feedback = activity.querySelector(".run-head");
+    const diagnostic = activity.querySelector(".run-diagnostic");
     const result = document.createElement("div");
     result.className = "run-result";
     result.hidden = true;
     result.innerHTML = '<div class="run-head"><span class="status" role="status"></span></div><pre class="run-output"></pre>';
-    box.after(result);
+    box.before(keys);
+    box.after(activity, result);
     const status = result.querySelector(".status");
     const output = result.querySelector(".run-output");
 
     const go = async () => {
       if (box.dataset.state === "running") return;
+      const source = area ? area.value : original;
+      const version = source === original ? "the book's code" : "your edited version";
+      const label = `Run ${++runs} (${version})`;
       box.dataset.state = "running";
-      result.hidden = false;
-      output.textContent = "";
+      run.setAttribute("aria-disabled", "true");
+      activity.classList.remove("run-error");
+      diagnostic.textContent = "";
       const started = Date.now();
       let phase = "Waiting for the page's other Python runs…";
-      const tick = setInterval(() => {
-        status.textContent = `${phase} ${Math.round((Date.now() - started) / 1000)} s`;
-      }, 1000);
-      status.textContent = phase;
+      const progress = () => {
+        feedback.textContent = `${label} · ${phase} ${Math.round((Date.now() - started) / 1000)} s`;
+      };
+      const tick = setInterval(progress, 1000);
+      progress();
+      const fail = (message, exit = "") => {
+        activity.classList.add("run-error");
+        feedback.textContent = `${label} failed.`;
+        diagnostic.textContent = message;
+        box.dataset.exit = exit;
+      };
       try {
-        const source = area ? area.value : original;
-        const r = await runPython(["python", source, file], { onStatus: (t) => { phase = t; } });
-        output.textContent = r.output;
-        status.textContent = `Ran in your browser in ${took(Date.now() - started)}` +
-          (area && area.value !== original ? ", your edited version" : "") + (r.exit === 0 ? "" : `; exit status ${r.exit}`);
-        box.dataset.exit = String(r.exit);
+        const r = await runPython(["python", source, file], { onStatus: (t) => { phase = t; progress(); } });
+        if (r.exit === 0) {
+          feedback.textContent = "";
+          output.textContent = r.output;
+          result.hidden = false;
+          status.textContent = `${label} finished in ${took(Date.now() - started)}.`;
+          box.dataset.exit = "0";
+        } else {
+          fail(r.output || `Python exited with status ${r.exit}.`, String(r.exit));
+        }
       } catch (error) {
-        status.textContent = `Could not run: ${error.message}`;
+        if (error.message === "Stopped.") {
+          feedback.textContent = `${label} stopped.`;
+          box.dataset.exit = "";
+        } else {
+          fail(error.message);
+        }
       } finally {
         clearInterval(tick);
+        run.removeAttribute("aria-disabled");
         box.dataset.state = "idle";
       }
     };
     run.addEventListener("click", go);
     change.addEventListener("click", () => {
       if (area) {
-        // Back to the book's version.
+        draft = area.value;
         area.replaceWith(pre);
         area = null;
-        change.textContent = "Edit";
+        keys.hidden = true;
+        change.textContent = draft === original ? "Edit" : "Return to edit";
         return;
       }
-      area = codeArea(original, { label: `Your version of ${file}`, onRun: go });
+      area = codeArea(draft, { label: `Your version of ${file}`, onRun: go });
       area.rows = original.split("\n").length + 1;
+      area.setAttribute("aria-describedby", keys.id);
       pre.replaceWith(area);
+      keys.hidden = false;
       area.focus();
-      change.textContent = "Restore";
+      change.textContent = "Show original";
     });
   }
 }

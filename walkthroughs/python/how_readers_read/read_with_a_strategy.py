@@ -9,7 +9,6 @@ from parquet_lab.scan import Query, Strategy, scan
 data = open("fixtures/pruning-sorted.parquet", "rb").read()
 query = Query([0, 1, 2, 3], (0, Op.EQ, "431"))  # every column, where order_id = 431
 
-# Try SuffixRange() and prefetch=8192; then coalesce_gap=4096; then connections=4.
 footer = FooterOptions(Head(), prefetch=8)
 strategy = Strategy(footer=footer, connections=1, coalesce_gap=None)
 result = scan(data, "orders.parquet", query, strategy, NetworkModel())
