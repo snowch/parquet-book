@@ -630,6 +630,24 @@ await explore(base + "writing-parquet-well.html");
     `the workbench runs the chapter's tests in the page as pytest does at a desk: ${failed} failed, ${passed} passed`);
   const first = await wb.locator(".results li.failed pre").first().innerText();
   check(first.includes("NotImplementedError: problem 7.1"), "and says which problem is unsolved");
+  const area = wb.locator("textarea");
+  const stub = await area.inputValue();
+  const saved = `${stub}\n# A draft saved by an older workbench.\n`;
+  await page.evaluate((draft) => localStorage.setItem("problems:compression", draft), saved);
+  await explore(base + "compression.html");
+  check(await area.inputValue() === saved, "the workbench opens previously saved drafts");
+  await wb.getByRole("button", { name: "Restore the stub" }).click();
+  check(await area.inputValue() === stub, "restoring a draft shows the starter code");
+  await explore(base + "compression.html");
+  check(await area.inputValue() === stub, "the starter stays active after reloading");
+  const trial = `${stub}\n# An experiment with the starter.\n`;
+  await area.fill(trial);
+  const recover = wb.getByRole("button", { name: "Recover saved work" });
+  await recover.click();
+  check(await area.inputValue() === saved, "recovery restores the earlier draft after reloading and editing the starter");
+  await recover.click();
+  check(await area.inputValue() === trial, "recovering earlier work also keeps the trial draft recoverable");
+  await page.evaluate(() => localStorage.removeItem("problem-drafts:compression"));
 }
 
 // Run buttons: a command the page prints in a Python tab runs in the page, and prints what it
@@ -694,10 +712,27 @@ await explore(base + "writing-parquet-well.html");
   const first = page.locator('figure.walkthrough[data-file$="first_bytes.py"]');
   await first.locator(".edit-button").click();
   const area = first.locator("textarea");
-  await area.fill((await area.inputValue()).replace("data[:4]", "data[-4:]"));
-  const edited = await runStep(first);
+  const editedSource = (await area.inputValue()).replace("data[:4]", "data[-4:]");
+  await area.fill(editedSource);
+  check(await first.getByText("Esc then Tab leaves the editor", { exact: false }).isVisible(),
+    "the walkthrough shows the keyboard instruction while editing");
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Tab");
+  check(await area.evaluate((el) => document.activeElement !== el), "Escape and Tab leave the walkthrough editor");
+  await first.evaluate((el) => {
+    el.querySelector(".run-button:not(.edit-button)").click();
+    el.querySelector(".edit-button").click();
+  });
+  await first.locator('.runnable[data-state="idle"]').waitFor({ timeout: 300000 });
+  const edited = await first.locator(".run-output").innerText();
   check(edited.includes("PAR1") && (await first.locator(".status").innerText()).includes("your edited version"),
-    "an edited walkthrough step runs the edit");
+    "the walkthrough labels the edited source that ran even when the editor switches to the original");
+  await first.getByRole("button", { name: "Return to edit" }).click();
+  check(await area.inputValue() === editedSource, "showing the original keeps the walkthrough edit recoverable");
+  await area.fill('raise ValueError("failed walkthrough run")');
+  const afterError = await runStep(first);
+  check(afterError === edited && (await first.locator(".run-error").innerText()).includes("failed walkthrough run"),
+    "a failed walkthrough run shows a separate error and keeps the last successful output");
   // The step that asks a library loads pyarrow into the page on its first run.
   const library = await runStep(page.locator('figure.walkthrough[data-file$="footer_with_a_library.py"]'));
   check(library.includes(`footer length: ${native.trailer.footer_length}`),

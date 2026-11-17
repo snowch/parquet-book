@@ -1,21 +1,11 @@
 // The page's one Python worker (python-worker.js), shared by the problems workbenches and the Run
 // buttons on commands. Runs queue: one at a time, in the order they were asked for.
 
+import { savedAnswers } from "./answers.js";
+
 let worker = null;
 let queue = Promise.resolve();
 let current = null;
-
-/** Every chapter's saved answers from its workbench, by chapter: `problems:<chapter>`. */
-export function savedAnswers() {
-  const out = {};
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k.startsWith("problems:")) out[k.slice("problems:".length)] = localStorage.getItem(k);
-    }
-  } catch {}
-  return out;
-}
 
 /**
  * Run `argv` (["pytest", …], ["parquet_lab", …] or ["python", source, file name]) from the

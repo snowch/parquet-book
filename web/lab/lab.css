@@ -278,18 +278,21 @@
   background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: .15rem .6rem;
   cursor: pointer; opacity: .9; }
 .run-button:hover { opacity: 1; }
-.runnable[data-state="running"] .run-button { background: var(--bg); color: var(--stop); border-color: var(--stop); }
+.runnable[data-state="running"] .run-button:not(.edit-button) { background: var(--bg); color: var(--stop); border-color: var(--stop); }
 .run-result { margin: 0 0 1.2rem; border: 1px solid var(--edge); border-top: 0; border-radius: 0 0 6px 6px;
   background: var(--bg); font: 13px/1.5 var(--chrome); }
 .run-head { padding: .35rem .8rem; color: var(--muted); font-size: 12.5px; border-bottom: 1px solid var(--edge);
   font-variant-numeric: tabular-nums; }
-.run-output { margin: 0; padding: .6rem .8rem; max-height: 26rem; overflow: auto; background: var(--code);
+.run-output, .run-diagnostic { margin: 0; padding: .6rem .8rem; max-height: 26rem; overflow: auto; background: var(--code);
   font: 12px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0 0 6px 6px; }
-.run-output:empty { display: none; }
+.run-output:empty, .run-diagnostic:empty, .walkthrough-activity:has(.run-head:empty) { display: none; }
+.walkthrough-activity { margin-bottom: .65rem; }
+.run-error .run-head { color: var(--stop); }
 
 .runnable[data-codespace] .run-button { color: var(--accent); background: var(--bg); border-color: var(--rule); }
 .runnable[data-codespace] .run-button:hover { border-color: var(--accent); }
 .run-note { margin: .3rem 0 1rem; color: var(--muted); font: 12.5px/1.45 var(--chrome); }
+.run-note.editor-keys { margin: .3rem 0; }
 /* A walkthrough step: Run and Edit side by side on the code. */
 .runnable .run-button.edit-button { right: calc(var(--u, 16px) * 4.6); color: var(--accent); background: var(--bg); border-color: var(--rule); }
 .walkthrough .runnable .code-area { border: 1px solid var(--edge); border-radius: 0 0 6px 6px; }

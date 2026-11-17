@@ -13,7 +13,6 @@ fn main() {
         condition: Some((0, Op::Eq, "431".to_string())),
     };
 
-    // Try SizeSource::SuffixRange and prefetch 8192; then Some(4096); then 4 connections.
     let strategy = Strategy {
         footer: FooterOptions {
             size: SizeSource::Head,

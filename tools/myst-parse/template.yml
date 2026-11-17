@@ -1,0 +1,4 @@
+jtex: v1
+title: Book content export
+description: Local template metadata for the MyST content export. The book renders its own HTML.
+version: 1.0.0
