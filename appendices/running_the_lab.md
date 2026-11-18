@@ -33,7 +33,7 @@ reader compiled to WebAssembly, a program format browsers can execute. This is t
 that draws the pictures, and its commands print what they print at a desk.
 
 To compile Rust or run a changed Rust walkthrough, use a local Rust compiler or
-**Open in Codespaces** in the Rust tab. [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+**Open in Codespaces** in the Rust tab. [GitHub Codespaces](https://codespaces.new/snowch/parquet-book/tree/main?quickstart=1)
 opens the repository with an editor and terminal. Open the file named above the example,
 make your change, then run the command shown or copied by the page in the Codespace terminal.
 Use `make && make serve` there to view the book with diagrams drawn by your edited reader.

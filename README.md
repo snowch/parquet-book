@@ -38,7 +38,7 @@ including a headless-browser test of the experiments if Playwright is installed.
 - **Rust, in the pages and in a Codespace.** The `pqlab` commands the pages print have a Run
   button too: the page runs them on the Rust reader compiled to WebAssembly. Rust cannot compile
   inside a web page, so every other Rust command, and every Rust walkthrough step, opens a
-  Codespace, and the repository comes with a dev container for it. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+  Codespace, and the repository comes with a dev container for it. [Open it in GitHub Codespaces](https://codespaces.new/snowch/parquet-book/tree/main?quickstart=1)
   for an editor, the pinned toolchain and every dependency in the browser; `make check`,
   `make problems` and `make serve` then work as they do at a desk. The same configuration
   (`.devcontainer/`) works in any editor that supports dev containers.

@@ -15,7 +15,7 @@ import { KEYS, codeArea } from "./code.js";
 import { fetchText } from "./pyodide.js";
 import { runPython } from "./runner.js";
 
-export const CODESPACES = "https://codespaces.new/snowch/parquet-book?quickstart=1";
+export const CODESPACES = "https://codespaces.new/snowch/parquet-book/tree/main?quickstart=1";
 const BILLING = "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces";
 
 /**
