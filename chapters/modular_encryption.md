@@ -43,10 +43,6 @@ header or page body. The later module lesson follows their byte boundaries.
 same keys. `email` is encrypted with one key and `amount_cents` with another; `order_id` and
 `country` are not encrypted. The files differ in one choice: whether the footer is encrypted too.
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab).
-
 **Footer modes.** A Parquet file starts and ends with its magic, as
 [Anatomy of a Parquet file](#anatomy-of-a-parquet-file) found. Read the first and last four bytes of both files:
 
@@ -208,9 +204,11 @@ module of the chunk from its length prefix:
 
 The footer gives the chunk's place and size, but no statistics: those are in the encrypted copy
 of the column's metadata. The module's length counts the nonce, the ciphertext and the tag, and
-the next module starts where it ends. Set `at` to that byte and run the step again: the second
-module ends exactly where the chunk ends. The first module is the page's header and the second
-the page. Change the column to `amount_cents` and read its first module the same way. Walking
+the next module starts where it ends. In Python, use **Edit** to replace `at = start` with
+`at = 374`, the next offset displayed by the original fixture. Select **Run** and compare
+`the next module starts at byte` with the chunk end on the first line. The second module ends
+at the chunk end. The first module holds the page header and the second holds its body.
+Restore `at = start`, set `columns[3]` in the `chunk` line, and run again to inspect `amount_cents`. Walking
 every module of a chunk is an exercise in the [inspector lab](build-encryption-inspector.html).
 
 Encrypting each page separately keeps what earlier chapters built. A reader with the keys can
@@ -237,14 +235,13 @@ fixture: plaintext-footer.parquet
 fixtures: plaintext-footer.parquet, encrypted-footer.parquet
 ```
 
-Try these:
+The file menu starts on `plaintext-footer.parquet`. In the structure tree, select `email` to
+mark its two modules in the byte view. The tree names each module's length, nonce, ciphertext
+and tag. Below `FileMetaData`, find the nonce and tag for the footer signature.
 
-1. **Select `email`.** Its chunk is the two modules the step read, a page header and a page. The
-   structure view splits each into its length, nonce, ciphertext and tag.
-2. **Find the signature.** In the structure view, after the `FileMetaData`, a nonce and a tag
-   sign the footer.
-3. **Switch to `encrypted-footer.parquet`.** No column can be located. The structure view shows a
-   plaintext `FileCryptoMetaData` and one encrypted module where the `FileMetaData` should be.
+Select `encrypted-footer.parquet` in the file menu. Compare the tree with the first file. The
+keyless reader can identify `FileCryptoMetaData` and the encrypted footer module. The column
+locations are inside that module.
 
 ### What still leaks
 
@@ -445,12 +442,12 @@ The Python step keeps away from one call. pyarrow's metadata for an encrypted co
 `metadata.row_group(0).column(2)`, needs that column's key. Without the key, pyarrow does not
 raise an error: it stops the whole Python process, and in the page that stops every step. A
 reader with keys passes decryption properties from `pyarrow.parquet.encryption`; the
-[encryption notes and sources](modular-encryption-notes.html) link to pyarrow's documentation. Ask for the other encrypted column,
-`amount_cents`, instead of `email`: both libraries fail on it as they did on `email`.
+[encryption notes and sources](modular-encryption-notes.html) link to pyarrow's documentation.
+To compare errors safely, open this example's Python editor. Replace `["email"]` with
+`["amount_cents"]` in the `for columns` line. Select **Run** and read the reason on the
+`read ['amount_cents']` line. This edits the table-read request and leaves the metadata calls intact.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encryption_with_a_library
@@ -509,8 +506,9 @@ without writing a program.
 Three, in `exercises/python/modular_encryption.py`, or in Rust in
 `exercises/src/modular_encryption.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: modular_encryption

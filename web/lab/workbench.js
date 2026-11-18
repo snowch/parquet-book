@@ -13,9 +13,9 @@
 import { loadDrafts, saveDrafts, savedAnswers } from "./answers.js";
 import { KEYS, codeArea } from "./code.js";
 import { fetchText } from "./pyodide.js";
-import { runPython, stopPython } from "./runner.js";
+import { runPython } from "./runner.js";
 
-export const CODESPACES = "https://codespaces.new/snowch/parquet-book?quickstart=1";
+export const CODESPACES = "https://codespaces.new/snowch/parquet-book/tree/main?quickstart=1";
 const BILLING = "https://docs.github.com/en/billing/concepts/product-billing/github-codespaces";
 
 /**
@@ -35,97 +35,122 @@ export async function mountWorkbench(el) {
   const file = `exercises/python/${chapter}.py`;
   const stub = await fetchText(new URL(`py/exercises/${chapter}.py`, import.meta.url));
   el.innerHTML = `
-    <div class="lab-head"><span class="lab-title">Solve them here, in Python</span>
-      <span class="lab-note"><code>${escape(file)}</code>, kept in this browser as you type</span></div>
+    <p class="workbench-note" id="keys-${escape(chapter)}">${escape(KEYS)}</p>
     <div class="workbench-bar">
       <button type="button" class="primary" data-act="run">Run the tests</button>
       <button type="button" data-act="stop" hidden>Stop</button>
       <button type="button" data-act="restore" hidden>Restore the stub</button>
       <button type="button" data-act="recover" hidden>Recover saved work</button>
-      <button type="button" data-act="download">Download</button>
+      <button type="button" data-act="download" hidden>Download code</button>
       <span class="status" role="status"></span>
     </div>
-    <ol class="results" aria-label="Test results"></ol>
-    <details class="output" hidden><summary>What pytest printed</summary><pre></pre></details>
-    <p class="workbench-note">${escape(KEYS)}. The tests are
-      <code>exercises/python/tests/test_${escape(chapter)}.py</code>, run by pytest in your browser.
-      Solving in Rust instead? Open the repository in
-      <a href="${CODESPACES}" target="_blank" rel="noopener">GitHub Codespaces</a>, an editor and the
-      Rust toolchain in your browser, and run
-      <code>cargo test -p exercises --test ${escape(chapter)} -- --ignored</code>. ${CODESPACES_COST}</p>`;
+    <p class="workbench-note save-status" role="status" hidden></p>
+    <p class="workbench-note checked-source" hidden></p>
+    <ul class="results" aria-label="Test results"></ul>
+    <details class="output" hidden><summary>Full test output</summary><pre></pre></details>`;
   const status = el.querySelector(".status");
+  const saveStatus = el.querySelector(".save-status");
+  const checkedSource = el.querySelector(".checked-source");
   const results = el.querySelector(".results");
   const output = el.querySelector(".output");
   const button = (act) => el.querySelector(`[data-act="${act}"]`);
   const drafts = loadDrafts(chapter);
   let previous = drafts.previous;
+  let controller;
+  let checked;
   const asDraft = (text) => text === stub ? null : text;
   const updateControls = () => {
     button("restore").hidden = area.value === stub;
     button("recover").hidden = previous === null || previous === area.value;
+    button("download").hidden = area.value === stub && saveStatus.hidden;
+    checkedSource.hidden = checked === undefined;
+    checkedSource.textContent = checked === undefined ? "" :
+      (checked === stub ? "Results for the starter code." : "Results for your code when you last ran the tests.") +
+      (checked !== area.value ? " The editor has changed. Run the tests again to check the current code." : "");
+  };
+  const saving = (message) => {
+    saveStatus.hidden = !message;
+    saveStatus.textContent = message;
   };
   const area = codeArea(drafts.draft ?? stub, {
     label: `Your answers, ${file}`,
     onRun: () => run(),
     onInput: (text) => {
-      if (!saveDrafts(chapter, { draft: asDraft(text), previous })) {
-        status.textContent = "This browser could not save the current draft.";
-      }
+      saving(saveDrafts(chapter, { draft: asDraft(text), previous }) ? "" :
+        "This browser could not save your draft. Download the code before leaving this page.");
       updateControls();
     },
   });
   area.rows = Math.min(Math.max(stub.split("\n").length, 14), 32);
+  area.setAttribute("aria-describedby", `keys-${chapter}`);
   el.querySelector(".workbench-bar").before(area);
+  if (!drafts.storageReadable) saving("This browser did not let the page read saved drafts.");
   updateControls();
 
   const idle = (text) => {
-    button("run").disabled = false;
+    const stopped = document.activeElement === button("stop");
+    button("run").removeAttribute("aria-disabled");
     button("stop").hidden = true;
+    if (stopped) button("run").focus();
     button("restore").disabled = false;
     button("recover").disabled = false;
     status.textContent = text;
     el.dataset.state = "idle";
+    controller = null;
   };
 
-  function show(result) {
+  function show(result, source) {
+    checked = source;
     const passed = result.tests.filter((t) => t.outcome === "passed").length;
+    const setupError = result.tests.some((t) => t.outcome === "error");
     results.innerHTML = result.tests.map((t) => `
       <li class="${escape(t.outcome)}"><span class="mark" aria-hidden="true">${t.outcome === "passed" ? "✓" : t.outcome === "failed" ? "✗" : "–"}</span>
         <code>${escape(t.name)}</code> <span class="outcome">${escape(t.outcome)}</span>
         ${t.message ? `<pre>${escape(t.message)}</pre>` : ""}</li>`).join("");
     output.hidden = false;
     output.querySelector("pre").textContent = result.output;
+    output.open = !result.tests.length || result.exit > 1;
     el.dataset.passed = passed;
     el.dataset.tests = result.tests.length;
-    idle(result.tests.length
-      ? `${passed} of ${result.tests.length} tests pass, in ${result.seconds} s`
-      : "pytest collected no tests; see what it printed");
+    let message = `${passed} of ${result.tests.length} checks passed.`;
+    if (result.exit === 5) message = "The test runner found no tests. Read the full test output.";
+    else if (result.exit > 1) message = "The test runner could not complete the checks. Read the full test output.";
+    else if (setupError) message += " A check could not finish. Read its error below.";
+    else if (passed < result.tests.length) message += " Read any failed checks below before editing again.";
+    idle(message);
+    updateControls();
   }
 
   function run() {
     if (el.dataset.state === "running") return;
     el.dataset.state = "running";
-    button("run").disabled = true;
+    button("run").setAttribute("aria-disabled", "true");
     button("stop").hidden = false;
     button("restore").disabled = true;
     button("recover").disabled = true;
-    results.innerHTML = "";
-    status.textContent = "Waiting for the page's other Python runs…";
+    controller = new AbortController();
+    status.textContent = "Waiting to run the tests…";
     const argv = ["pytest", `exercises/python/tests/test_${chapter}.py`, "--problems", "-q", "--tb=short"];
-    runPython(argv, { answers: { ...savedAnswers(), [chapter]: area.value }, onStatus: (t) => { status.textContent = t; } })
-      .then(show, (error) => idle(error.message === "Stopped." ? "Stopped." : `The tests could not run: ${error.message}`));
+    const source = area.value;
+    runPython(argv, { answers: { ...savedAnswers(), [chapter]: source }, signal: controller.signal,
+      onStatus: (t) => { status.textContent = t; } })
+      .then((result) => show(result, source),
+        (error) => idle(error.message === "Stopped." ? "Stopped." : `The tests could not run: ${error.message}`));
   }
 
   function switchDraft(text, message) {
     const nextPrevious = asDraft(area.value);
     if (!saveDrafts(chapter, { draft: asDraft(text), previous: nextPrevious })) {
-      status.textContent = "This browser could not save a recovery copy. Your work is still in the editor.";
+      saving("This browser could not save a recovery copy. Your code is still in the editor. Download it before leaving.");
+      updateControls();
       return;
     }
     previous = nextPrevious;
     area.value = text;
     results.innerHTML = "";
     output.hidden = true;
+    checked = undefined;
+    saving("");
     status.textContent = message;
     updateControls();
     area.focus();
@@ -134,7 +159,7 @@ export async function mountWorkbench(el) {
   el.addEventListener("click", (e) => {
     const act = e.target.closest("button[data-act]")?.dataset.act;
     if (act === "run") run();
-    if (act === "stop" && el.dataset.state === "running") stopPython();
+    if (act === "stop") controller?.abort();
     if (act === "restore" && area.value !== stub) {
       if (previous !== null && previous !== area.value &&
           !confirm("Replace the existing recovery copy with the code in the editor and restore the stub?")) return;

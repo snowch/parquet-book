@@ -129,9 +129,6 @@ then resolve the file's columns through a small table schema with a rename and a
 :::
 ::::
 
-In Python, run the step in the page, change it with **Edit**, and run it again. In Rust, open it
-in a Codespace, or run it at a desk with `cargo run -p walkthroughs --bin field_ids_by_hand`.
-
 The footer names each column twice: by the name the writer used, and by its id. The table's
 schema is keyed by id, so the step turns each id into this file's name, and asks the reader's
 engine for those columns. `order_number` is id 1, so it reads the file's `order_id`, although the
@@ -140,11 +137,13 @@ has no column with that id, so every row of the file reads it as null. By name, 
 neither column. A reader that matched names would lose the renamed column's values, and treat it
 as a column that was never written.
 
-Change the id of `channel` to 5 and run it again. `channel` now reads the file's `status`: values
-that were never channels. That is why an id is never reused. The table's metadata records the
-highest id it has assigned, and a new column takes the next one. Then take `country` out of the
-table: the file still holds it, and the step no longer asks for it. Dropping a column changes the
-table's metadata and no file.
+In the Python example above, select **Edit** and change `7: "channel"` to `5: "channel"` in
+`table`. Select **Run**. Read the line starting with `channel (id` to see which file field now
+supplies its values.
+The file calls field `5` `status`, so reusing that ID silently selects the old data.
+
+Remove `4: "country",` from `table` and run again. Compare `field id 4` with the lines showing
+the table's requested fields. The file still holds `country`, while this view no longer asks for it.
 
 Iceberg's other schema changes work the same way. Reordering columns changes only the schema.
 Widening a type, from a 32-bit to a 64-bit integer for example, is allowed where every stored
@@ -177,13 +176,12 @@ file it reads.
 :::
 ::::
 
-Both find the ids the book's reader found, and both read id 1 from the file's `order_id`. Change
-`wanted` to 4 in either, and both read `country`. Change it to 7, and both stop: the file has no
-column with that id, and neither library knows that the table's answer is null.
+Both find the same IDs as the book's reader. The line beginning `id 1` reports that the file
+stores this field as `order_id`. In the Python library example, select **Edit**, set
+`wanted = 4`, then select **Run**. Read which column supplies the values. The libraries
+inspect one file, so a table reader must decide what to return for fields missing from it.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-step. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin field_ids_with_a_library

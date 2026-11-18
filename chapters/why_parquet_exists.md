@@ -61,8 +61,8 @@ the way programs read CSV, a row at a time, through a file that counts the bytes
 :::
 ::::
 
-It read every byte of the file. Each line holds all six columns, and there is no way to reach the
-next line without reading past the fields you do not want, since nothing says where it starts.
+The `read … of … bytes` line shows that the example read every byte. Each line holds all the
+columns. This reader passes over fields it does not need while looking for the start of the next row.
 
 ### The same two columns from Parquet
 
@@ -91,16 +91,19 @@ Now the Parquet file, read with a library, through the same kind of counting fil
 :::
 ::::
 
-The same answer, from a fraction of the file. In Python the first run loads pyarrow into the
-page, which takes a while; in Rust the step needs the `parquet` crate, so it runs in a Codespace
-or at a desk. The two libraries read different amounts. The Rust crate reads the file's last
-bytes, then its footer, then the two columns and nothing else. pyarrow reads a large piece of the
-file's end in its first request, which usually holds the footer and avoids a later request, at the
-price of bytes the query did not need. Reading extra bytes in advance, hoping to avoid another
-request, is **prefetching**. [ch10](#how-readers-read) weighs that trade.
+Compare `amount_cents in the UK` in the two worked results. The total agrees. Compare
+`read … of … bytes` to see how many bytes the Parquet example saves in this case.
 
-The least any Parquet reader can read, worked out by the book's reader from each file's footer,
-beside what a CSV reader reads. In this table, the **trailer** is the small final block that
+The two Parquet libraries read different amounts in these examples. The Rust crate reads the
+trailer, footer and selected columns. pyarrow starts with a larger tail read, which can include
+the footer and avoid another request. Reading extra bytes in advance is **prefetching**.
+[ch10](#how-readers-read) weighs its costs.
+
+The browser version of pyarrow can fetch a different total from the recorded desktop run.
+Check that the UK sales sum agrees. The byte totals depend on the reader's fetch strategy.
+
+The table shows the bytes for the CSV scan and the Parquet byte ranges needed in this example.
+The book's reader finds the latter ranges in each file's footer. The **trailer** is the small final block that
 lets the reader locate the footer. A **row group** is a batch of the table's rows, and a
 **column chunk** holds one column's values for that batch. The table counts the chunks for the
 columns this query needs; the next module shows where these regions sit in the file.
@@ -159,12 +162,13 @@ short run per order and a reader must skip past everything between them. By colu
 column's values sit together, as in a Parquet file, so these neighbouring columns form one run of selected values. This schematic counts runs,
 not storage requests or encoded bytes.
 
-Change `wanted` and run it again. Add columns, and the row layout keeps one run per order until
-every column is wanted; the column layout needs one run for each group of neighbouring columns.
-Then keep a single order, `rows = rows[3:4]`, and the trade reverses: by rows the order is one
-run, and by columns it is a piece of every column. Reading a row back out of columns is called
-*reconstructing* it, and its cost grows with the number of columns. This is the trade Parquet
-makes, and the reason it is not a database format.
+To separate the selected columns, open **Read or run the code** above, then select **Edit** in
+Python. Replace `{"country", "amount_cents"}` on the `wanted` line with
+`{"order_id", "amount_cents"}` and select **Run**. Compare the run counts after `by rows`
+and `by columns`. The dots between the selected columns now split their values into separate runs.
+
+A complete record uses values from every column. In the diagram, follow one order's fields
+across the column layout to see why rebuilding a row requires pieces from each column.
 
 ### Why analytical queries favour columns
 
@@ -178,16 +182,16 @@ WHERE order_date >= '2026-01-04'
 GROUP BY country
 ```
 
-It needs `country`, `amount_cents` and `order_date` across the orders. Real tables have hundreds of columns, and a
-query typically touches a handful. Three things follow from a column layout. The
+It needs `country`, `amount_cents` and `order_date` across the orders. On a wide table, a
+query can touch few columns. Three things follow from a column layout. The
 [CSV/Parquet read comparison](#two-columns-from-a-csv-file) measures the first for its selected columns:
 
 - **Projection.** Selecting the columns the query needs lets a reader avoid the other columns.
   Here that includes `order_date`, which is tested but not returned.
 - **Compression.** A lossless compressor represents bytes more compactly while allowing the
   original bytes to be recovered. A column holds values that often repeat or change slowly: the
-  `country` column above repeats a few codes. Similar values side by side encode and compress far
-  better than interleaved rows ([ch05](#encodings), [ch07](#compression)).
+  `country` column above repeats a few codes. Grouping similar values can improve encoding and
+  compression. [ch05](#encodings) and [ch07](#compression) compare the effects on examples.
 - **Vectorised processing.** The engine applies an operation to a batch of values instead of
   handling one record at a time. A column supplies values of one type for that batch.
 

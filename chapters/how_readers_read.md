@@ -46,11 +46,9 @@ how many connections to use. **Coalescing** merges nearby byte ranges into one r
 including any gap between them. **Concurrency** lets independent requests overlap in time.
 Neither can remove a dependency on metadata that has not arrived yet.
 
-Open **Read or run the code**. In the Python tab, click **Run** to see the starting trace. Then
-click **Edit** to try the changes below. In the Rust tab, click **Open in Codespaces** or run
-`cargo run -p walkthroughs --bin read_with_a_strategy`. The
-[footer-reading walkthrough](trace-footer-requests.html) stops once the footer arrives.
-This trace continues through the indexes and data.
+The [footer-reading example](trace-footer-requests.html) ends when the footer arrives.
+This fixture also has page indexes, so the trace continues through the index and data requests.
+The worked result uses the example's starting settings.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -74,9 +72,13 @@ statistics keep, and an OffsetIndex for each column. Last come the pages, one re
 it ends. The bytes are a small share of the file, and they move in almost no time. The time is
 the latency, paid once per request.
 
-After each change, click **Run** in Python or rerun the `cargo run` command in Rust. The output
-lists individual requests, then gives the total requests, bytes fetched and simulated elapsed
-time in milliseconds.
+`rows matching` lists row positions counted from zero. Order ID `431` is at position `430` in
+this fixture.
+
+To try the same query with a different strategy, open **Read or run the code**. In Python,
+select **Run** with the original code, then select **Edit**. Run after each edit below. Compare
+`requests`, `bytes` and `ms` on the totals line. The individual request lines show what caused
+any change. The reported time comes from the simulation.
 
 - **Read more of the tail.** Find the footer with `SuffixRange()` and `prefetch=8192`
   (`SizeSource::SuffixRange` and `prefetch: 8192` in Rust). The first request brings the trailer,
@@ -109,9 +111,9 @@ connections cannot remove a dependency on metadata that has not arrived.
 
 ### The phases on a timeline
 
-The panel runs the same query with the Rust reader and draws each request in the lane of the
-connection that carried it. Pick a strategy from the list; the list is the rows of the table
-in [Choose a read strategy](choose-a-read-strategy.html).
+The panel selects the page-index strategy automatically and draws its requests by connection.
+Choose a different option under **Strategy** to update the timeline and totals. The options
+match the rows in [Choose a read strategy](choose-a-read-strategy.html).
 
 ```lab
 experiment: scan
@@ -189,15 +191,17 @@ depends on the network:
 ```{include} _generated/scan-networks.md
 ```
 
-On a fast network with high latency, reading the whole file wins even though it moves many times
-the bytes. On a slow link with low latency, the careful plan wins, because moving the extra bytes
-takes longer than the round trips it saves. To reproduce this comparison, open the code in
-[Trace a complete scan](trace-a-complete-scan.html) and pass
-`NetworkModel(latency_us=1000, bandwidth_bytes_per_sec=1_000_000)` (the same fields in Rust's
-`NetworkModel { .. }`) and compare `prefetch=8192` with `prefetch=65536`. Real files are far
-larger than this one, which moves the balance toward the careful plan: nobody reads a gigabyte to
-find one row. Readers therefore merge ranges up to a threshold, and choose the threshold from the
-latency and bandwidth they expect.
+For the simulated networks in the table, compare the elapsed time for a whole-file read and a
+selective read. On the fast link with high latency, the whole-file read avoids round trips. On
+the slower link with low latency, reading fewer bytes wins. The simulation does not measure a
+storage service or your connection.
+
+To reproduce the slower-link case, open the Python example in
+[Trace a complete scan](trace-a-complete-scan.html) and select **Edit**. Set `FooterOptions` to
+`FooterOptions(SuffixRange(), prefetch=8192)`. In the `result = scan(...)` call, replace
+`NetworkModel()` with `NetworkModel(latency_us=1000, bandwidth_bytes_per_sec=1_000_000)`.
+Select **Run**, then change only `prefetch` to `65536` and run again. Compare `bytes` and `ms`
+in the two totals, and check that `rows matching` is unchanged. Which cost dominates now?
 
 ### Only what was fetched
 
@@ -230,7 +234,7 @@ then the takeaways and the understanding check.
 The [complete scan trace](trace-a-complete-scan.html) runs `scan` on `pruning-sorted.parquet`.
 It locates metadata with `read_footer`, chooses ranges with `prune.plan`, and fetches in phases. This section builds the fetching: how ranges merge, how one
 phase is sent, how the store's clock prices it, and how the reader decodes only the pages it
-fetched. The tabs switch every excerpt on the page between the two languages.
+fetched. Choose Python or Rust in an open code section. The same choice applies to the other code sections.
 
 ### Merging ranges
 
@@ -385,9 +389,10 @@ which a dataset scan takes through `ParquetFragmentScanOptions(cache_options=...
 an older build of pyarrow for WebAssembly ([why](#two-pyarrows)), which reads a chunk at a time either way; run the step at a
 desk to see the merged read.
 
-In place of `read_row_groups`, try `pq.read_table(file, filters=[("order_id", "==", 431)])`. The
-statistics skip three row groups, and the fourth is read whole: pyarrow does not use the page
-index to skip pages.
+For a filtered read in Python, select **Edit** and replace the expression after `rows =` with
+`pq.read_table(file, filters=[("order_id", "==", 431)]).num_rows`. Select **Run**. Compare the
+number of rows returned and the byte lengths on the `read` lines. This pyarrow example can use
+the footer statistics to skip row groups. It still reads chunks from the group holding the match.
 
 The crate's `ParquetMetaDataReader` makes no requests of its own. Given the last eight bytes, it
 answers `NeedMoreData` with the size of tail it needs: the footer and its trailer. Given that, it
@@ -398,9 +403,7 @@ crate's asynchronous reader takes the same number through `with_prefetch_hint`, 
 group's ranges to the `object_store` crate's `get_ranges`, which merges ranges that lie close
 together. It needs the crate's `arrow` and `async` features, which this workspace does not build.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin reads_with_a_library
@@ -461,8 +464,9 @@ without writing a program.
 Three, in `exercises/python/how_readers_read.py`, or in Rust in
 `exercises/src/how_readers_read.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: how_readers_read

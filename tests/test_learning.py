@@ -47,12 +47,20 @@ def test_request_choices_cover_footer_without_duplicate_file_bytes():
         assert len(fetched) == case["bytes"]
 
 
-@pytest.mark.parametrize("name", ["byte", "length", "start", "chunk", "requests"])
+@pytest.mark.parametrize("name", ["byte", "length", "start", "chunk"])
 def test_no_javascript_view_keeps_evidence_and_explanations(name):
     rendered = render_learning(name)
     assert 'class="learning-controls" hidden' in rendered
     assert "<details>" in rendered
-    assert "<table>" in rendered or "Reveal the explanation" in rendered
+    assert "Reveal the explanation" in rendered
+
+
+def test_no_javascript_view_keeps_the_initial_trace():
+    rendered = render_learning("requests")
+    assert 'class="learning-controls" hidden' in rendered
+    assert rendered.count('<table class="cards">') == 1
+    assert "HEAD" in rendered
+    assert "Compare other request strategies in the table below." in rendered
 
 
 def test_unknown_check_fails_instead_of_silently_losing_content():

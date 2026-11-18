@@ -22,7 +22,7 @@
 import { Lab } from "./wasm.js";
 import { packageList } from "./pyodide.js";
 import { KEYS, codeArea } from "./code.js";
-import { runPython, stopPython } from "./runner.js";
+import { runPython } from "./runner.js";
 import { CODESPACES, CODESPACES_COST } from "./workbench.js";
 
 /** A duration as the status line shows it: milliseconds under a second. */
@@ -86,7 +86,7 @@ function commands(text) {
 }
 
 /** A command a Codespace runs: the repository's own tools, from its root. */
-const forCodespace = (line) => /^(cargo|make|python3|PYTHONPATH=python) /.test(line);
+const forCodespace = (line) => /^(cargo|make|python3|PYTHONPATH=python)( |$)/.test(line);
 
 // The Rust reader for pqlab commands: its own instance, so the labs' files are untouched, with
 // every fixture loaded under the path a command names it by.
@@ -108,9 +108,9 @@ function rustReader() {
   return rust;
 }
 
-async function runOne({ engine, argv }, onStatus) {
+async function runOne({ engine, argv }, onStatus, signal) {
   if (engine === "python") {
-    const r = await runPython(argv, { onStatus });
+    const r = await runPython(argv, { onStatus, signal });
     return { exit: r.exit, output: r.output };
   }
   onStatus("Loading the Rust reader…");
@@ -138,11 +138,19 @@ function wrap(pre) {
   return box;
 }
 
+function toolbar(box) {
+  const bar = document.createElement("div");
+  bar.className = "run-actions";
+  box.prepend(bar);
+  return bar;
+}
+
 function mountRun(pre, runs) {
   const box = wrap(pre);
+  const actions = toolbar(box);
   const rust = runs.every((r) => r.run.engine === "rust");
   const problems = runs.some((r) => r.run.argv[1]?.startsWith("exercises/python"));
-  const run = button(box, "▶ Run", rust
+  const run = button(actions, "Run", rust
     ? "Run in your browser, on the book's Rust reader compiled to WebAssembly"
     : problems
       ? "Run in your browser, on your answers from this chapter's workbench (or the stub)"
@@ -155,70 +163,86 @@ function mountRun(pre, runs) {
   const status = result.querySelector(".status");
   const output = result.querySelector(".run-output");
   box.dataset.state = "idle";
+  let controller;
 
   run.addEventListener("click", async () => {
     if (box.dataset.state === "running") {
-      stopPython();
+      controller?.abort();
       return;
     }
     box.dataset.state = "running";
-    run.textContent = "■ Stop";
+    if (!rust) {
+      controller = new AbortController();
+      run.textContent = "Stop";
+    } else {
+      run.setAttribute("aria-disabled", "true");
+    }
     result.hidden = false;
+    result.classList.remove("run-error");
     output.textContent = "";
     const started = Date.now();
-    let phase = "Waiting for the page's other Python runs…";
-    const tick = setInterval(() => {
-      status.textContent = `${phase} ${Math.round((Date.now() - started) / 1000)} s`;
-    }, 1000);
-    status.textContent = phase;
+    const onStatus = (text) => { status.textContent = text; };
+    onStatus("Waiting to run…");
     const codes = [];
     try {
       for (const { line, run: how } of runs) {
-        const r = await runOne(how, (t) => { phase = t; });
+        const r = await runOne(how, onStatus, controller?.signal);
         output.textContent += `${runs.length > 1 ? `$ ${line}\n` : ""}${r.output}${runs.length > 1 ? "\n" : ""}`;
         codes.push(r.exit);
       }
       const failed = codes.find((c) => c !== 0);
-      status.textContent = `Ran in your browser in ${took(Date.now() - started)}` +
-        (rust ? ", on the Rust reader compiled to WebAssembly" : "") +
-        (failed === undefined ? "" : `; exit status ${failed}`);
+      if (failed === undefined) {
+        onStatus(`Finished in ${took(Date.now() - started)}${rust ? " on the Rust reader compiled to WebAssembly" : ""}.`);
+      } else if (problems && failed === 1) {
+        onStatus("The tests ran. Read the failed checks below.");
+      } else {
+        result.classList.add("run-error");
+        onStatus(`The command reported exit status ${failed}. Read the output below.`);
+      }
       box.dataset.exit = String(failed ?? 0);
     } catch (error) {
-      status.textContent = error.message === "Stopped." ? "Stopped." : `Could not run: ${error.message}`;
+      if (error.message !== "Stopped.") result.classList.add("run-error");
+      onStatus(error.message === "Stopped." ? "Stopped." : `Could not run: ${error.message}`);
       box.dataset.exit = "";
     } finally {
-      clearInterval(tick);
       box.dataset.state = "idle";
-      run.textContent = "▶ Run";
+      controller = null;
+      run.textContent = "Run";
+      run.removeAttribute("aria-disabled");
     }
   });
 }
 
 function mountCodespace(pre, lines) {
   const box = wrap(pre);
+  const actions = toolbar(box);
   box.dataset.codespace = "true";
-  const open = button(box, "Open in Codespaces",
+  const open = button(actions, "Open in Codespaces",
     "Rust needs a compiler, which a page does not have. A Codespace is the repository with its " +
     "toolchains and an editor, in your browser: edit the code and run this there. It runs on your own " +
     "GitHub account, within its free monthly allowance or at GitHub's charges past it.");
   const note = document.createElement("p");
   note.className = "run-note";
+  note.setAttribute("role", "status");
   note.hidden = true;
-  box.after(note);
+  const command = document.createElement("pre");
+  command.textContent = lines.join("\n");
+  command.hidden = true;
+  box.after(note, command);
   open.addEventListener("click", async () => {
-    const text = lines.join("\n");
+    const copying = navigator.clipboard?.writeText(command.textContent);
+    window.open(CODESPACES, "_blank", "noopener");
     let copied = false;
     try {
-      await navigator.clipboard.writeText(text);
-      copied = true;
+      await copying;
+      copied = Boolean(copying);
     } catch {}
-    window.open(CODESPACES, "_blank", "noopener");
     note.hidden = false;
-    const then = "edit any file first to run it on your change. The first start takes a few minutes, " +
-      "while it installs the toolchains.";
+    const then = "Edit the source file there if you want to run a changed example. The first start installs the toolchains.";
     note.innerHTML = (copied
-      ? `Copied the command. When the Codespace has started, paste it into its terminal; ${then}`
-      : `When the Codespace has started, run this command in its terminal; ${then}`) + ` ${CODESPACES_COST}`;
+      ? `Command copied. Paste it into the Codespace terminal. ${then}`
+      : `Copy the command below and run it in the Codespace terminal. ${then}`) + ` ${CODESPACES_COST}`;
+    command.hidden = copied;
   });
 }
 
@@ -246,18 +270,31 @@ function mountWalkthroughs(root) {
     }
     const original = pre.textContent.replace(/\n$/, "");
     const box = wrap(pre);
+    const actions = toolbar(box);
     box.dataset.state = "idle";
-    const run = button(box, "▶ Run", "Run in your browser, with Python under Pyodide, from the repository's root");
-    const change = button(box, "Edit", "Change the code, then run it");
+    const run = button(actions, "Run", "Run the Python code shown here");
+    const change = button(actions, "Edit", "Change the Python code, then run it");
     change.classList.add("edit-button");
     let area = null;
+    const draftKey = `walkthrough-draft:${file}`;
     let draft = original;
+    let storageReadable = true;
+    try {
+      draft = localStorage.getItem(draftKey) ?? original;
+    } catch {
+      storageReadable = false;
+    }
+    let controller;
     let runs = 0;
     const keys = document.createElement("p");
     keys.className = "run-note editor-keys";
     keys.id = `walkthrough-keys-${index + 1}`;
     keys.textContent = KEYS;
     keys.hidden = true;
+    const saveStatus = document.createElement("p");
+    saveStatus.className = "run-note draft-status";
+    saveStatus.setAttribute("role", "status");
+    saveStatus.hidden = true;
     const activity = document.createElement("div");
     activity.className = "run-result walkthrough-activity";
     activity.innerHTML = '<div class="run-head" role="status"></div><pre class="run-diagnostic"></pre>';
@@ -267,7 +304,7 @@ function mountWalkthroughs(root) {
     result.className = "run-result";
     result.hidden = true;
     result.innerHTML = '<div class="run-head"><span class="status" role="status"></span></div><pre class="run-output"></pre>';
-    box.before(keys);
+    box.before(keys, saveStatus);
     box.after(activity, result);
     const status = result.querySelector(".status");
     const output = result.querySelector(".run-output");
@@ -278,16 +315,15 @@ function mountWalkthroughs(root) {
       const version = source === original ? "the book's code" : "your edited version";
       const label = `Run ${++runs} (${version})`;
       box.dataset.state = "running";
-      run.setAttribute("aria-disabled", "true");
+      controller = new AbortController();
+      run.textContent = "Stop";
       activity.classList.remove("run-error");
       diagnostic.textContent = "";
       const started = Date.now();
-      let phase = "Waiting for the page's other Python runs…";
-      const progress = () => {
-        feedback.textContent = `${label} · ${phase} ${Math.round((Date.now() - started) / 1000)} s`;
+      const progress = (phase) => {
+        feedback.textContent = `${label} · ${phase}`;
       };
-      const tick = setInterval(progress, 1000);
-      progress();
+      progress("Waiting to run…");
       const fail = (message, exit = "") => {
         activity.classList.add("run-error");
         feedback.textContent = `${label} failed.`;
@@ -295,7 +331,7 @@ function mountWalkthroughs(root) {
         box.dataset.exit = exit;
       };
       try {
-        const r = await runPython(["python", source, file], { onStatus: (t) => { phase = t; progress(); } });
+        const r = await runPython(["python", source, file], { onStatus: progress, signal: controller.signal });
         if (r.exit === 0) {
           feedback.textContent = "";
           output.textContent = r.output;
@@ -313,26 +349,45 @@ function mountWalkthroughs(root) {
           fail(error.message);
         }
       } finally {
-        clearInterval(tick);
-        run.removeAttribute("aria-disabled");
         box.dataset.state = "idle";
+        controller = null;
+        run.textContent = "Run";
       }
     };
-    run.addEventListener("click", go);
+    const editLabel = () => draft === original ? "Edit" : "Return to edit";
+    const save = (text) => {
+      draft = text;
+      try {
+        if (text === original) localStorage.removeItem(draftKey);
+        else localStorage.setItem(draftKey, text);
+        saveStatus.hidden = true;
+      } catch {
+        saveStatus.textContent = "This browser could not save your edit. Copy the code before leaving this page.";
+        saveStatus.hidden = false;
+      }
+    };
+    change.textContent = editLabel();
+    run.addEventListener("click", () => {
+      if (controller) controller.abort();
+      else go();
+    });
     change.addEventListener("click", () => {
       if (area) {
-        draft = area.value;
         area.replaceWith(pre);
         area = null;
         keys.hidden = true;
-        change.textContent = draft === original ? "Edit" : "Return to edit";
+        change.textContent = editLabel();
         return;
       }
-      area = codeArea(draft, { label: `Your version of ${file}`, onRun: go });
+      area = codeArea(draft, { label: `Your version of ${file}`, onRun: go, onInput: save });
       area.rows = original.split("\n").length + 1;
       area.setAttribute("aria-describedby", keys.id);
       pre.replaceWith(area);
       keys.hidden = false;
+      if (!storageReadable && saveStatus.hidden) {
+        saveStatus.textContent = "This browser did not let the page read earlier edits.";
+        saveStatus.hidden = false;
+      }
       area.focus();
       change.textContent = "Show original";
     });

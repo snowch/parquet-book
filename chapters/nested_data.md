@@ -250,8 +250,9 @@ Count the levels in each stream: one per *slot*. There are more slots than order
 discounts. The levels say which slot starts a record, which holds a discount, and which holds
 nothing.
 
-Change `column` to 2, which is `tags[]`, and its levels need fewer bits. Change it to 1, which is
-`email`: nothing on its path repeats, so the page stores no repetition levels at all.
+In Python, use **Edit** above to change `column = 4` to `column = 2` for `tags[]`. Select
+**Run** and compare the `rep` and `def` lines with the original. Then set `column = 1` for
+`email` and run again. `rep` has no stored stream because each row holds at most one address.
 
 ### How the levels are stored
 
@@ -492,9 +493,7 @@ the file stored no value at all. The crate prints the repetition and definition 
 reader decoded in the [tags walkthrough](#four-orders-every-way-of-being-missing). Its values hold only the present strings, and it counts
 records where the repetition level is zero.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin levels_with_a_library
@@ -559,8 +558,9 @@ without writing a program.
 Three, in `exercises/python/nested_data.py`, or in Rust in
 `exercises/src/nested_data.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: nested_data

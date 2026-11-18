@@ -41,10 +41,8 @@ a meaning, such as a date or a decimal. The **schema** records the fields, their
 they nest. We first follow its structure; the next lesson interprets the values.
 
 `types.parquet` holds three orders, with a column for each physical type and the common logical
-types on top of them. [Appendix B](#the-fixtures) says how pyarrow wrote it. Each step shows its worked result before its optional code. You can read the results as they
-stand, or open **Read or run the code** to explore them. Each step finds the footer as [ch02](#anatomy-of-a-parquet-file) did, and hands its
-bytes to the book's reader. It decodes the footer's numbered fields; the optional build lab in
-ch02 explains their binary representation.
+types on top of them. See [how the fixture was written](#the-fixtures). The example locates the footer using
+[the earlier byte calculation](#locate-the-footer), then decodes its schema.
 
 **The schema as stored.** The footer's second field is the schema. Each printed element names
 a field, its repetition and its types, or a group and its count of children.
@@ -83,8 +81,11 @@ the column chunks in every row group follow the same order.
 
 `shipping` is neither a leaf nor the root. It has children and no type: it is a *group*, and the
 elements after it are its children. Nothing in the list says where a group ends. Its count of
-children is the only clue. Change the path to `fixtures/nested.parquet` and run the step again:
-a list is a group too, with a `REPEATED` field inside it.
+children is the only clue.
+
+In the Python example above, use **Edit** to replace `fixtures/types.parquet` with
+`fixtures/nested.parquet`. Select **Run** and find the `tags`, `list` and `element` lines.
+Which group marks `list` as `REPEATED`?
 
 ### Rebuilt as a tree
 
@@ -142,10 +143,12 @@ says:
 
 `order_date`'s bytes are a little-endian `INT32`, and as a number they mean little. Its logical
 type, `DATE`, says the number counts days since 1970-01-01, and then it is a date. `paid_at` is
-the same idea at a finer grain: an `INT64` count of microseconds. `amount` is the odd one out. Its
-integer is read most significant byte first, which is **big-endian**, and it counts hundredths.
-Change `"big"` to `"little"` (`from_be_bytes` to `from_le_bytes` in Rust), and the same bytes are
-a number nobody meant. Only the schema says which reading is right.
+an `INT64` count of microseconds. For `amount`, read the most significant byte first.
+This is **big-endian** order. The resulting integer counts hundredths.
+
+In Python, select **Edit** above and change `"big"` to `"little"` on the `cents` line. Select
+**Run** and compare the `amount` line with the worked result. The hex bytes stay the same,
+while the interpreted integer and amount change.
 
 ### Every column, read two ways
 
@@ -288,12 +291,11 @@ become even numbers, and negative values become odd numbers. A **varint** stores
 a variable number of bytes, using fewer bytes for smaller unsigned values. Thrift combines them
 to keep small signed numbers short.
 
-Open the code for [the tree-rebuilding walkthrough](#schema-level-walkthrough) to damage
-the list. That step writes the root's count of children back to the byte that holds it,
-as the zigzag varint `0x14`. Change it to `0x12`, one child fewer, and run the step again. The
-walk prints a shorter tree without complaint: it never looks at the elements after the root's
-last child. `shipping` and its children now belong to no one, and the reader's `build` refuses the
-file for that reason.
+In [the tree-rebuilding example](#schema-level-walkthrough), open **Read or run the code** and
+select **Edit** in Python. Replace `0x14` with `0x12`, then select **Run**. The edit changes a
+length byte in the example's in-memory copy. Compare the printed tree and the reader's last line.
+The simple walk stops before `shipping`. The reader reports the remaining elements because the
+root now claims one fewer child.
 
 ### Schema elements
 
@@ -516,15 +518,16 @@ path, physical type and maximum levels for `types.parquet`, as in the
 :::
 ::::
 
-The two part over the statistics. pyarrow reads each minimum through its logical type and hands
-you a `datetime.date` and a `Decimal`. The crate, without its Arrow feature, hands you stored bytes,
-as in the [physical/logical comparison](#stored-values-and-their-meaning), and the logical reading is yours to do. The two also name the logical types
-differently: pyarrow's `Int(bitWidth=8, isSigned=true)` is the crate's `INTEGER(8,true)`. pyarrow
-prints `field_id=-1` for a field with no field id, which is every field of this fixture.
+pyarrow interprets each minimum using its logical type. Look for a `datetime.date` on the
+`order_date` line and a `Decimal` on the `amount` line. The browser and desktop print the
+same `paid_at` minimum with different UTC labels.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+The Rust crate in this example returns the stored bytes. The
+[logical-type comparison](#stored-values-and-their-meaning) shows how their annotations give
+them meaning. pyarrow's `Int(bitWidth=8, isSigned=true)` and Rust's `INTEGER(8,true)` both
+describe a signed eight-bit integer. pyarrow prints `field_id=-1` when a field has no ID.
+
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin schema_with_a_library
@@ -601,8 +604,9 @@ Four, in `exercises/python/the_type_system.py`, or in Rust in
 `exercises/src/the_type_system.rs`. The first three have tests that fail until you solve
 them. The fourth has no test.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: the_type_system

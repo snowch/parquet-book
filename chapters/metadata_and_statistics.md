@@ -41,11 +41,9 @@ is the rule for comparing those values. Using the wrong rule can make a reader d
 that a query needs.
 
 `statistics.parquet` holds twelve orders, four to a row group. Each column was chosen for a way
-statistics are misread. [Appendix B](#the-fixtures) says how pyarrow wrote it.
+statistics are misread. See [how the fixture was written](#the-fixtures).
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
+Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
 `decode_file_metadata` from [ch03](#the-type-system).
 
@@ -73,9 +71,9 @@ every row group's maximum is a customer number above `2^31`. Read as signed, the
 are negative, and the maximum falls below the minimum. The minimums are small, so both readings
 agree on them. Nothing in the bytes says which reading is right. Only the annotation does.
 
-Change the column to 2, which is `delta`, a signed 8-bit integer stored in an `INT32`. Now the
-signed reading is the right one, and the unsigned reading turns its negative minimums into
-numbers above `2^31`.
+In the Python example for `customer_id`, select **Edit** and set `column = 2` for `delta`.
+Select **Run** and compare the `unsigned` and `signed` ranges. The schema declares `delta`
+signed. The unsigned interpretation makes a negative minimum look large and positive.
 
 **Bytes in order.** Strings are compared byte by byte, as UTF-8 writes them. Sort four of the
 fixture's cities by their bytes, then by the same bytes read as signed numbers:
@@ -247,13 +245,14 @@ Two kinds of chunk give nothing. `coupon` in row group 1 has no minimum and no m
 null count says why: every value is null. `note` has no statistics at all, because the writer was
 told not to keep them.
 
-Set `old_writer` to true (`True` in Python). The step then deletes `min_value` and `max_value`, and keeps only the
-deprecated `min` and `max`, as a writer from before the newer fields would have. The reader still
-accepts `order_id`, `delta` and `temp_c`. `customer_id` and the strings have nothing left, because
-pyarrow wrote no deprecated fields for them. The reader refuses `amount`, although pyarrow wrote
-both pairs for it, and the deprecated-fields section explains why. Then set `old_writer`
-back, and make `type_order` false, as if the footer had no `column_orders`: every chunk with
-statistics is refused.
+In Python, select **Edit** above and set `old_writer = True`. Select **Run**. The example
+removes `min_value` and `max_value` in memory to model a footer with only the older fields.
+Read the lines for `order_id`, `customer_id` and `amount`. Which still has a usable range,
+and why does the reader refuse each of the other two?
+
+Set `old_writer = False`, then replace the expression after `type_order =` with `False`.
+Run again and read the reasons after `refused`. This isolates the effect of missing sort-order
+information while keeping the stored statistics.
 
 Statistics are optional. Historical writer defects can require additional reader safeguards; this teaching reader does not model every writer-specific exception.
 
@@ -478,9 +477,7 @@ an unsigned column, and applying the column order is left to you. It also says e
 and that none came from the deprecated fields, although pyarrow wrote those too: where both pairs
 are present, the crate reads `min_value` and `max_value`.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin statistics_with_a_library
@@ -544,8 +541,9 @@ Three, in `exercises/python/metadata_and_statistics.py`, or in Rust in
 `exercises/src/metadata_and_statistics.rs`. The first two have tests. The third has
 none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: metadata_and_statistics

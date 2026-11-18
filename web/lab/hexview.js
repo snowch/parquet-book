@@ -6,6 +6,7 @@
 // the footer length, that is because the Rust reader said those are the footer-length bytes.
 
 const ROW = 16;
+let grids = 0;
 
 export class HexView {
   constructor(container, { onSelect } = {}) {
@@ -13,6 +14,7 @@ export class HexView {
     this.el.className = "hex";
     this.el.setAttribute("role", "grid");
     this.el.setAttribute("aria-label", "File bytes");
+    this.gridId = `file-bytes-${++grids}`;
     container.append(this.el);
     this.onSelect = onSelect || (() => {});
     this.bytes = new Uint8Array();
@@ -39,26 +41,28 @@ export class HexView {
       let hex = "", ascii = "";
       for (let i = row; i < row + ROW; i++) {
         if (i >= bytes.length) {
-          hex += '<span class="pad">  </span>';
+          hex += '<span class="pad" aria-hidden="true">  </span>';
           continue;
         }
         const b = bytes[i];
         const cls = kinds[i] ? ` ${kinds[i]}` : "";
-        const t = titles[i] ? ` title="${titles[i]} · offset ${i}"` : ` title="offset ${i}"`;
-        hex += `<span class="b${cls}" data-o="${i}"${t}>${b.toString(16).padStart(2, "0")}</span>`;
+        const label = titles[i] ? `${titles[i]}, offset ${i}` : `offset ${i}`;
+        const value = b.toString(16).padStart(2, "0");
+        hex += `<span class="b${cls}" id="${this.gridId}-${i}" data-o="${i}" role="gridcell" title="${escapeHtml(label)}" aria-label="${escapeHtml(`Byte ${value}, ${label}`)}">${value}</span>`;
         const ch = b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : "·";
         ascii += `<span class="a${cls}" data-o="${i}">${escapeHtml(ch)}</span>`;
-        if ((i - row) === 7) hex += '<span class="gap"></span>';
+        if ((i - row) === 7) hex += '<span class="gap" aria-hidden="true"></span>';
       }
       rows.push(
-        `<div class="row"><span class="off" title="0x${row.toString(16)}">${String(row).padStart(6, " ")}</span>` +
-        `<span class="hexcol">${hex}</span><span class="asc">${ascii}</span></div>`);
+        `<div class="row" role="row"><span class="off" aria-hidden="true" title="0x${row.toString(16)}">${String(row).padStart(6, " ")}</span>` +
+        `<span class="hexcol" role="presentation">${hex}</span><span class="asc" aria-hidden="true">${ascii}</span></div>`);
     }
     this.el.innerHTML = rows.join("");
     this.cells = Array.from(this.el.querySelectorAll(".b"));
     this.chars = Array.from(this.el.querySelectorAll(".a"));
     this.el.tabIndex = 0;
     if (this.selection) this.#paintSelection();
+    else this.el.removeAttribute("aria-activedescendant");
   }
 
   // Dim every byte outside `spans`: the bytes the reader never asked the store for.
@@ -97,11 +101,16 @@ export class HexView {
   }
 
   #paintSelection() {
-    for (const c of this.el.querySelectorAll(".sel")) c.classList.remove("sel");
+    for (const c of this.el.querySelectorAll(".sel")) {
+      c.classList.remove("sel");
+      c.removeAttribute("aria-selected");
+    }
     if (!this.selection) return;
     const [a, b] = this.selection;
+    if (this.cells[a]) this.el.setAttribute("aria-activedescendant", this.cells[a].id);
     for (let i = a; i < Math.min(b, this.cells.length); i++) {
       this.cells[i].classList.add("sel");
+      this.cells[i].setAttribute("aria-selected", "true");
       this.chars[i].classList.add("sel");
     }
   }
@@ -120,11 +129,12 @@ export class HexView {
   }
 
   #key(e) {
-    if (!this.selection) return;
     const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -ROW, ArrowDown: ROW }[e.key];
-    if (step === undefined) return;
+    if (!this.bytes.length || (step === undefined && !["Home", "End"].includes(e.key))) return;
     e.preventDefault();
-    const o = Math.max(0, Math.min(this.bytes.length - 1, this.selection[0] + step));
+    const next = e.key === "Home" ? 0 : e.key === "End" ? this.bytes.length - 1
+      : this.selection ? this.selection[0] + step : 0;
+    const o = Math.max(0, Math.min(this.bytes.length - 1, next));
     this.select(o);
     this.highlight(null);
     const cell = this.cells[o];

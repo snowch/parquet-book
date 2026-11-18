@@ -22,21 +22,24 @@ export class Inspector {
     container.append(this.el);
     this.onEdit = onEdit || (() => {});
     this.onRestore = onRestore || (() => {});
-    this.el.innerHTML = '<p class="hint">Select a byte in the byte view. Shift-click to select a range.</p>';
+    this.clear();
     this.el.addEventListener("submit", (e) => {
       e.preventDefault();
       const input = this.el.querySelector("input[name=byte]");
-      const value = parseInt(input.value, 16);
-      if (Number.isNaN(value) || value < 0 || value > 255) {
-        input.setCustomValidity("Two hex digits, 00 to ff");
-        input.reportValidity();
-        return;
-      }
-      this.onEdit(this.offset, value);
+      if (!input.reportValidity()) return;
+      this.onEdit(this.offset, parseInt(input.value, 16));
+      this.el.querySelector("input[name=byte]")?.focus();
     });
     this.el.addEventListener("click", (e) => {
-      if (e.target.closest(".restore")) this.onRestore();
+      if (e.target.closest(".restore")) {
+        this.onRestore();
+        this.el.querySelector("input[name=byte]")?.focus();
+      }
     });
+  }
+
+  clear() {
+    this.el.innerHTML = '<p class="hint">Select a byte in the byte view. Use the arrow keys when the byte view has focus. Hold Shift to select a range with the mouse.</p>';
   }
 
   show({ selection, info, path, bytes, edited }) {
@@ -73,9 +76,10 @@ export class Inspector {
     this.el.innerHTML =
       (where ? `<p class="where">${where}</p>` : "") +
       `<table>${rows.join("")}</table>` +
-      `<form class="edit"><label>Change byte ${fmt(a)} to <input name="byte" size="2" maxlength="2" ` +
-      `value="${info && info.ok ? info.hex : ""}" spellcheck="false" autocomplete="off"></label> ` +
-      `<button type="submit">Apply</button>` +
+      `<form class="edit"><label>Hex for byte ${fmt(a)} <input name="byte" size="2" maxlength="2" ` +
+      `value="${info && info.ok ? info.hex : ""}" pattern="[0-9A-Fa-f]{2}" required ` +
+      `title="Enter two hex digits from 00 to ff" spellcheck="false" autocomplete="off"></label> ` +
+      `<button type="submit">Apply byte edit</button>` +
       (edited ? ` <button type="button" class="restore">Restore the original file</button>` : "") +
       `</form>`;
   }

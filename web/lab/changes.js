@@ -23,19 +23,20 @@ export async function mountChanges(root, lab, files, initial, config) {
   form.innerHTML = `
     <div class="row"><label>Snapshot <select name="snapshot">${snapshots.map((s) =>
       `<option${s === (config.snapshot || "after-a-day") ? " selected" : ""}>${escapeHtml(s)}</option>`).join("")}</select></label>
-      <label>Find order <input name="key" type="number" min="0" max="99999" value="300" aria-label="order_id"></label></div>`;
+      <label>Order ID <input name="key" type="number" min="0" max="99999" value="300" required></label></div>`;
   root.append(form);
   const grid = document.createElement("div");
   grid.className = "changes-grid";
   grid.innerHTML = `
-    <section class="panel c-answer"><h4>The answer</h4><div class="c-answer-body"></div></section>
+    <section class="panel c-answer"><h4>Lookup result and simulated cost</h4><div class="c-answer-body"></div></section>
     <section class="panel c-time"><h4>Requests over time, by connection</h4><div class="timeline"></div></section>`;
   root.append(grid);
   const $ = (k) => grid.querySelector(k);
 
   const run = () => {
     const f = form.elements;
-    const r = lab.changes(ids, f.snapshot.value, Math.max(0, Number(f.key.value) || 0));
+    if (!f.key.checkValidity()) return;
+    const r = lab.changes(ids, f.snapshot.value, Number(f.key.value));
     root.dataset.state = r.ok ? "ok" : "error";
     if (!r.ok) {
       $(".c-answer-body").innerHTML = `<p class="lab-error">${escapeHtml(r.error)}</p>`;
@@ -50,7 +51,7 @@ export async function mountChanges(root, lab, files, initial, config) {
     const found = r.row.length ? `Order ${fmt(r.key)} is in ${where}.`
       : r.deleted_by ? `Order ${fmt(r.key)} is in ${where}, but <code>${escapeHtml(r.deleted_by)}</code> deletes it.`
         : `No file holds order ${fmt(r.key)}.`;
-    $(".c-answer-body").innerHTML = `<p class="note">${found}</p>` +
+    $(".c-answer-body").innerHTML = `<p class="note" role="status">${found}</p>` +
       `<dl class="scan-costs"><dt>This table</dt><dd>${ms(t.elapsed_us)} <small>${fmt(t.dependency_phases)} dependency phases, ${fmt(t.requests)} requests, ${fmt(t.bytes_fetched)} bytes</small></dd>` +
       `<dt>A key-value store</dt><dd>${ms(r.key_value.elapsed_us)} <small>1 request, ${fmt(r.key_value.bytes)} bytes</small></dd></dl>`;
     drawTimeline($(".timeline"), r);

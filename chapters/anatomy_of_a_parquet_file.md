@@ -58,8 +58,8 @@ are a way of displaying stored values; the file format decides what those values
 ### Read the bytes yourself
 
 A **fixture** is a known input file used in examples and tests. `tiny.parquet` is a real Parquet
-fixture written by pyarrow: four orders from a sales table, and
-[Appendix B](#the-fixtures) says exactly how it was written. The results below show what its
+fixture written by pyarrow. It contains four orders from a sales table.
+See [how the fixture was written](#the-fixtures). The results below show what its
 first and last bytes reveal. Open **Read or run the code** to inspect or change an example;
 [Appendix A](#running-the-lab) explains how to run Python and Rust.
 
@@ -214,7 +214,8 @@ The footer occupies the span we located, immediately before the trailer. Its byt
 fields that a reader decodes. The **schema** describes the column names, types and structure.
 [The type system](#the-type-system) explores those types; the [footer-reader implementation](anatomy_of_a_parquet_file.md#building-it) explains the footer’s binary encoding.
 
-**Break it.** Change one byte of the length and do the same arithmetic:
+**A damaged footer length.** The example changes one length byte in an in-memory copy of
+`tiny.parquet`. Its output shows the new length and the offset that the same subtraction gives.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -235,8 +236,10 @@ The subtraction still produces a number, but that number is not a valid offset: 
 file. A reader has to check what it reads before it trusts it. The
 [request-trace example](#open-a-file-with-the-books-reader) shows the book's reader refusing this damage.
 
-Try changes of your own with **Edit**: read the first eight bytes, print the whole footer, or
-open another fixture, such as `fixtures/multiple-row-groups.parquet`.
+To find the footer of a second file, open **Read or run the code** below the result that starts
+`the footer starts at byte`. In Python, select **Edit**, replace `fixtures/tiny.parquet` with
+`fixtures/multiple-row-groups.parquet` in the first line, then select **Run**. Compare the
+reported footer start and length with the original. The calculation works for both files.
 
 ```transfer
 footer
@@ -278,10 +281,10 @@ fixed number of requests.
 
 ### The whole file
 
-The footer is a map. This panel draws what it describes: every region of the file, as the reader
-parsed it. Click a region in the structure view to see its bytes, or click a byte to see which
-structure it belongs to. The dim bytes are the ones the reader never asked for when it opens
-only the footer.
+The panel opens `tiny.parquet` and draws the regions the reader found. Select a region under
+**Structure, as the reader parsed it** to highlight its bytes. You can also focus **File bytes**
+and use the arrow keys to inspect individual bytes. The legend marks data the reader did
+not request when it opened the footer.
 
 ```lab
 experiment: anatomy
@@ -297,13 +300,13 @@ Read the structure view from the top, and the file's design appears:
 - **A row group** is a horizontal slice of the table: some number of rows, all columns. A writer
   arranges each group by column before writing it; how much it buffers depends on the writer.
   Row groups are also the unit a reader can skip or hand to another worker. `tiny.parquet` has one row
-  group. Switch the panel to `multiple-row-groups.parquet` to see several.
+  group. Select `multiple-row-groups.parquet` in the **File** menu to see several.
 - **A column chunk** is one column's data within one row group. Its pages occupy a contiguous region,
   so a reader can fetch the chunk without fetching the other columns.
 - **A page** is the unit a column chunk is divided into for encoding and compression. Each page
-  starts with a header that says how long its body is. In `tiny.parquet` each column chunk is a
-  single page, and the body holds the four values in plain little-endian form. Select the first
-  value byte of `order_id`'s page body and read it as a 64-bit integer.
+  starts with a header that says how long its body is. Select `tiny.parquet` again. Expand
+  **Row group 0**, `order_id` and its data page in the tree, then select **Body**. Read
+  `i64, little-endian` under **Inspector** to interpret the first value in that page.
 - **The footer** is a `FileMetaData` structure: the schema, the row count, and for every column
   chunk its offsets, sizes, encodings, compression and statistics.
 
@@ -363,12 +366,15 @@ A `HEAD` can therefore show no file bytes returned while still costing a round t
 :::
 ::::
 
-Three requests: the size, then the trailer, then the footer, each waiting for the one before.
-Every byte the reader did not ask for is a byte it never saw, and that is most of the file: it has
-learned the schema, the row count and where every column lives without reading the data pages.
+The trace shows three requests: the size, then the trailer, then the footer. Each waits for
+the previous request. The footer gives the reader the schema, the row count and the column
+locations. Its requests stop at the footer.
 The [footer-map lesson](#use-the-footer-as-a-map) interprets that map;
-[tail-read strategies](#choose-a-tail-strategy) shorten the request chain. You can also
-open the code and try the reader’s size-source and prefetch options yourself.
+[tail-read strategies](#choose-a-tail-strategy) shorten the request chain. To explore the same
+trade-off in code, open **Read or run the code** above. In Python, select **Edit** and replace
+`Head()` with `SuffixRange()` in `FooterOptions`. Select **Run** and check whether `HEAD`
+disappears. Then change `prefetch=8` to `prefetch=512` and run again. Count the `GET` lines
+and read the number before `bytes by` to see what the larger request returns.
 
 The reader also checks what it reads before it trusts it. Hand it the damaged-length case from
 the [footer-location example](#locate-the-footer):
@@ -388,8 +394,10 @@ the [footer-location example](#locate-the-footer):
 :::
 ::::
 
-It stops after the trailer, before asking the store for a byte of a footer that cannot exist, and
-says why. Damage the magic instead, `data[-1]`, and it refuses for a different reason.
+It stops after the trailer and explains why the footer cannot exist. To see a different refusal,
+open this example’s code and select **Edit** in Python. Change `data[-7] = 0xFF` to
+`data[-1] = 0xFF`, then select **Run**. Read the reason after `the reader refuses`. The example
+handles both refusals and prints them as results.
 
 ### Why the reader made the requests it did
 
@@ -430,9 +438,9 @@ shows this chain on `tiny.parquet`. Here we compare ways to shorten it:
 - **Read more than the trailer.** If the first read is large enough to hold the footer too, the
   third request never happens. The cost is bytes the reader may not use.
 
-Try the size-source and prefetch options below. **Prefetching** means reading more of the file’s
-tail than the trailer alone, in case the footer fits inside that first read. A suffix range
-returns the file size with the bytes, so it does not need a preceding `HEAD`.
+**Prefetching** means reading more of the file’s tail than the trailer alone, in case the footer
+fits inside that first read. A suffix range returns the file size with the bytes, so it does not
+need a preceding `HEAD`.
 
 ```learning
 requests
@@ -444,8 +452,9 @@ computed by the same simulated reader:
 ```{include} _generated/footer-strategies.md
 ```
 
-The last row for each file is the pattern most production readers use: one suffix read of a few
-tens of kilobytes, on the bet that the footer fits. For these files it does. A footer grows with
+The last row for each file uses one large suffix read in case the whole footer fits. It does
+for these files. Some readers use large tail reads, with sizes that depend on their settings.
+A footer grows with
 every row group, and [ch11](#writing-parquet-well) writes one table with small row groups and
 shows its footer many times larger than with one row group.
 
@@ -705,12 +714,8 @@ The library reads `tiny.parquet`. Compare its footer length with the
 against pyarrow's manifest. From here on a chapter that builds something ends by asking a library
 the same question, so that you know where each fact lives in the tools you already use.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. The page's pyarrow is an older version than the desk's, for a reason
-[Appendix A](#two-pyarrows) gives; for this step the two print the same. In Rust the step needs
-the `parquet` crate, which lives in `walkthroughs/libraries`, a
-workspace of its own so that the book's reader keeps no dependencies. Run it in a Codespace, or at
-a desk:
+The browser and desktop versions of pyarrow report the same facts for this fixture.
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin footer_with_a_library
@@ -778,8 +783,9 @@ Four, in `exercises/python/anatomy_of_a_parquet_file.py`, or in Rust in
 them. Each test compares your function with the book's reader or with pyarrow, across
 many cases, so a hard-coded answer does not pass. The fourth has no test, and says why.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: anatomy_of_a_parquet_file

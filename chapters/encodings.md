@@ -45,11 +45,9 @@ by its position in that list. That position is a **dictionary index**, counted f
 
 `encodings.parquet` holds forty orders, and each column was written with the encoding that suits
 its values. `dictionary.parquet` holds twelve orders written with the default, dictionary
-encoding. [Appendix B](#the-fixtures) says how pyarrow wrote each.
+encoding. See [how the fixtures were written](#the-fixtures).
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
+Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, and the reader's `walk_pages` finds a column chunk's
 pages as it did in [ch04](#nested-data). Every column in both files is required, so a data page's
 body holds values and no levels.
@@ -78,8 +76,9 @@ a bit width, then a run of the RLE / bit-packing hybrid from [ch04](#nested-data
 position of each row's country in the dictionary. Four entries need two bits each, so the whole
 column's values fit in the few bytes the step printed.
 
-Change `slots` to `8 * (header >> 1)`, the number of slots the run's groups hold, and look at the
-indices after the page's own.
+In Python, select **Edit** above and replace `slots = page.num_values` with
+`slots = 8 * (header >> 1)`. Select **Run** and compare the `indices` line. The longer run
+includes padding after the last stored value.
 
 ### Dictionary encoding
 
@@ -202,11 +201,14 @@ URL shares none, and the deltas after it say that most of the others share all b
 character. The second run is the lengths of what is left of each URL, and the bytes are those
 suffixes, back to back. Only the first URL is stored in full.
 
-Change `name` to `"order_id"`, `"sku"` or `"weight_kg"` and run the step again. `order_id` is the
+In Python, select **Edit** above and replace `name = "url"` with `name = "order_id"`,
+`name = "sku"` or `name = "weight_kg"`. Select **Run** after each change. Read the first line
+for the encoding and the later lines for its decoded values. `order_id` is the
 integer sequence used in the [delta example](#a-first-value-then-differences). `sku`'s strings are all the same length, and its
 lengths take no bytes beyond their header and block. `weight_kg` is a float, split into four
-streams; look at how few different bytes the last stream holds. Then open `dictionary.parquet`
-and ask for `"country"`: compare its dictionary and indices with the
+streams; look at how few different bytes the last stream holds. To switch formats, replace
+`fixtures/encodings.parquet` with `fixtures/dictionary.parquet` in `open(...)` and set
+`name = "country"`. Run again and compare the dictionary and indices with the
 [dictionary walkthrough](#read-the-encodings-yourself).
 
 ```practice
@@ -341,7 +343,8 @@ that many bits. The first deltas the step unpacked are all close to a minute, so
 over the smallest fits in two bits. The page's deltas all fit in the first miniblock, and the
 others hold none: their width bytes are zero.
 
-Change `column` to 0, which is `order_id`. Its values go up by one, so every delta equals the
+In Python, use **Edit** above to set `column = 0`, then select **Run**. Look for `min delta`
+and `widths` in the output for `order_id`. Its values go up by one, so every delta equals the
 smallest. Look at the bit widths, and at how many bytes the page body takes.
 
 
@@ -527,9 +530,7 @@ for a required column that stores none. pyarrow's `read_dictionary` hands back a
 crate's metadata gives the offset of the dictionary page, and its page reader returns that page
 first, then the data page with its count of values.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin encodings_with_a_library
@@ -597,8 +598,9 @@ without writing a program.
 Four, in `exercises/python/encodings.py`, or in Rust in
 `exercises/src/encodings.rs`. The first three have tests. The fourth has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: encodings
