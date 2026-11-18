@@ -35,10 +35,6 @@ read-partition-paths
 dataset writer. The writer split the rows by `country` into one directory per value, and wrote at
 most a hundred rows to a file.
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab).
-
 **List the table.** Walk the directories and print each Parquet file with the directory it sits
 in and its size:
 
@@ -145,7 +141,9 @@ statistics are the same kind [Metadata and statistics](#metadata-and-statistics)
 maximum for each column, copied into the log when the file was written. A reader of the log knows
 each file's range of `order_id` without opening it.
 
-Change `order_id` to `status`, or print `stats["nullCount"]`: the log records every column.
+In the Python log example, select **Edit** and replace `order_id` with `status` in the
+statistics lookup and in its printed label. Select **Run** and compare the ranges on the
+`add` lines. The log has statistics for both fields.
 
 The `UK` files show what the writer's order gives the reader. The dataset writer wrote rows in the
 order it received them, by `order_id`, and started a new file every hundred rows, so the three `UK`
@@ -181,11 +179,15 @@ Every file has its reason. The paths rule out the files outside `country=UK`. Th
 statistics rule out two of the three `UK` files, whose ranges of `order_id` start too high. The
 reader fetches the log, then one file, and the count comes from that file alone.
 
-Change `Discovery.LOG` to `Discovery.LIST_AND_PRUNE` (`Discovery::ListAndPrune` in Rust). The
-reader now lists the keys instead of reading the log, and rules out by path alone, so all three
-`UK` files are read, and the count is the same. With `Discovery.LIST` it reads every file. Then
-change the connections from `4` to `1` and to `8`, and watch the times: whole files are small, so
-the time is almost all waiting for first bytes, and connections decide it.
+In the Python query example, select **Edit** and replace `Discovery.LOG` with
+`Discovery.LIST_AND_PRUNE`. Select **Run** and count the `GET` lines that name a Parquet file.
+Compare the `count(*)` answer with the original. Replace the option with `Discovery.LIST`
+and run again. Listing without pruning reads every file.
+
+Keep `Discovery.LIST` and change the next argument in the `query` call from `4` to `1`, then
+`8`, running after each edit. Compare the end of the last request in milliseconds. Check that
+the request lines list the same files and byte counts. The model charges fewer rounds of
+waiting when requests overlap.
 
 ### Three ways to find the files
 
@@ -470,12 +472,11 @@ pyarrow's schema has a `country` column that no file holds. Its filter on the pa
 three `UK` files, and the condition on `order_id` keeps a row group only in the first, from its
 footer: the plan the log made, paid for with a read of each footer rather than one read of the
 log. The count is the reader's. The crate prints every file's range of `order_id` from its
-footer, and the ranges are the ones the log recorded. Change the limit to `300` in either, and the
-second `UK` file is kept too.
+footer, and the ranges are the ones the log recorded. In Python, select **Edit** and change
+`ds.field("order_id") < 200` to `ds.field("order_id") < 300`. Select **Run** and compare
+the `row groups kept` list for the second `UK` file. Its lower bound now allows a match.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin table_with_a_library
@@ -542,8 +543,9 @@ without writing a program.
 Three, in `exercises/python/lakehouse_and_beyond.py`, or in Rust in
 `exercises/src/lakehouse_and_beyond.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: lakehouse_and_beyond

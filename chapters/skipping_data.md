@@ -44,11 +44,9 @@ way: four row groups and pages of forty rows. They also have page indexes, which
 individual pages, and Bloom filters, which can rule out an exact value. Later lessons examine
 those structures. Here we use only the row-group statistics in the footer.
 The first file is in `order_id` order; the second is shuffled.
-[Appendix B](#the-fixtures) says how pyarrow wrote them.
+See [how the fixtures were written](#the-fixtures).
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
+Each step finds the footer as
 [Anatomy of a Parquet file](#anatomy-of-a-parquet-file) did, and decodes it with the reader's
 `decode_file_metadata` from [The type system](#the-type-system).
 
@@ -75,8 +73,10 @@ Each row group covers its own band of order numbers, and only row group 2's band
 other three are skipped on the footer's word alone, before a byte of their data is fetched. The
 test compares `431` with a minimum and a maximum, and nothing else.
 
-Change `wanted` to `200`, then to `201`: each lands in one row group, the last of one band or the
-first of the next. Then change the file to `pruning-shuffled.parquet`. Every row group now spans
+In Python, select **Edit** above. Enter `wanted = 200`, select **Run**, and find the line
+marked `read`. Repeat with `wanted = 201` to see which group keeps the next order. Then reset
+`wanted = 431` and replace `fixtures/pruning-sorted.parquet` with
+`fixtures/pruning-shuffled.parquet`. Select **Run**. Every row group now spans
 nearly every order number, and every one must be read.
 
 ### When a range rules a condition out
@@ -135,7 +135,9 @@ The row group's pages cover disjoint bands of forty order numbers, and only the 
 binary-search them rather than test every page. The OffsetIndex says where each page's bytes are
 and which row it starts at, so the reader can fetch that page without the pages after it.
 
-Change the file to `pruning-shuffled.parquet`. The boundary order is `UNORDERED`, each page
+In Python, select **Edit** above and replace `fixtures/pruning-sorted.parquet` with
+`fixtures/pruning-shuffled.parquet`. Select **Run** and read `boundary order` and the `read` or
+`skip` labels. The boundary order is `UNORDERED`, each page
 covers nearly every order number, and every page must be read.
 
 The **predicate column** supplies the values tested by the condition. The **projected columns**
@@ -207,11 +209,12 @@ same block. The bits differ, because each row group's customers set different on
 group at least one of the eight bits is clear, so `424242` was never added to any of them, and the
 reader skips the whole file for it.
 
-Change `424242` to `426545`, the customer in the shuffled file's first row: row group 0's
-filter has all eight bits set, as it must, since a filter never forgets a value it was given.
-Then change the file to `pruning-sorted.parquet` and probe `424242` again. One row group's filter
-has all eight bits set, although no order in the file is from that customer. That is a
-**false positive**: a possible match for a value that is absent.
+In Python, select **Edit** above and replace `424242` with `426545` in `struct.pack`. Select
+**Run** and read `may contain it` for row group zero. Its filter includes that customer.
+Then restore `424242` and replace `fixtures/pruning-shuffled.parquet` with
+`fixtures/pruning-sorted.parquet`. Run again and find a row group with `may contain it: True`.
+The fixture contains no order from that customer. This is a **false positive**, a possible match
+for a value that is absent.
 
 The reader measured how often that happens. It probed every filter in the shuffled file with
 thousands of customer numbers its row group does not hold:
@@ -266,12 +269,14 @@ keeps one page of five, and the reader reads that page's rows from every column.
 counts the bytes of column chunks the plan reads, and the bytes of page index it fetched to
 decide.
 
-Set `page_index=False` (`page_index: false` in Rust): the reader keeps all of row group 2, and
-reads several times as many bytes. Then take `leaves[1]`, which is `customer_id`, with `"424242"`
-on `pruning-shuffled.parquet`. Statistics keep every row group, and the Bloom filters skip every
-one, so the plan reads nothing but the filters. `prune.Op` has the other comparisons. Try
-`amount_cents > 9800`, which is `leaves[3]` with `Op.GT` (`Op::Gt` in Rust), or `country is null`,
-which is `leaves[2]` with `Op.IS_NULL` (`Op::IsNull`), whose value the reader ignores.
+In Python, select **Edit** above and set `page_index=False` in `prune.Mechanisms`. Select
+**Run** and compare the final data and index byte counts. Can statistics alone narrow a read
+within the group they keep?
+
+Restore `page_index=True`. Replace the file path with `fixtures/pruning-shuffled.parquet`,
+`leaf = leaves[0]` with `leaf = leaves[1]`, and `"431"` with `"424242"` in `Predicate.new`.
+Select **Run**. Read the `statistics` and `bloom` lines for each group. Check which mechanism
+can rule out that customer and how many data bytes the resulting plan needs.
 
 The same two conditions, with the mechanisms allowed one at a time:
 
@@ -328,7 +333,7 @@ then the takeaways and the understanding check.
 The [combined pruning example](compose-a-pruning-plan.html) uses `pruning-sorted.parquet` and
 `pruning-shuffled.parquet` to choose row groups and pages. This lab builds that planner: the test of a condition
 against a range, the probe of a filter, and the step from kept rows to the pages of every column.
-The tabs switch every excerpt on the page between the two languages.
+Choose Python or Rust in an open code section. The same choice applies to the other code sections.
 
 ### A condition against a range
 
@@ -512,9 +517,7 @@ index, it returns the kept row group's ColumnIndex: the order and the pages' bou
 not there. The crate's Arrow reader skips pages by the page index, with row selections and row
 filters. It needs the crate's `arrow` feature, which this workspace does not build.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin skipping_with_a_library
@@ -577,8 +580,9 @@ without writing a program.
 Three, in `exercises/python/skipping_data.py`, or in Rust in
 `exercises/src/skipping_data.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: skipping_data

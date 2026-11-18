@@ -64,8 +64,7 @@ batches, one file per batch.
 
 Before the reader looks anything up, read the table's metadata yourself: in Python with the
 `json` module, in Rust with the reader's `changes::read_snapshots`, which parses the same file.
-The steps below run in the page in Python, and in a Codespace or at a desk in Rust. First, what
-the latest snapshot holds:
+The first result shows the files listed by the `after-a-day` snapshot.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -126,8 +125,9 @@ Last, a delete file itself. It is an ordinary Parquet file with two columns, `fi
 ::::
 
 The delete file names a position, not an order: the row's place in its data file, counting from
-zero. The data file still holds the order; the delete file says it is gone. Change the path to
-another delete file and run it again.
+zero. The data file still holds the order. The delete file marks it as removed.
+Use **Edit** in Python to replace `delete-00.parquet` with `delete-01.parquet` and select **Run**.
+The output gives the removed row position, its data-file path and its order ID.
 
 Position deletes identify a data file and row position, not a global row key. This model does
 not implement deletes identified by matching column values, or bitmaps that mark deleted row
@@ -175,17 +175,16 @@ footer located; then the pages the index chose in every column, to put the whole
 together. The phase boundaries show where this reader waits for metadata it needs to plan
 later reads. They do not mean that every request in a phase starts at the same time.
 
-Change the order to `250`. The reader finds it in its data file, decodes it, and only then finds
-that a delete file removes it: it read the data to learn that the answer is nothing. Then change
-the snapshot to `written`, which has no delete files, and set `prefetch` to `65536`. The first
-read of the data file now asks for that much of its tail, which is the whole file: the chain
-shrinks to two dependency phases, and the bytes grow to the whole file, for one row.
+In Python, select **Edit** and set `snapshot, key, prefetch = "after-a-day", 250, 0`.
+Select **Run** and find the line that says which file deletes order `250`. Next set the same
+line to `snapshot, key, prefetch = "written", 250, 65536` and run again. Compare the phase
+headings, total bytes and row values. This snapshot has no deletes and the first data request
+fetches the whole file.
 
-The panel draws the same lookup's requests over time, one lane per connection. Change the
-snapshot and the order. Whenever a file can hold the order, the chain has the same steps, and
-delete files widen only the second. Order `805` is past the end of `written`, so the snapshots
-alone answer; in `after-a-day` it is in a small append, and the whole chain is paid for a file of
-a few rows.
+The panel starts with order `300` in `after-a-day`. Choose `written` under **Snapshot**,
+enter `805` under **Order ID**, then press Enter. The result says the snapshot has no file for
+that order. Keep the same ID and choose `after-a-day`. Compare the answer and request totals.
+A file added after `written` now holds the order.
 
 ```lab
 experiment: changes
@@ -302,10 +301,12 @@ shows their ongoing scan costs. The planner chooses:
 ::::
 
 Each data file with deletes is a group of its own, with its delete files, since two of them
-together would pass the target. The small appends go together into one group. Lower the target to
-`100` rows, and the appends split into two groups. Then set the small size to `10` rows instead:
-no append is small any more, and only the files with deletes are rewritten. On `merge-on-read-8`
-the plan rewrites the files its delete files name and nothing else.
+together would pass the target. The small appends go together into one group.
+
+In the Python example, select **Edit** and change `target_rows=200` to `target_rows=100`.
+Select **Run** and compare the listed groups. Keep the target and set `small_rows=10`, then
+run again. Which file lists disappear? The planner now marks only files with deletes for a
+rewrite. The example reports which files a compaction would rewrite.
 
 What carrying out the first plan costs, from the files pyarrow wrote for `compacted`:
 
@@ -510,13 +511,12 @@ files name:
 :::
 ::::
 
-The live rows and their sum are the ones the book's reader reports for that file. A table
-format's own libraries apply delete files for you when they read a snapshot; the work they do is
-this. Change the path to `data/part-2.parquet`, and the other delete files apply instead.
+Compare the live row count and sum with the book's reader for the same file. To check a different
+data file, select **Edit** in Python and change `path` to `"data/part-2.parquet"`. Select
+**Run** and read the numbers before `deleted` and `live`. The example applies the delete files
+that refer to that data path.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin deletes_with_a_library
@@ -591,8 +591,9 @@ without writing a program.
 Three, in `exercises/python/changing_a_table.py`, or in Rust in
 `exercises/src/changing_a_table.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: changing_a_table

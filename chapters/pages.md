@@ -37,11 +37,9 @@ pages small, so each column chunk holds several. Every seventh country is null. 
 uses data page version 1; the second uses version 2 and puts a **checksum** in every page
 header. A checksum is a number calculated from the stored bytes, which a reader can recompute
 to check for accidental changes.
-[Appendix B](#the-fixtures) says how pyarrow wrote both.
+See [how the fixtures were written](#the-fixtures).
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
+Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did.
 
 **A column chunk, header by header.** The footer says where `country`'s column chunk starts and
@@ -69,10 +67,10 @@ body before it ended, and the last body ends where the footer said the column ch
 needs no index and no count of pages, because each header's body size says where the next header
 is.
 
-Change `pages.parquet` to `pages-v2.parquet` and run the step again. The same rows sit in the
-same number of pages, but each data page is now a `DATA_PAGE_V2`, its body is smaller, and its
-header counts the page's rows and nulls. Then change the column to 2, which is `amount_cents`. It
-has no dictionary page, and its headers are longer. Each carries the page's minimum and maximum,
+In Python, select **Edit** above and replace `fixtures/pages.parquet` with
+`fixtures/pages-v2.parquet`. Select **Run**. Compare the page type, body size, and `rows` and
+`nulls` counts with the worked result. Next replace `columns[1]` with `columns[2]` and run
+again. Check the first page type for `amount_cents` and compare its header size with `country`. Each carries the page's minimum and maximum,
 which for this column are eight-byte integers, where `country`'s are two-letter strings.
 
 ### What a page header says
@@ -205,9 +203,10 @@ page no longer matches its header. The reader checks every page it walks, and it
 only the damaged page fails. Python computed the checksum with `zlib` and Rust with the book's
 reader. They agree because CRC-32 is one fixed algorithm.
 
-Change the byte the step flips, or flip two bits, and look at the checksum each time. Then change
-`[-1]` to `[1]` in Python, or `last()` to `get(1)` in Rust, to damage the first data page
-instead, and see which page the reader's walk marks.
+In Python, select **Edit** above and change `data[end - 2] ^= 1` to `data[end - 2] ^= 3` to
+flip two bits in the same byte. Select **Run** and read `matches the header`. Then change
+`[-1]` to `[1]` on the `page =` line and run again. Find which position changes to `False`
+in `the reader's walk`. That position indicates the damaged page.
 
 ```practice
 question: A stored page’s checksum matches its body, but its encoding header is invalid. Has the checksum proved that decoding will succeed?
@@ -232,8 +231,7 @@ Build the page walker and checksum check used on `pages.parquet` and `pages-v2.p
 The [boundary walkthrough](#walk-the-pages-yourself) locates pages;
 [version comparison](#data-page-version-1) separates levels and values; the
 [damage example](#checksums) compares stored and recomputed checksums.
-This implementation connects those operations and implements CRC-32. The tabs switch every excerpt on the page between
-the two languages.
+This implementation connects those operations and implements CRC-32. Choose Python or Rust in an open code section. The same choice applies to the other code sections.
 
 ### Walking the pages
 
@@ -378,9 +376,7 @@ gives one row a different country, and nothing says so. With `page_checksum_veri
 refuses the file and names the page. The crate prints each version 2 header's rows, nulls and
 level bytes, which agree with the [version-2 table](#data-page-version-1), and refuses the damaged page when it reaches it.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin pages_with_a_library
@@ -452,8 +448,9 @@ without writing a program.
 Three, in `exercises/python/pages.py`, or in Rust in
 `exercises/src/pages.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: pages

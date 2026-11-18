@@ -4,7 +4,7 @@
 // colon), since Python's blocks are its indentation. Tab would otherwise trap the keyboard in the
 // editor, so Escape then Tab leaves it. Ctrl+Enter (Cmd+Enter on a Mac) runs.
 
-export const KEYS = "Tab indents · Esc then Tab leaves the editor · Ctrl+Enter runs";
+export const KEYS = "Tab indents. Esc then Tab leaves the editor. Run with Ctrl+Enter or Command+Enter.";
 
 export function codeArea(text, { label, onRun, onInput }) {
   const area = document.createElement("textarea");
@@ -25,6 +25,7 @@ export function codeArea(text, { label, onRun, onInput }) {
       e.preventDefault();
       onRun?.();
     } else if (e.key === "Escape") {
+      e.stopPropagation();
       leaving = true;
     } else if (e.key === "Tab" && !leaving && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();

@@ -42,7 +42,7 @@ export async function mountScan(root, lab, files, initial, config) {
   const grid = document.createElement("div");
   grid.className = "scan-grid";
   grid.innerHTML = `
-    <section class="panel p-scan-sum"><h4>The cost</h4><div class="scan-sum"></div></section>
+    <section class="panel p-scan-sum"><h4>Scan totals</h4><div class="scan-sum"></div></section>
     <section class="panel p-scan-time"><h4>Requests over time, by connection</h4><div class="timeline"></div></section>`;
   root.append(grid);
 
@@ -74,7 +74,7 @@ function drawSummary(box, r) {
   const t = r.totals;
   box.innerHTML = `<dl class="scan-costs">` +
     `<div><dt>Requests</dt><dd>${fmt(t.requests)}</dd></div>` +
-    `<div><dt>Time</dt><dd>${ms(t.elapsed_us)}</dd></div>` +
+    `<div><dt>Simulated time</dt><dd>${ms(t.elapsed_us)}</dd></div>` +
     `<div><dt>Bytes fetched</dt><dd>${fmt(t.bytes_fetched)} <small>of ${fmt(r.file_size)}</small></dd></div>` +
     `<div><dt>Rows matching</dt><dd>${fmt(t.rows_matching)}</dd></div></dl>` +
     `<p class="note">Time is simulated: each request costs the latency, then its bytes over the bandwidth.</p>`;

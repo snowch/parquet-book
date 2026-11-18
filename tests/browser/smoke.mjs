@@ -132,14 +132,24 @@ check(await whole.getAttribute("data-footer-length") === String(expected.trailer
 const dim = await whole.locator(".hex .b.unfetched").count();
 check(dim === expected.file_size - expected.totals.bytes_returned,
   `${dim} bytes dimmed: the ones the reader never asked for when it opened the file`);
-// Damage the closing magic: the reader refuses the file, and nothing is dimmed; restore it.
-await whole.locator(`.hex .b[data-o="${expected.file_size - 1}"]`).click();
-await whole.locator('.inspector input[name="byte"]').fill("32");
+// Reach the first and last bytes by keyboard before damaging the closing signature.
+const byteGrid = whole.getByRole("grid", { name: "File bytes" });
+await byteGrid.press("ArrowRight");
+check((await byteGrid.getAttribute("aria-activedescendant")).endsWith("-0"),
+  "the byte grid starts selecting without a mouse click");
+await byteGrid.press("End");
+const editedByte = whole.locator('.inspector input[name="byte"]');
+const originalByte = await editedByte.inputValue();
+await editedByte.fill("aZ");
+check(!await editedByte.evaluate((e) => e.checkValidity()), "the inspector requires two hexadecimal digits");
+await editedByte.fill("32");
 await whole.locator(".inspector form.edit button[type=submit]").click();
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]').dataset.state === "error");
 check(await whole.locator(".hex .b.unfetched").count() === 0, "a damaged file dims nothing: the reader refused it");
 await whole.locator(".inspector .restore").click();
 await page.waitForFunction(() => document.querySelector('.lab[data-experiment="anatomy"]').dataset.state === "ok");
+check(await editedByte.inputValue() === originalByte && await editedByte.evaluate((e) => document.activeElement === e),
+  "restoring the file updates the selected byte and returns focus to its editor");
 
 // The anatomy panel maps the whole file.
 const anatomy = page.locator('.lab[data-experiment="anatomy"]');

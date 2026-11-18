@@ -105,9 +105,6 @@ by `order_id`, and counts orders per country where `order_id < 300`, then sorts 
 :::
 ::::
 
-In Python, run the step in the page, change it with **Edit**, and run it again. In Rust, open it
-in a Codespace, or run it at a desk with `cargo run -p walkthroughs --bin run_a_query`.
-
 The Scan stage is the only one that touched the file. It skipped two of the four row groups on
 their `order_id` statistics, and read the two columns the query names from the others. The
 Filter stage kept the rows whose `order_id` passes the condition, the Aggregate stage counted each country, and the
@@ -119,7 +116,10 @@ the decoded rows before grouping.
 ```{include} _generated/visual-query-stages.md
 ```
 
-Change the query to `SELECT count(*) FROM orders`, and the scan reads no column at all. The optional module notes compare further query shapes. The following lessons examine their individual mechanisms.
+In the Python example that prints `Scan`, select **Edit** and replace the SQL inside `sql` with
+`SELECT count(*) FROM orders`. Select **Run** and compare `bytes of column chunks` with the
+original. The footer supplies the row count for the new query. The following lessons explain
+when further query operations can use metadata.
 
 ### Projection
 
@@ -179,7 +179,9 @@ columns to read, then filter and count the rows yourself:
 Both keep the two row groups the book's engine read, and both count the same orders per country.
 pyarrow's `subset` says which row groups a condition keeps, from the statistics alone, before any
 page is read. The crate's predicate tests each row group's minimum, and its row iterator decodes
-only the projected columns. Change the limit to `450` in either, and both keep a third row group.
+only the projected columns. In the Python library example, select **Edit** and change the
+right side of `ds.field("order_id") < 300` to `450`. Select **Run** and compare
+`row groups kept`. What extra group can now contain matching orders?
 
 In Python, the first run loads pyarrow into the page, a much larger download than the engine's
 step. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a

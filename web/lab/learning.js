@@ -21,7 +21,11 @@ export function mountLearning() {
     const table=document.createElement('table');const header=table.createTHead().insertRow();
     for(const label of ['Request','Range','File bytes returned','Why']){const th=document.createElement('th');th.textContent=label;header.append(th);}
     const body=table.createTBody();for(const r of selected.requests){const tr=body.insertRow();for(const value of [r.method,r.range,r.bytes,r.why])tr.insertCell().textContent=value;}
-    wrap.append(table);host.append(wrap);const summary=document.createElement('p');summary.textContent=`${selected.requests.length} requests · ${selected.bytes} file bytes returned.`;summary.setAttribute('role','status');host.append(summary);
+    wrap.append(table);host.append(wrap);
+    const count=selected.requests.length;
+    const summary=document.createElement('p');
+    summary.textContent=`${count} ${count===1?'request':'requests'} · ${selected.bytes} file bytes returned.`;
+    summary.setAttribute('role','status');host.append(summary);
    };
    mode.addEventListener('change',draw);prefetch.addEventListener('change',draw);
   }

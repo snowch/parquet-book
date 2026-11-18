@@ -5,41 +5,51 @@ import { savedAnswers } from "./answers.js";
 
 let worker = null;
 let queue = Promise.resolve();
-let current = null;
 
 /**
  * Run `argv` (["pytest", …], ["parquet_lab", …] or ["python", source, file name]) from the
  * repository's root, with `answers`
  * as the chapters' problem files. Resolves with {exit, output, tests, seconds}.
  */
-export function runPython(argv, { answers = savedAnswers(), onStatus = () => {} } = {}) {
-  const job = queue.then(() => new Promise((resolve, reject) => {
-    current = { reject };
-    worker ||= new Worker(new URL("python-worker.js", import.meta.url), { type: "module" });
-    worker.onmessage = ({ data }) => {
-      if (data.type === "status") return onStatus(data.text);
-      current = null;
-      if (data.type === "result") resolve(data.result);
-      else reject(new Error(data.message));
+export function runPython(argv, { answers = savedAnswers(), onStatus = () => {}, signal } = {}) {
+  const stopped = new Error("Stopped.");
+  if (signal?.aborted) return Promise.reject(stopped);
+  let stopActive;
+  let abort;
+  const cancelled = new Promise((resolve, reject) => {
+    abort = () => {
+      stopActive?.();
+      reject(stopped);
     };
-    worker.onerror = (e) => {
-      current = null;
-      reject(new Error(e.message || "the Python worker failed"));
-    };
-    worker.postMessage({ argv, answers });
-  }));
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+  const job = queue.then(() => {
+    if (signal?.aborted) return;
+    return new Promise((resolve, reject) => {
+      const active = (worker ||= new Worker(new URL("python-worker.js", import.meta.url), { type: "module" }));
+      const discard = () => {
+        active.terminate();
+        worker = null;
+      };
+      // Stopping a queued run must leave the active run's worker alone.
+      stopActive = () => {
+        discard();
+        reject(stopped);
+      };
+      active.onmessage = ({ data }) => {
+        if (data.type === "status") return onStatus(data.text);
+        stopActive = null;
+        if (data.type === "result") resolve(data.result);
+        else reject(new Error(data.message));
+      };
+      active.onerror = (e) => {
+        stopActive = null;
+        discard();
+        reject(new Error(e.message || "the Python worker failed"));
+      };
+      active.postMessage({ argv, answers });
+    });
+  });
   queue = job.catch(() => {});
-  return job;
-}
-
-/**
- * Stop the run in progress. Python cannot be interrupted from outside, so the worker goes, and
- * the next run starts a fresh one.
- */
-export function stopPython() {
-  if (!current) return;
-  worker.terminate();
-  worker = null;
-  current.reject(new Error("Stopped."));
-  current = null;
+  return Promise.race([job, cancelled]).finally(() => signal?.removeEventListener("abort", abort));
 }

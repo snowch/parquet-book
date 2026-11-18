@@ -306,6 +306,7 @@ figure.quoted { margin: 1.3rem 0; }
 .code-disclosure > summary:hover { background: var(--wash); }
 .code-disclosure[open] > summary { border-bottom: 1px solid var(--edge); }
 .code-disclosure > .tab-set { margin: 1rem; }
+.walkthrough-guide { margin: .8rem 1rem; color: var(--muted); font: 14px/1.55 var(--chrome); }
 #main > .page > .exercise-disclosure[open] { max-width: var(--wide); }
 .exercise-disclosure .workbench { margin: 1rem; }
 .example-result + .code-disclosure { margin-top: 0; border-radius: 0 0 8px 8px;
@@ -496,6 +497,7 @@ td code { font-size: 12.5px; }
 .learning-check summary { color: var(--accent); cursor: pointer; }
 .learning-check .learning-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; margin: 1rem 0; font: 13px/1.5 var(--chrome); }
 .learning-check .learning-controls[hidden] { display: none; }
+.learning-check p.learning-controls:not([hidden]) { display: block; font: 14px/1.65 var(--chrome); }
 .learning-controls input { width: 7rem; }
 .learning-controls :is(input, select, button) { font: inherit; padding: .5rem .7rem; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; }
 .learning-controls button { color: var(--accent); cursor: pointer; }

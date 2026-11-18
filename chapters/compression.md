@@ -42,11 +42,9 @@ them. It works on the bytes produced by an encoding, rather than on the columnâ€
 
 The `codec-*.parquet` files hold the same orders, encoded the same way: PLAIN, no dictionary.
 Only the codec differs, so their pages are identical before compression, and any difference in
-size is the codec's. [Appendix B](#the-fixtures) lists how each was written.
+size is the codec's. See [how the fixtures were written](#the-fixtures).
 
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab). Each step finds the footer as
+Each step finds the footer as
 [ch02](#anatomy-of-a-parquet-file) did, decodes it with the reader's `decode_file_metadata` from
 [ch03](#the-type-system), and finds a column chunk's page with `walk_pages` from [ch06](#pages).
 
@@ -89,11 +87,11 @@ The country code itself is a literal, because Snappy's compressor never copies f
 bytes. The last line checks the result: the elements wrote exactly as many bytes as the varint
 promised and the page header says.
 
-Print `tokens[-6:]` instead (`tokens.iter().rev()` in Rust, which lists them last first). Once the
-five countries have all appeared, the page repeats with a fixed period, and from there every
-element is a copy from one period back, longer than the distance it reaches. A copy may overlap
-the bytes it writes, which is why the step copies a byte at a time. Then change the column to
-`5`, `distance_km`: noisy floating point, mostly long literals with short copies between them.
+In the Python example that begins with the Snappy length, select **Edit** and change
+`tokens[:6]` to `tokens[-6:]`. Select **Run**. Read the lengths and distances on the `copy`
+lines. Where the length exceeds the distance, the copy reuses bytes it is still writing.
+Keep that edit and replace `columns[1]` with `columns[5]`. Run again and compare the last
+tokens for `distance_km`. Different byte patterns give the compressor different repeats.
 
 This is the **LZ77** idea every codec here shares: replace a run of bytes the output already
 holds with how far back it is and how long. The codecs differ in how they write those references
@@ -125,7 +123,9 @@ Every codec gives back the uncompressed file's page, byte for byte, and each get
 different number of bytes and tokens. The reader counts the Snappy varint as a token, so its
 count is one more than the first step's. The GZIP tokens include the stream's header and trailer.
 
-Change the column to `5`, `distance_km`: every codec saves far less, and needs hundreds of tokens.
+In the Python example that begins with `SNAPPY`, select **Edit** and set `column = 5`. Select
+**Run** to compare `distance_km` with `country`. Read the input bytes and token counts for each
+codec. The `the same` field checks the decoded bytes against the corresponding uncompressed page.
 Add `"zstd"` to the list: the reader refuses, because it does not decode ZSTD. In Python, compare
 `out.data` with `zlib.decompress(body, 31)`, which inflates a GZIP page with the standard library.
 
@@ -155,12 +155,12 @@ fixtures: codec-snappy.parquet, codec-lz4.parquet, codec-gzip.parquet, pages-v2-
 column: 1
 ```
 
-Step through the `country` page under Snappy, and watch a copy's outline stay a period behind
-what it writes. Switch to `codec-lz4.parquet` and find the one token that writes most of the
-page. Switch to `codec-gzip.parquet`: the tokens do the same work, but each is written in a few
-bits rather than whole bytes, so neighbouring tokens share a byte. Then open
-`pages-v2-snappy.parquet` and pick `country`. In version 2 data pages the levels sit in front of
-the compressed section, untouched.
+The panel starts on the `country` page in `codec-snappy.parquet`. Select **Next token** until a
+copy appears. Compare its outlined source bytes with the shaded output it writes. In the file
+menu, select `codec-lz4.parquet` and use the token lengths to find the largest copy. Then select
+`codec-gzip.parquet` and find neighbouring tokens that highlight the same compressed byte.
+Finally select `pages-v2-snappy.parquet` and `country`. The page note identifies the levels in
+front of the compressed values.
 
 The reader decodes Snappy, LZ4_RAW and GZIP. ZSTD and Brotli are measured from metadata, not decompressed by this implementation.
 
@@ -237,10 +237,11 @@ pattern from the [byte-split example](#byte-stream-split): the sign and exponent
 finds them. The weights are different. Each is a number of kilograms to two decimal places, and a
 decimal fraction often has a repeating binary expansion. Its finite floating-point
 approximation can contain repeated byte patterns. To inspect them, open the
-[multi-codec walkthrough](#multi-codec-walkthrough), select column `4`, `weight_kg`, and print the decompressed page (`out.data.hex(" ")`
-in Python, or `{:02x?}` of `out.bytes` in Rust). The same byte sequences recur, `33 33 33` and
-`14 ae 47 e1 7a` among them. In PLAIN order a compressor matches them as whole runs. Split, each
-run is scattered over eight streams.
+[multi-codec walkthrough](#multi-codec-walkthrough) and select **Edit** in Python.
+Set `column = 4` for `weight_kg`. After the line that assigns `tokens, same`, add
+`print(out.data[:80].hex(" "))` with the same indentation. Select **Run** and look for
+recurring byte sequences such as `33 33 33`. In PLAIN order, repeated bytes can sit
+next to each other. A byte split can separate them across eight streams.
 
 Neither result is a rule. What an encoding is worth to a codec depends on the values, and the
 only way to know is to measure both on real data.
@@ -294,7 +295,7 @@ then the takeaways and the understanding check.
 Build the decompressors used in the [literal-and-copy walkthrough](#one-table-six-codecs).
 That example decodes the `country` page in the Snappy, LZ4 and GZIP fixtures and compares each
 with `codec-none.parquet`. Review its overlapping-copy example before implementing the decoder.
-This lab builds Snappy, locates the other decoders and connects them to the column reader. The tabs switch every excerpt on the page between the two languages.
+This lab builds Snappy, locates the other decoders and connects them to the column reader. Choose Python or Rust in an open code section. The same choice applies to the other code sections.
 
 ### Snappy
 
@@ -498,9 +499,7 @@ the file's field: for GZIP it adds a compression level, which the file does not 
 is the crate's default, the one it would write with. `compression_codec()` gives the name the file
 stores. No reader needs the level: a DEFLATE stream decodes the same way whatever level wrote it.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin compression_with_a_library
@@ -563,8 +562,9 @@ without writing a program.
 Three, in `exercises/python/compression.py`, or in Rust in
 `exercises/src/compression.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: compression

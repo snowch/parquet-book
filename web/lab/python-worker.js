@@ -44,7 +44,8 @@ class Collect:
             message = crash.message if crash else report.longreprtext.strip().splitlines()[-1]
         elif report.skipped and isinstance(report.longrepr, tuple):
             message = report.longrepr[2]
-        self.tests.append({"name": report.nodeid.split("::")[-1], "outcome": report.outcome, "message": message})
+        outcome = "error" if report.failed and report.when != "call" else report.outcome
+        self.tests.append({"name": report.nodeid.split("::")[-1], "outcome": outcome, "message": message})
 
 
 def run(argv_json, answers_json):
@@ -95,11 +96,11 @@ def run(argv_json, answers_json):
 let ready = null;
 
 async function setup() {
-  postMessage({ type: "status", text: "Loading Python and pytest in your browser (a few megabytes the first time)…" });
+  postMessage({ type: "status", text: "Loading Python and its test runner. The first download may take a moment." });
   const [pyodide, reader, list] = await Promise.all([startPyodide(), readerSources(BASE), packageList(BASE)]);
   pyodide.runPython("import sys; sys.dont_write_bytecode = True");
   await pyodide.loadPackage("pytest", { messageCallback: () => {} });
-  postMessage({ type: "status", text: "Fetching the tests and the fixtures…" });
+  postMessage({ type: "status", text: "Loading the book’s example files and tests…" });
   writeReader(pyodide, reader);
   const [exercises, tests, pyproject, fixtures] = await Promise.all([
     Promise.all(list.exercises.map((name) => fetchText(new URL(`py/exercises/${name}`, BASE)))),
@@ -130,7 +131,7 @@ async function loadImports(pyodide, source) {
     await pyodide.loadPackagesFromImports(source, {
       messageCallback: (message) => {
         const m = /^Loading (.+)$/.exec(message);
-        if (m) postMessage({ type: "status", text: `Loading ${m[1]} into your browser (a large download, the first time only)…` });
+        if (m) postMessage({ type: "status", text: `Downloading ${m[1]}. The first library run can take longer.` });
       },
     });
   } catch {

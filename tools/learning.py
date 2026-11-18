@@ -58,6 +58,8 @@ def evidence():
 
 
 def trace_table(case):
+    count = len(case["requests"])
+    request = "request" if count == 1 else "requests"
     rows = "".join(
         f"<tr><td>{esc(r['method'])}</td><td><code>{esc(r['range'])}</code></td>"
         f"<td>{r['bytes']}</td><td>{esc(r['why'])}</td></tr>"
@@ -66,29 +68,29 @@ def trace_table(case):
     return (
         '<div class="table-wrap"><table><thead><tr><th>Request</th><th>Range</th>'
         "<th>File bytes returned</th><th>Why</th></tr></thead><tbody>" + rows + "</tbody></table></div>"
-        f"<p>{len(case['requests'])} requests · {case['bytes']} file bytes returned.</p>"
+        f"<p>{count} {request} · {case['bytes']} file bytes returned.</p>"
     )
 
 
 def render_learning(name):
     d = evidence()
     if name == "requests":
-        modes = '<label>Size source <select name="mode"><option value="head">Ask with HEAD</option><option value="known">Size already known</option><option value="suffix">Use a suffix range</option></select></label>'
+        modes = '<label>How to find the size <select name="mode"><option value="head">Ask with HEAD</option><option value="known">Size already known</option><option value="suffix">Use a suffix range</option></select></label>'
         sizes = (
-            '<label>First GET size <select name="prefetch">'
+            '<label>Bytes requested in first GET <select name="prefetch">'
             + "".join(f'<option value="{n}">{n} bytes</option>' for n in d["sizes"])
             + "</select></label>"
         )
         body = (
-            "<p>Change the size source or the first read. Every displayed request is a trace from the book’s reader.</p>"
+            "<p>The trace starts with a HEAD request for the file size.</p>"
+            '<p class="learning-controls" hidden>Choose <strong>Use a suffix range</strong> and check which request '
+            "disappears. Then increase <strong>Bytes requested in first GET</strong>. Compare the number of "
+            "requests with the total file bytes returned.</p>"
             f'<div class="learning-controls" hidden>{modes}{sizes}</div>'
             f'<div class="learning-trace">{trace_table(d["cases"][0])}</div>'
-            "<details><summary>Compare all strategies without JavaScript</summary>"
-            + "".join(
-                f"<p><strong>{esc(c['mode'])} · {c['prefetch']} bytes prefetched</strong></p>{trace_table(c)}"
-                for c in d["cases"]
-            )
-            + '</details><p class="learning-note">Byte totals count file data, excluding HTTP headers. Request costs use a simulated store, not a real network measurement.</p>'
+            "<noscript><p>Compare other request strategies in the table below.</p></noscript>"
+            '<p class="learning-note">File bytes exclude HTTP headers. The book’s reader '
+            "records the requests using a simulated object store.</p>"
         )
         payload = {"cases": d["cases"]}
         title = "Explore the reader’s requests"

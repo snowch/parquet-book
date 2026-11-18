@@ -142,7 +142,7 @@ def _problems(node: dict) -> str:
     slug = parse_problems_block(str(node.get("value", "")))
     return (
         '<details class="code-disclosure exercise-disclosure">'
-        "<summary>Try the coding exercises (optional)</summary>"
+        "<summary>Edit Python solutions and run tests</summary>"
         f'<div class="workbench" data-chapter="{html.escape(slug)}">'
         '<p class="lab-fallback">Here you can edit this chapter\'s problems and run their tests in your '
         "browser, in Python. It needs JavaScript. The same problems run at a desk: see "
@@ -171,8 +171,7 @@ def _repo_path(include: dict) -> str:
 
 def _source_bar(include: dict) -> str:
     clean = _repo_path(include)
-    # A walkthrough is a short program the chapter asks you to run and change, not the reader.
-    label = "Try it" if clean.startswith("walkthroughs/") else "From the implementation"
+    label = "Example source" if clean.startswith("walkthroughs/") else "Reader source"
     return (
         f'<div class="source-bar"><span class="source-label">{label}</span>'
         f'<a href="{REPO_URL}{html.escape(clean)}"><code>{html.escape(clean)}</code></a></div>'
@@ -204,11 +203,23 @@ def _tab_set(node: dict, footnotes: list | None) -> str:
         if len(walkthroughs) != 1:
             raise TabSetError("each walkthrough tab set must quote one Python example")
         result = _worked_result(walkthroughs[0])
+        library = (
+            '<p class="walkthrough-guide">The first browser run of this example downloads pyarrow.</p>'
+            if walkthroughs[0].endswith("_with_a_library.py")
+            else ""
+        )
         # The answer and its source share one layout unit, including when the code widens.
         return (
             '<section class="worked-example">'
             + result
-            + _optional_code(tabs, "Read or run the code")
+            + _optional_code(
+                '<p class="walkthrough-guide">In Python, select <strong>Run</strong> for the code shown. '
+                "To try a change, select <strong>Edit</strong>, change the code, then select <strong>Run</strong> again. "
+                "The result appears below the code. Rust runs in Codespaces or at a desk.</p>"
+                + library
+                + tabs,
+                "Read or run the code",
+            )
             + "</section>"
         )
     return _optional_code(tabs, "Read the implementation code" if sources else "Run the checks")
@@ -252,7 +263,7 @@ def _worked_result(path: str) -> str:
         )
     return (
         f'<figure class="example-result" data-source="{html.escape(path)}">'
-        "<figcaption><span>Worked result</span><small>Python output · no need to run</small></figcaption>"
+        "<figcaption><span>Worked result</span><small>Generated from the original Python example</small></figcaption>"
         f'<pre tabindex="0" aria-label="Worked example output">{html.escape(saved["stdout"])}</pre>'
         f"{note}{cases}</figure>"
     )

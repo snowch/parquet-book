@@ -38,11 +38,7 @@ The `writing-*.parquet` files hold the same orders. `writing-baseline.parquet` i
 sorted by `order_id`, dictionary-encoded, compressed with Snappy, and written in four row groups
 of small pages with a page index. Each other file changes one of those settings: one row group,
 many small ones, sorted by country, shuffled, no dictionary, or no page index.
-[Appendix B](#the-fixtures) lists them.
-
-Each step shows its worked result first. Open **Read or run the code** if you want to inspect
-or change it. Python runs in the page; Rust runs in a Codespace or at a desk as described in
-[Appendix A](#running-the-lab).
+See [the list of fixtures](#the-fixtures).
 
 **Row groups a lookup reads.** The query is `order_id = 431`. A reader reads every row group whose
 footer range could hold the value. Read each file's footer, as [Skipping data](#skipping-data) did, and
@@ -68,7 +64,8 @@ many row groups it has. The file sorted by country and the shuffled one send it 
 their row groups spans nearly every order number. The footers differ too: the file of small row
 groups has one many times larger than the file of one row group.
 
-Change `column` to `2`, which is `customer_id`, and `wanted` to `500000`. Nobody sorted by
+In Python, select **Edit** under **Row groups a lookup reads**. Set `column, wanted = 2, 500000`,
+then select **Run**. Compare the counts before `row groups may hold it`. The writer never sorted by
 customer, so every file sends that lookup to every row group it has. Small row groups do not
 help this customer lookup; they only add row groups whose ranges still retain it.
 
@@ -118,8 +115,10 @@ transferred bytes, not time.
 ```{include} _generated/visual-writing-costs.md
 ```
 
-Change the condition to `country = 'FR'`, with column `3` and `"FR"`: now the file sorted by
-country reads least. Then try `status = 'refunded'`, with column `4`. No file does well. Refunds
+In Python, select **Edit** under **What a query reads** and replace `(0, Op.EQ, "431")` with
+`(3, Op.EQ, "FR")` in `Query`. Select **Run** and compare `bytes` and `requests` across the files.
+The file sorted by country now reads the fewest bytes. Then replace the condition tuple with
+`(4, Op.EQ, "refunded")` and run again. Compare the same totals for the status filter. Refunds
 are rare and spread through every row group, and no single sort order serves every column. The
 reader ran those conditions, and one on amounts, against every file:
 
@@ -336,9 +335,7 @@ index, `set_sorting_columns` and `set_column_bloom_filter_enabled`. Writing rows
 either a column writer fed value by value, or the `arrow` feature's `ArrowWriter`, which this
 workspace does not build, so the step reads instead.
 
-In Python, the first run loads pyarrow into the page, a much larger download than the other
-steps. In Rust the step needs the `parquet` crate, in `walkthroughs/libraries`, so it runs in a
-Codespace or at a desk:
+To reproduce the Rust example locally, run this from the repository root.
 
 ```bash
 cargo run -q --manifest-path walkthroughs/libraries/Cargo.toml --bin writing_with_a_library
@@ -396,8 +393,9 @@ without writing a program.
 Three, in `exercises/python/writing_parquet_well.py`, or in Rust in
 `exercises/src/writing_parquet_well.rs`. The first two have tests. The third has none.
 
-The editor below holds the Python stubs and keeps your edits in this browser. **Run the tests**
-runs the graders in the page, the same tests that run at a desk.
+Read the tasks below. To solve them in the browser, open **Edit Python solutions and run tests**.
+The editor starts with unfinished functions. Edit the functions for the task and select **Run the tests**.
+Read the failed checks to see which behavior is still missing.
 
 ```problems
 chapter: writing_parquet_well

@@ -12,27 +12,31 @@ code follows the [worked footer calculations](locate-the-footer.html).
 
 ## In your browser
 
-Nothing to install. Open **Read or run the code** to reach an example's controls. Chapters with
-coding problems also have **Try the coding exercises (optional)**, where you edit the Python
-problems and run their tests. pytest is the test runner; Pyodide runs Python in the browser.
-They run the same tests as a desk installation. A Python command in these pages that runs the
-reader’s tests, a problem’s tests or the reader’s command line has a **Run** button. It runs the
-command in the page and shows what it printed;
-a problem's tests run on your answers from its chapter's workbench. Every walkthrough step has
-**Edit** and **Run**: change the step and run your version in the page. Your answers and edits
-stay in your browser.
+The page prepares the example files. Open **Read or run the code**, select **Python**, then
+select **Run** for the code shown. The output appears below the code. To try a change, use
+**Edit** and then **Run** again. **Show original** switches back to the book's code.
+**Return to edit** reopens your draft.
+
+On a build-lab page, open **Edit Python solutions and run tests** to work on the coding
+problems. Edit the unfinished functions, select **Run the tests** and read the results
+under the editor. A failed check describes an unmet expectation in your solution. If the test
+runner cannot complete its work, read **Full test output** for the error. The page uses the
+same tests as a local installation. Python commands elsewhere on the page also use the active
+answers saved in the build lab.
+
+The browser keeps your active drafts on this device when storage is available. Use **Download code**
+in a build lab to keep a separate copy. If the browser cannot save a walkthrough edit, copy the
+text before leaving the page.
 
 The `cargo run -p pqlab` commands below have a Run button too. The page runs them on the Rust
 reader compiled to WebAssembly, a program format browsers can execute. This is the reader
 that draws the pictures, and its commands print what they print at a desk.
 
-The book does not compile edited Rust inside its lesson pages. Editing the Rust reader, and
-running every other Rust command, needs a Rust compiler. Their blocks have an **Open in Codespaces**
-button, and so does every Rust walkthrough step: [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
-opens the repository with an editor, the pinned toolchain and every dependency, in the browser.
-Edit a file there and run the command in its terminal; `make && make serve` shows the book with
-every picture drawn by your edited reader. The configuration is in `.devcontainer/`, and works
-in any editor that supports dev containers.
+To compile Rust or run a changed Rust walkthrough, use a local Rust compiler or
+**Open in Codespaces** in the Rust tab. [GitHub Codespaces](https://codespaces.new/snowch/parquet-book?quickstart=1)
+opens the repository with an editor and terminal. Open the file named above the example,
+make your change, then run the command shown or copied by the page in the Codespace terminal.
+Use `make && make serve` there to view the book with diagrams drawn by your edited reader.
 
 A Codespace runs on your own GitHub account, not the book's. Personal accounts get a free
 allowance of use each month; past it, GitHub blocks further use unless you have set up billing,
@@ -43,13 +47,9 @@ counts against the storage allowance.
 (two-pyarrows)=
 ## Two versions of pyarrow
 
-The *Ask a library* steps run pyarrow, and the pyarrow in the page is older than the one at a
-desk. That is not a choice the book makes twice. At a desk, `requirements.txt` pins the pyarrow
-that wrote every fixture, and the build refuses to run under any other, so the files and every
-number measured from them come out the same on every machine. In the page, pyarrow is whatever
-the book's pinned Pyodide release ships. pyarrow is compiled C++, not pure Python, so the page
-cannot install another version the way it installs a pure-Python package; it takes the build
-Pyodide made for WebAssembly, which trails the desk's.
+The *Ask a library* steps use pyarrow. The browser runs the version bundled with Pyodide, the
+browser's Python runtime. `requirements.txt` specifies a newer desktop version, which also
+generates the book's example files and saved outputs.
 
 For almost every step the two give the same output, and the tests check the steps at a desk. Where
 they differ, the chapter says so beside the step: a field the older version does not report
@@ -59,9 +59,8 @@ ships a newer pyarrow, the book moves to it and those notes go.
 
 ## What you need
 
-At a desk, to read and run the book's reader in Python, Python 3.11 or later is enough: the
-Python reader and its tests use the standard library, and pytest. Everything below that builds
-the site needs the rest.
+To run the Python reader locally, use Python 3.11 or later. Install pytest to run its tests.
+To build the site or generate its results, install the following tools.
 
 - A Rust toolchain, with the WebAssembly target: `rustup target add wasm32-unknown-unknown`.
 - Python 3.11 or later, with the packages in `requirements.txt` for building the site and
@@ -69,9 +68,8 @@ the site needs the rest.
 - Node.js and the pinned MyST command-line tool, which parses the pages:
   `npm install -g mystmd@1.10.1`.
 
-Neither reader has dependencies outside the repository, so both build and run offline. The page
-runs Python through Pyodide, which it fetches from a public CDN the first time you run Python in
-the page.
+After installing the toolchains, the book's own readers can run offline. The first Python run
+in a browser downloads Pyodide. The first example that uses pyarrow downloads that library too.
 
 ## Building and serving the book
 
@@ -119,11 +117,10 @@ them.
 
 ## Solving the problems
 
-Each chapter's problems are stubs in Python, in `exercises/python/<chapter>.py`, and in Rust, in
-`exercises/src/<chapter>.rs`. Their tests are
-skipped by a plain test run, so the suite passes before you start. The commands here run the
-[footer-reader lab’s coding problems](build-footer-reader.html). Open that lab to read
-the tasks and edit your answers:
+The [footer-reader lab](build-footer-reader.html#problems) lists the tasks. To solve them at a
+desk, edit `exercises/python/anatomy_of_a_parquet_file.py` or
+`exercises/src/anatomy_of_a_parquet_file.rs`. Then run the matching command below from the
+repository root. These commands include the exercise tests, which a plain test run skips.
 
 ::::{tab-set}
 :::{tab-item} Python
@@ -140,4 +137,4 @@ cargo test -p exercises --test anatomy_of_a_parquet_file -- --ignored
 :::
 ::::
 
-and `make problems` runs them all. They fail until you solve them.
+Use `make problems` to run the exercise tests for all build labs.

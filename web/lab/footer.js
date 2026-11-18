@@ -51,7 +51,7 @@ export class FileViews {
     this.edited = false;
     // A selection belongs to the file it was made in.
     this.hex.selection = null;
-    this.inspector.el.innerHTML = '<p class="hint">Select a byte in the byte view. Shift-click to select a range.</p>';
+    this.inspector.clear();
     this.refresh();
   }
 
@@ -88,6 +88,7 @@ export class FileViews {
     }
     this.edited = false;
     this.refresh();
+    if (this.hex.selection) this.#inspect(this.hex.selection, false);
   }
 
   #selected(sel) {
@@ -125,10 +126,9 @@ export function mountAnatomy(root, lab, files, initial) {
 
 export function fileChooser(head, files, initial, open) {
   const names = files.names();
-  head.innerHTML = `<span class="lab-title">Parquet laboratory</span>` +
-    (names.length > 1
-      ? `<label>file <select>${names.map((n) => `<option${n === initial ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>`
-      : `<code>${escapeHtml(initial)}</code>`) +
+  head.innerHTML = (names.length > 1
+      ? `<label>File <select aria-label="File">${names.map((n) => `<option${n === initial ? " selected" : ""}>${escapeHtml(n)}</option>`).join("")}</select></label>`
+      : `<span>File <code>${escapeHtml(initial)}</code></span>`) +
     `<span class="lab-note">running the book's Rust reader, compiled to WebAssembly</span>`;
   const select = head.querySelector("select");
   if (select) select.addEventListener("change", () => open(select.value));
