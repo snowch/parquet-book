@@ -61,13 +61,15 @@ def trace_table(case):
     count = len(case["requests"])
     request = "request" if count == 1 else "requests"
     rows = "".join(
-        f"<tr><td>{esc(r['method'])}</td><td><code>{esc(r['range'])}</code></td>"
-        f"<td>{r['bytes']}</td><td>{esc(r['why'])}</td></tr>"
+        f'<tr><td data-label="Request">{esc(r["method"])}</td>'
+        f'<td data-label="Range"><code>{esc(r["range"])}</code></td>'
+        f'<td data-label="File bytes">{r["bytes"]}</td><td data-label="Why">{esc(r["why"])}</td></tr>'
         for r in case["requests"]
     )
     return (
-        '<div class="table-wrap"><table><thead><tr><th>Request</th><th>Range</th>'
-        "<th>File bytes returned</th><th>Why</th></tr></thead><tbody>" + rows + "</tbody></table></div>"
+        '<div class="table-wrap"><table class="cards"><thead><tr><th scope="col">Request</th>'
+        '<th scope="col">Range</th><th scope="col">File bytes</th><th scope="col">Why</th>'
+        "</tr></thead><tbody>" + rows + "</tbody></table></div>"
         f"<p>{count} {request} · {case['bytes']} file bytes returned.</p>"
     )
 

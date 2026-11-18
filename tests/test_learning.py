@@ -58,7 +58,7 @@ def test_no_javascript_view_keeps_evidence_and_explanations(name):
 def test_no_javascript_view_keeps_the_initial_trace():
     rendered = render_learning("requests")
     assert 'class="learning-controls" hidden' in rendered
-    assert rendered.count("<table>") == 1
+    assert rendered.count('<table class="cards">') == 1
     assert "HEAD" in rendered
     assert "Compare other request strategies in the table below." in rendered
 

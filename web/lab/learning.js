@@ -14,13 +14,26 @@ export function mountLearning() {
   });
   if(data.cases){
    const mode=root.querySelector('[name=mode]'),prefetch=root.querySelector('[name=prefetch]');
+   const host=root.querySelector('.learning-trace');
+   const columns=[...host.querySelectorAll('thead th')].map(th=>th.textContent);
    const draw=()=>{
     const selected=data.cases.find(c=>c.mode===mode.value&&c.prefetch===Number(prefetch.value));
-    const host=root.querySelector('.learning-trace');host.replaceChildren();
+    host.replaceChildren();
     const wrap=document.createElement('div');wrap.className='table-wrap';
-    const table=document.createElement('table');const header=table.createTHead().insertRow();
-    for(const label of ['Request','Range','File bytes returned','Why']){const th=document.createElement('th');th.textContent=label;header.append(th);}
-    const body=table.createTBody();for(const r of selected.requests){const tr=body.insertRow();for(const value of [r.method,r.range,r.bytes,r.why])tr.insertCell().textContent=value;}
+    const table=document.createElement('table');
+    table.className='cards';
+    const header=table.createTHead().insertRow();
+    for(const label of columns){
+     const th=document.createElement('th');
+     th.scope='col';th.textContent=label;header.append(th);
+    }
+    const body=table.createTBody();
+    for(const r of selected.requests){
+     const tr=body.insertRow();
+     [r.method,r.range,r.bytes,r.why].forEach((value,index)=>{
+      const cell=tr.insertCell();cell.dataset.label=columns[index];cell.textContent=value;
+     });
+    }
     wrap.append(table);host.append(wrap);
     const count=selected.requests.length;
     const summary=document.createElement('p');
